@@ -14,14 +14,15 @@
 TLDK_ROOT := $(CURDIR)
 export TLDK_ROOT
 
+DPDK_VERSION=16.04
+LOCAL_RTE_SDK=$(TLDK_ROOT)/dpdk/_build/dpdk-$(DPDK_VERSION)/
+
 ifeq ($(RTE_SDK),)
-$(error "Please define RTE_SDK environment variable")
+	export RTE_SDK=$(LOCAL_RTE_SDK)
 endif
 
 # Default target, can be overriden by command line or environment
 RTE_TARGET ?= x86_64-native-linuxapp-gcc
-
-include $(RTE_SDK)/mk/rte.vars.mk
 
 DIRS-y += lib/libtle_udp
 DIRS-y += examples/udpfwd
@@ -39,7 +40,7 @@ all: $(DIRS-y)
 clean: $(DIRS-y)
 
 .PHONY: $(DIRS-y)
-$(DIRS-y):
+$(DIRS-y): $(RTE_SDK)/mk/rte.vars.mk
 	@echo "== $@"
 	$(Q)$(MAKE) -C $(@) \
 		M=$(CURDIR)/$(@)/Makefile \
@@ -48,4 +49,14 @@ $(DIRS-y):
 		CUR_SUBDIR=$(CUR_SUBDIR)/$(@) \
 		S=$(CURDIR)/$(@) \
 		$(filter-out $(DIRS-y),$(MAKECMDGOALS))
+
+$(RTE_SDK)/mk/rte.vars.mk:
+ifeq ($(RTE_SDK),$(LOCAL_RTE_SDK))
+	@echo "== Beginning $(@)"
+	@make V=1 config -C $(TLDK_ROOT)/dpdk/
+	@echo "== Config complete"
+	@ls dpdk/_build/dpdk-16.04/app/Makefile
+	@make V=1 -C $(TLDK_ROOT)/dpdk/
+	@echo "== Ending $(@)"
+endif
 
