@@ -1,0 +1,76 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+Vagrant.configure(2) do |config|
+
+  # Pick the right distro and bootstrap, default is ubuntu1404
+  distro = ENV['VPP_VAGRANT_DISTRO']
+  if distro == 'centos7'
+    config.vm.box = "puppetlabs/centos-7.2-64-nocm"
+  else
+    config.vm.box = "puppetlabs/ubuntu-14.04-64-nocm"
+  end
+  config.vm.box_check_update = false
+
+  config.vm.provision :shell, :path => File.join(File.dirname(__FILE__),"update.sh")
+  config.vm.provision :shell, :path => File.join(File.dirname(__FILE__),"build.sh"), :args => "/tldk vagrant"
+
+  # Add .gnupg dir in so folks can sign patches
+  # Note, as gnupg puts socket files in that dir, we have
+  # to be cautious and make sure we are dealing with a plain file
+  homedir = File.expand_path("~/")
+  Dir["#{homedir}/.gnupg/**/*"].each do |fname|
+    if File.file?(fname)
+      destname = fname.sub(Regexp.escape("#{homedir}/"),'')
+      config.vm.provision "file", source: fname, destination: destname
+    end
+  end
+
+  # Copy in the .gitconfig if it exists
+  if File.file?(File.expand_path("~/.gitconfig"))
+    config.vm.provision  "file", source: "~/.gitconfig", destination: ".gitconfig"
+  end
+
+  # vagrant-cachier caches apt/yum etc to speed subsequent
+  # vagrant up
+  # to enable, run
+  # vagrant plugin install vagrant-cachier
+  #
+  if Vagrant.has_plugin?("vagrant-cachier")
+    config.cache.scope = :box
+  end
+
+  # Define some physical ports for your VMs to be used by DPDK
+  nics = 2
+  if ENV.key?('VPP_VAGRANT_NICS')
+    nics = ENV['VPP_VAGRANT_NICS'].to_i(10)
+  end
+  for i in 1..nics
+    config.vm.network "private_network", type: "dhcp"
+  end
+
+  # use http proxy if avaiable
+  if ENV['http_proxy'] && Vagrant.has_plugin?("vagrant-proxyconf")
+   config.proxy.http     = ENV['http_proxy']
+   config.proxy.https    = ENV['https_proxy']
+   config.proxy.no_proxy = "localhost,127.0.0.1"
+  end
+
+  config.vm.synced_folder "../", "/tldk", disabled: false
+  config.vm.provider "virtualbox" do |vb|
+      vb.customize ["modifyvm", :id, "--ioapic", "on"]
+      vb.memory = 4096
+      vb.cpus = 2
+  end
+  config.vm.provider "vmware_fusion" do |fusion,override|
+    fusion.vmx["memsize"] = "4096"
+  end
+  config.vm.provider "libvirt" do |lv|
+    lv.memory = 4096
+    lv.cpus = 8
+  end
+  config.vm.provider "vmware_workstation" do |vws,override|
+    vws.vmx["memsize"] = "8192"
+    vws.vmx["numvcpus"] = "4"
+  end
+end
