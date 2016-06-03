@@ -1,0 +1,134 @@
+Introduction
+============
+
+udpfwd is a sample application to demonstrate and test libtle_udp.
+Depending on configuration it can do simple send/recv or both over
+opened udp streams. Also it implements ability to do UDP datagram
+forwarding between different streams, so it is possible to use that
+application as some sort of 'UDP proxy'.
+The application can reassemble input fragmented IP packets,
+and fragment outgoing IP packets (if destination MTU is less then packet size).
+To build and run the application DPDK and TLDK libraries are required.
+
+Logically the application is divided into two parts:
+
+- Back End (BE)
+BE is responsible for:
+	- RX over DPDK ports and feed them into UDP TLDK context(s)
+	(via tle_udp_rx_bulk).
+	- retrieve packets ready to be send out from UDP TLDK context(s)
+	and TX them over destined DPDK port.
+Right now only one RX/TX queue per port is used.
+Each BE lcore can serve multiple DPDK ports, TLDK UDP contexts.
+
+- Front End (FE)
+FE responsibility is to open configured UDP streams and perform
+send/recv over them. These streams can belong to different UDP contexts.
+
+Right now each lcore can act as BE or FE (but not both simultaneously).
+Master lcore can act as FE only.
+
+Usage
+=====
+
+udpfwd <EAL parameters> -- \
+	-P | --promisc          /* promiscuous mode enabled. */    \
+	-R | --rbufs <num>      /* max recv buffers per stream. */ \
+	-S | --sbufs <num>      /* max send buffers per stream. */ \
+	-s | --streams <num>    /* streams to open per context. */ \
+	-b | --becfg <filename> /* backend configuration file. */  \
+	-f | --fecfg <filename> /* frontend configuration file. */ \
+	<port0_params> <port1_params> ... <portN_params>
+
+port_params: port=<uint>,lcore=<uint>,\
+[rx_offload=<uint>,tx_offload=<uint>,mtu=<uint>,ipv4=<ipv4>,ipv6=<ipv6>]
+
+port_params are used to configure the particular DPDK device (rte_ethdev port),
+and specify BE lcore that will do RX/TX from/to the device and manage
+BE part of corresponding UDP context.
+
+port -		DPDK port id (right now on each port is used just one RX,
+		one TX queue).
+lcore -		EAL lcore id to do IO over that port (rx_burst/tx_burst).
+		several ports can be managed by the same lcore,
+		but same port can't belong to more than one lcore.
+rx_offload -	RX HW offload capabilities to enable/use on this port.
+		(bitmask of DEV_RX_OFFLOAD_* values).
+tx_offload -	TX HW offload capabilities to enable/use on this port.
+		(bitmask of DEV_TX_OFFLOAD_* values).
+mtu -		MTU to be used on that port
+		( = UDP data size + L2/L3/L4 headers sizes, default=1514).
+ipv4 -		ipv4 address to assign to that port.
+ipv6 -		ipv6 address to assign to that port.
+
+At least one of ipv4/ipv6 values have to be specified for each port.
+
+As an example:
+udpfwd --lcores='3,6' -w 01:00.0 -- \
+--promisc --rbufs 0x1000 --sbufs 0x1000 --streams 0x100 \
+--fecfg ./fe.cfg --becfg ./be.cfg \
+port=0,lcore=6,rx_offload=0xf,tx_offload=0,\
+ipv4=192.168.1.233,ipv6=2001:4860:b002::28
+
+Will create TLDK UDP context on lcore=6 (BE lcore) to manage DPDK port 0.
+Will assign IPv4 address 192.168.1.233 and IPv6 address 2001:4860:b002::28
+to that port.
+The following supported by DPDK RX HW offloads:
+	DEV_RX_OFFLOAD_VLAN_STRIP,
+	DEV_RX_OFFLOAD_IPV4_CKSUM,
+	DEV_RX_OFFLOAD_UDP_CKSUM,
+	DEV_RX_OFFLOAD_TCP_CKSUM
+will be enabled on that port.
+No HW TX offloads will be enabled.
+
+Fornt-End (FE) and Back-End (BE) configuration files format:
+------------------------------------------------------------
+        - each record on a separate line.
+        - lines started with '#' are treated as comments.
+        - empty lines (containing whitespace chars only) are ignored.
+        - kvargs style format for each record.
+        - each FE record correspond to at least one stream to be opened
+          (could be multiple streams in case of op="fwd").
+        - each BE record define a ipv4/ipv6 destination.
+
+FE config record format:
+------------------------
+
+lcore=<uint>,op=<"rx|tx|echo|fwd">,\
+laddr=<ip>,lport=<uint16>,raddr=<ip>,rport=<uint16>,\
+[txlen=<uint>,fwladdr=<ip>,fwlport=<uint16>,fwraddr=<ip>,fwrport=<uint16>
+
+lcore -		EAL lcore to manage that stream(s).
+op -		operation to perform on that stream:
+		"rx" - do receive only on that stream.
+		"tx" - do send only on that stream.
+		"echo" - mimic recvfrom(..., &addr);sendto(..., &addr);
+		on that stream.
+		"fwd" - forward packets between streams.
+laddr -		local address for the stream to open.
+lport -		local port for the stream to open.
+raddr -		remote address for the stream to open.
+rport -		remote port for the stream to open.
+txlen - 	data length to send with each packet ("tx" mode only).
+fwladdr -	local address for the forwarding stream(s) to open
+		("fwd mode only).
+fwlport -	local port for the forwarding stream(s) to open
+		("fwd mode only).
+fwraddr -	remote address for the forwarding stream(s) to open
+		("fwd mode only).
+fwrport -	remote port for the forwarding stream(s) to open
+		("fwd mode only).
+
+Refer to fe.cfg for an example.
+
+BE config record format:
+------------------------
+
+port=<uint>,addr=<ipv4/ipv6>,masklen=<uint>,mac=<ether>
+
+port -		port number to be used to send packets to the destination.
+addr -		destionation network address.
+masklen -	desitantion network prefix length.
+mac -		destination ethernet address.
+
+Refer to fe.cfg for an example.
