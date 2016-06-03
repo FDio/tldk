@@ -1,0 +1,51 @@
+# Copyright (c) 2016 Intel Corporation.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at:
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+TLDK_ROOT := $(CURDIR)
+export TLDK_ROOT
+
+ifeq ($(RTE_SDK),)
+$(error "Please define RTE_SDK environment variable")
+endif
+
+# Default target, can be overriden by command line or environment
+RTE_TARGET ?= x86_64-native-linuxapp-gcc
+
+include $(RTE_SDK)/mk/rte.vars.mk
+
+DIRS-y += lib/libtle_udp
+DIRS-y += examples/udpfwd
+
+MAKEFLAGS += --no-print-directory
+
+# output directory
+O ?= $(TLDK_ROOT)/${RTE_TARGET}
+BASE_OUTPUT ?= $(abspath $(O))
+
+.PHONY: all
+all: $(DIRS-y)
+
+.PHONY: clean
+clean: $(DIRS-y)
+
+.PHONY: $(DIRS-y)
+$(DIRS-y):
+	@echo "== $@"
+	$(Q)$(MAKE) -C $(@) \
+		M=$(CURDIR)/$(@)/Makefile \
+		O=$(BASE_OUTPUT) \
+		BASE_OUTPUT=$(BASE_OUTPUT) \
+		CUR_SUBDIR=$(CUR_SUBDIR)/$(@) \
+		S=$(CURDIR)/$(@) \
+		$(filter-out $(DIRS-y),$(MAKECMDGOALS))
+
