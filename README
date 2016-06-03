@@ -1,0 +1,66 @@
+OVERVIEW
+========
+
+TLDK project scope is:
+1) Implement a set of libraries for L4 protocol processing (UDP, TCP etc.)
+   for both IPv4 and IPv6.
+
+   The goal is to provide lightweight, high performance and highly adaptable
+   implementation for L4(UDP, TCP etc.) protocol processing. The provided API
+   are not planned to be compatible with BSD socket API. These libraries are
+   suppose to be built on top of DPDK.
+
+      Note: these libraries are not supposed to be a 'complete' network stack.
+
+   Implementation of ARP, IP, ETHER, etc layers and related routing tables,
+   code for setup, manage and perform actual IO over underlying devices are
+   all out of scope of these libraries.
+
+  Implementation of ARP, IP etc. layers and their related routing tables
+  are out of scope of these libraries. Similarly, the setup, management and
+  actual IO on underlying NIC devices are out of scope too.
+
+   The libraries only need to know about underlying devices plus what
+   HW offloads are supported, underlying device MTU and L3/L2 addresses to
+   fill into L3/L2 headers for the outgoing packets.
+
+   These libraries should be developed in such manner, they could be used
+   independently from implementations of 2) and 3).
+
+2) Create VPP graph nodes, plugins etc using those libraries to implement
+   a host stack.
+
+3) Create such mechanisms (netlink agents, packaging, etc) necessary to make
+   the resulting host stack easily usable by existing non-vpp aware software.
+
+INSTALLATION GUIDE
+=================
+
+1. Obtain latest DPDK.
+   (refer to http://dpdk.org for information how to download and build it).
+2. Make sure that RTE_SDK and RTE_TARGET DPDK related environment variables
+   are setup correctly.
+3. Go to the TLDK root directory and type: 'make all'.
+4. Run sample applications.
+
+As an example:
+export RTE_SDK=/opt/DPDK
+export RTE_TARGET=x86_64-native-linuxapp-gcc
+cd tldk
+make all
+./x86_64-native-linuxapp-gcc/app/udpfwd ...
+
+CONTENTS
+========
+
+$(TLDK_ROOT)
+|
++----lib
+|      |
+|      +--libtle_udp  - implementation of the UDP datagram processing
+|
++----examples
+         |
+         +-- udpfwd - sample app to demonstrate and test libtle_udp usage 
+             (refer to examples/udpfwd/README for more information)
+
