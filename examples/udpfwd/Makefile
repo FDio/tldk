@@ -40,5 +40,7 @@ LDLIBS += -L$(TLDK_ROOT)/$(RTE_TARGET)/lib
 LDLIBS += -ltle_udp
 
 EXTRA_CFLAGS += -O3
+CFLAGS_parse.o += -D_GNU_SOURCE
+CFLAGS_main.o += -mcmodel=medium
 
 include $(RTE_SDK)/mk/rte.extapp.mk

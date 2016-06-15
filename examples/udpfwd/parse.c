@@ -13,6 +13,7 @@
  * limitations under the License.
  */
 
+#include <sched.h>
 #include "netbe.h"
 #include "parse.h"
 
@@ -60,7 +61,6 @@ parse_ip_val(__rte_unused const char *key, const char *val, void *prm)
 		return -EINVAL;
 	return 0;
 }
-
 
 #define PARSE_UINT8x16(s, v, l)	                          \
 do {                                                      \
@@ -110,6 +110,41 @@ parse_feop_val(__rte_unused const char *key, const char *val, void *prm)
 }
 
 static int
+parse_lcore_list_val(__rte_unused const char *key, const char *val, void *prm)
+{
+	union parse_val *rv;
+	unsigned long a, b;
+	uint32_t i;
+	char *end;
+
+	rv = prm;
+	errno = 0;
+	a = strtoul(val, &end, 0);
+	if (errno != 0 || (end[0] != 0 && end[0] != '-') || a > UINT32_MAX)
+		return -EINVAL;
+
+	if (end[0] == '-') {
+		val = end + 1;
+		errno = 0;
+		b = strtoul(val, &end, 0);
+		if (errno != 0 || end[0] != 0 || b > UINT32_MAX)
+			return -EINVAL;
+	} else
+		b = a;
+
+	if (a <= b) {
+		for (i = a; i <= b; i++)
+			CPU_SET(i, &rv->cpuset);
+	} else {
+		RTE_LOG(ERR, USER1,
+			"%s: lcores not in ascending order\n", __func__);
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+static int
 parse_kvargs(const char *arg, const char *keys_man[], uint32_t nb_man,
 	const char *keys_opt[], uint32_t nb_opt,
 	const arg_handler_t hndl[], union parse_val val[])
@@ -139,7 +174,7 @@ parse_kvargs(const char *arg, const char *keys_man[], uint32_t nb_man,
 		if (rte_kvargs_process(kvl, keys_man[j], hndl[j],
 				val + j) != 0) {
 			RTE_LOG(ERR, USER1,
-				"%s: %s invalid value for key: %s\n",
+				"%s: %s invalid value for man key: %s\n",
 				__func__, arg, keys_man[j]);
 			rte_kvargs_free(kvl);
 			return -EINVAL;
@@ -151,7 +186,7 @@ parse_kvargs(const char *arg, const char *keys_man[], uint32_t nb_man,
 		if (rte_kvargs_process(kvl, keys_opt[j], hndl[k],
 				val + k) != 0) {
 			RTE_LOG(ERR, USER1,
-				"%s: %s invalid value for key: %s\n",
+				"%s: %s invalid value for opt key: %s\n",
 				__func__, arg, keys_opt[j]);
 			rte_kvargs_free(kvl);
 			return -EINVAL;
@@ -166,6 +201,7 @@ int
 parse_netbe_arg(struct netbe_port *prt, const char *arg)
 {
 	int32_t rc;
+	uint32_t i, j;
 
 	static const char *keys_man[] = {
 		"port",
@@ -182,7 +218,7 @@ parse_netbe_arg(struct netbe_port *prt, const char *arg)
 
 	static const arg_handler_t hndl[] = {
 		parse_uint_val,
-		parse_uint_val,
+		parse_lcore_list_val,
 		parse_uint_val,
 		parse_uint_val,
 		parse_uint_val,
@@ -201,7 +237,10 @@ parse_netbe_arg(struct netbe_port *prt, const char *arg)
 		return rc;
 
 	prt->id = val[0].u64;
-	prt->lcore = val[1].u64;
+	for (i = 0, j = 0; i < RTE_MAX_LCORE; i++)
+		if (CPU_ISSET(i, &val[1].cpuset))
+			prt->lcore[j++] = i;
+	prt->nb_lcore = j;
 	prt->mtu = val[2].u64;
 	prt->rx_offload = val[3].u64;
 	prt->tx_offload = val[4].u64;
@@ -210,6 +249,7 @@ parse_netbe_arg(struct netbe_port *prt, const char *arg)
 
 	return 0;
 }
+
 static int
 check_netbe_dest(const struct netbe_dest *dst)
 {
@@ -390,6 +430,7 @@ parse_netfe_arg(struct netfe_stream_prm *sp, const char *arg)
 		"fwlport",
 		"fwraddr",
 		"fwrport",
+		"belcore",
 	};
 
 	static const arg_handler_t hndl[] = {
@@ -404,16 +445,17 @@ parse_netfe_arg(struct netfe_stream_prm *sp, const char *arg)
 		parse_uint_val,
 		parse_ip_val,
 		parse_uint_val,
+		parse_uint_val,
 	};
 
 	union parse_val val[RTE_DIM(hndl)];
 
 	memset(val, 0, sizeof(val));
+	val[11].u64 = LCORE_ID_ANY;
 	rc = parse_kvargs(arg, keys_man, RTE_DIM(keys_man),
 		keys_opt, RTE_DIM(keys_opt), hndl, val);
 	if (rc != 0)
 		return rc;
-
 	sp->lcore = val[0].u64;
 	sp->op = val[1].u64;
 	pv2saddr(&sp->sprm.prm.local_addr, val + 2, val + 3);
@@ -421,6 +463,7 @@ parse_netfe_arg(struct netfe_stream_prm *sp, const char *arg)
 	sp->txlen = val[6].u64;
 	pv2saddr(&sp->fprm.prm.local_addr, val + 7, val + 8);
 	pv2saddr(&sp->fprm.prm.remote_addr, val + 9, val + 10);
+	sp->be_lcore = val[11].u64;
 
 	return 0;
 }

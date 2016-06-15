@@ -47,6 +47,10 @@ check_dev_prm(const struct tle_udp_dev_param *dev_prm)
 			sizeof(tle_udp6_any)) == 0)
 		return -EINVAL;
 
+	/* all the ports are blocked. */
+	if (dev_prm->nb_bl_ports > UINT16_MAX)
+		return -EINVAL;
+
 	return 0;
 }
 
@@ -241,9 +245,11 @@ tle_udp_ctx_invalidate(struct tle_udp_ctx *ctx)
 }
 
 static int
-init_dev_proto(struct tle_udp_dev *dev, uint32_t idx, int32_t socket_id)
+init_dev_proto(struct tle_udp_dev *dev, uint32_t idx, int32_t socket_id,
+		uint16_t *bl_ports, uint32_t nb_bl_ports)
 {
 	size_t sz;
+	uint32_t i;
 
 	sz = sizeof(*dev->dp[idx]);
 	dev->dp[idx] = rte_zmalloc_socket(NULL, sz, RTE_CACHE_LINE_SIZE,
@@ -257,6 +263,11 @@ init_dev_proto(struct tle_udp_dev *dev, uint32_t idx, int32_t socket_id)
 	}
 
 	udp_pbm_init(&dev->dp[idx]->use, LPORT_START_BLK);
+
+	if (bl_ports != NULL)
+		for (i = 0; i < nb_bl_ports; i++)
+			udp_pbm_set(&dev->dp[idx]->use, bl_ports[i]);
+
 	return 0;
 }
 
@@ -281,6 +292,7 @@ tle_udp_add_dev(struct tle_udp_ctx *ctx,
 	const struct tle_udp_dev_param *dev_prm)
 {
 	int32_t rc;
+	uint32_t i;
 	struct tle_udp_dev *dev;
 
 	if (ctx == NULL || dev_prm == NULL || check_dev_prm(dev_prm) != 0) {
@@ -294,13 +306,23 @@ tle_udp_add_dev(struct tle_udp_ctx *ctx,
 	rc = 0;
 
 	/* device can handle IPv4 traffic */
-	if (dev_prm->local_addr4.s_addr != INADDR_ANY)
-		rc = init_dev_proto(dev, TLE_UDP_V4, ctx->prm.socket_id);
+	if (dev_prm->local_addr4.s_addr != INADDR_ANY) {
+		rc = init_dev_proto(dev, TLE_UDP_V4, ctx->prm.socket_id,
+				dev_prm->bl_ports, dev_prm->nb_bl_ports);
+		for (i = 0; i < dev_prm->nb_bl_ports; i++)
+			udp_pbm_set(&ctx->use[TLE_UDP_V4],
+				dev_prm->bl_ports[i]);
+	}
 
 	/* device can handle IPv6 traffic */
 	if (rc == 0 && memcmp(&dev_prm->local_addr6, &tle_udp6_any,
-			sizeof(tle_udp6_any)) != 0)
-		rc = init_dev_proto(dev, TLE_UDP_V6, ctx->prm.socket_id);
+			sizeof(tle_udp6_any)) != 0) {
+		rc = init_dev_proto(dev, TLE_UDP_V6, ctx->prm.socket_id,
+				dev_prm->bl_ports, dev_prm->nb_bl_ports);
+		for (i = 0; i < dev_prm->nb_bl_ports; i++)
+			udp_pbm_set(&ctx->use[TLE_UDP_V6],
+				dev_prm->bl_ports[i]);
+	}
 
 	if (rc != 0) {
 		/* cleanup and return an error. */
@@ -483,13 +505,11 @@ stream_fill_dev(struct tle_udp_ctx *ctx, struct tle_udp_stream *s)
 		return ENFILE;
 
 	/* fill socket's dst port and type */
-
 	sp = htons(p);
 	s->type = t;
 	s->port.dst = sp;
 
 	/* mark port as in-use */
-
 	udp_pbm_set(&ctx->use[t], p);
 	if (dev != NULL) {
 		udp_pbm_set(pbm, p);

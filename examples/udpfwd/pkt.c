@@ -23,7 +23,6 @@ _mbuf_tx_offload(uint64_t il2, uint64_t il3, uint64_t il4, uint64_t tso,
 	return il2 | il3 << 7 | il4 << 16 | tso << 24 | ol3 << 40 | ol2 << 49;
 }
 
-
 static inline void
 fill_pkt_hdr_len(struct rte_mbuf *m, uint32_t l2, uint32_t l3, uint32_t l4)
 {
@@ -223,7 +222,7 @@ reassemble(struct rte_mbuf *m, struct netbe_lcore *lc, uint64_t tms,
 
 	tbl = lc->ftbl;
 	dr = &lc->death_row;
-	l3cs = lc->prt[port].port.rx_offload & DEV_RX_OFFLOAD_IPV4_CKSUM;
+	l3cs = lc->prtq[port].port.rx_offload & DEV_RX_OFFLOAD_IPV4_CKSUM;
 
 	if (RTE_ETH_IS_IPV4_HDR(m->packet_type)) {
 
@@ -508,7 +507,8 @@ typen_rx_callback(uint8_t port, __rte_unused uint16_t queue,
 }
 
 int
-setup_rx_cb(const struct netbe_port *uprt, struct netbe_lcore *lc)
+setup_rx_cb(const struct netbe_port *uprt, struct netbe_lcore *lc,
+	uint16_t qid)
 {
 	int32_t i, rc;
 	uint32_t smask;
@@ -589,7 +589,7 @@ setup_rx_cb(const struct netbe_port *uprt, struct netbe_lcore *lc)
 
 	for (i = 0; i != RTE_DIM(ptype2cb); i++) {
 		if ((smask & ptype2cb[i].mask) == ptype2cb[i].mask) {
-			cb = rte_eth_add_rx_callback(uprt->id, 0,
+			cb = rte_eth_add_rx_callback(uprt->id, qid,
 				ptype2cb[i].fn, lc);
 			rc = -rte_errno;
 			RTE_LOG(ERR, USER1,

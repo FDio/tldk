@@ -16,6 +16,8 @@
 #ifndef __PARSE_H__
 #define __PARSE_H__
 
+#define PARSE_LIST_DELIM "-"
+
 union parse_val {
 	uint64_t u64;
 	struct {
@@ -26,6 +28,7 @@ union parse_val {
 		};
 	} in;
 	struct ether_addr mac;
+	rte_cpuset_t cpuset;
 };
 
 static int
