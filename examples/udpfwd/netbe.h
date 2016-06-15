@@ -44,19 +44,25 @@
 
 #define	MAX_PKT_BURST	0x20
 
+/* Used to allocate the memory for hash key. */
+#define RSS_HASH_KEY_LENGTH 64
+
 /*
  * BE related structures.
  */
 
 struct netbe_port {
 	uint32_t id;
-	uint32_t lcore;
+	uint32_t nb_lcore;
+	uint32_t lcore[RTE_MAX_LCORE];
 	uint32_t mtu;
 	uint32_t rx_offload;
 	uint32_t tx_offload;
 	uint32_t ipv4;
 	struct in6_addr ipv6;
 	struct ether_addr mac;
+	uint32_t hash_key_size;
+	uint8_t hash_key[RSS_HASH_KEY_LENGTH];
 };
 
 struct netbe_dest {
@@ -109,10 +115,10 @@ struct netbe_lcore {
 	struct rte_lpm6 *lpm6;
 	struct rte_ip_frag_tbl *ftbl;
 	struct tle_udp_ctx *ctx;
-	uint32_t prt_num;
+	uint32_t prtq_num;
 	uint32_t dst4_num;
 	uint32_t dst6_num;
-	struct netbe_dev prt[RTE_MAX_ETHPORTS];
+	struct netbe_dev prtq[RTE_MAX_ETHPORTS * RTE_MAX_LCORE];
 	struct tle_udp_dest dst4[LCORE_MAX_DST];
 	struct tle_udp_dest dst6[LCORE_MAX_DST];
 	struct rte_ip_frag_death_row death_row;
@@ -144,6 +150,7 @@ struct netfe_sprm {
 
 struct netfe_stream_prm {
 	uint32_t lcore;
+	uint32_t be_lcore;
 	uint32_t line;
 	uint16_t op;
 	uint16_t txlen; /* valid/used only for TXONLY op. */
@@ -253,6 +260,7 @@ struct lcore_prm {
 	} \
 } while (0)
 
-int setup_rx_cb(const struct netbe_port *uprt, struct netbe_lcore *lc);
+int setup_rx_cb(const struct netbe_port *uprt, struct netbe_lcore *lc,
+	uint16_t qid);
 
 #endif /* __NETBE_H__ */
