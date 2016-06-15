@@ -63,6 +63,8 @@ struct tle_udp_dev_param {
 	uint32_t tx_offload; /**< DEV_TX_OFFLOAD_* supported. */
 	struct in_addr local_addr4;  /**< local IPv4 address assigned. */
 	struct in6_addr local_addr6; /**< local IPv6 address assigned. */
+	uint32_t nb_bl_ports; /**< number of blocked ports. */
+	uint16_t *bl_ports; /**< list of blocked ports. */
 };
 
 #define TLE_UDP_MAX_HDR	0x60
