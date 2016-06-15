@@ -18,15 +18,15 @@ BE is responsible for:
 	(via tle_udp_rx_bulk).
 	- retrieve packets ready to be send out from UDP TLDK context(s)
 	and TX them over destined DPDK port.
-Right now only one RX/TX queue per port is used.
+Multiple RX/TX queues per port are supported by RSS. Right now the number of
+TX is same as the number of RX queue.
 Each BE lcore can serve multiple DPDK ports, TLDK UDP contexts.
 
 - Front End (FE)
 FE responsibility is to open configured UDP streams and perform
 send/recv over them. These streams can belong to different UDP contexts.
 
-Right now each lcore can act as BE or FE (but not both simultaneously).
-Master lcore can act as FE only.
+Right now each lcore can act as BE and/or FE.
 
 Usage
 =====
@@ -40,18 +40,18 @@ udpfwd <EAL parameters> -- \
 	-f | --fecfg <filename> /* frontend configuration file. */ \
 	<port0_params> <port1_params> ... <portN_params>
 
-port_params: port=<uint>,lcore=<uint>,\
+port_params: port=<uint>,lcore=<uint>[-<uint>],\
 [rx_offload=<uint>,tx_offload=<uint>,mtu=<uint>,ipv4=<ipv4>,ipv6=<ipv6>]
 
 port_params are used to configure the particular DPDK device (rte_ethdev port),
 and specify BE lcore that will do RX/TX from/to the device and manage
-BE part of corresponding UDP context.
+BE part of corresponding UDP context. Multiple BE lcore can be specified.
 
-port -		DPDK port id (right now on each port is used just one RX,
-		one TX queue).
+port -		DPDK port id (multiple queues are supported when multiple lcore
+		is specified for a port).
 lcore -		EAL lcore id to do IO over that port (rx_burst/tx_burst).
-		several ports can be managed by the same lcore,
-		but same port can't belong to more than one lcore.
+		several ports can be managed by the same lcore, and same port can
+		belong to more than one lcore.
 rx_offload -	RX HW offload capabilities to enable/use on this port.
 		(bitmask of DEV_RX_OFFLOAD_* values).
 tx_offload -	TX HW offload capabilities to enable/use on this port.
@@ -64,15 +64,15 @@ ipv6 -		ipv6 address to assign to that port.
 At least one of ipv4/ipv6 values have to be specified for each port.
 
 As an example:
-udpfwd --lcores='3,6' -w 01:00.0 -- \
+udpfwd --lcores='3,6,8' -w 01:00.0 -- \
 --promisc --rbufs 0x1000 --sbufs 0x1000 --streams 0x100 \
 --fecfg ./fe.cfg --becfg ./be.cfg \
-port=0,lcore=6,rx_offload=0xf,tx_offload=0,\
+port=0,lcore=6,lcore=8,rx_offload=0xf,tx_offload=0,\
 ipv4=192.168.1.233,ipv6=2001:4860:b002::28
 
-Will create TLDK UDP context on lcore=6 (BE lcore) to manage DPDK port 0.
-Will assign IPv4 address 192.168.1.233 and IPv6 address 2001:4860:b002::28
-to that port.
+Will create TLDK UDP context on lcore=6 and lcore=8 (BE lcore) to manage
+DPDK port 0. Will assign IPv4 address 192.168.1.233 and IPv6 address
+2001:4860:b002::28 to that port.
 The following supported by DPDK RX HW offloads:
 	DEV_RX_OFFLOAD_VLAN_STRIP,
 	DEV_RX_OFFLOAD_IPV4_CKSUM,
@@ -80,6 +80,11 @@ The following supported by DPDK RX HW offloads:
 	DEV_RX_OFFLOAD_TCP_CKSUM
 will be enabled on that port.
 No HW TX offloads will be enabled.
+
+If multiple lcore is specified per DPDK port, the following RSS hash will
+be enabled on that port:
+	ETH_RSS_UDP
+
 
 Fornt-End (FE) and Back-End (BE) configuration files format:
 ------------------------------------------------------------
@@ -96,9 +101,10 @@ FE config record format:
 
 lcore=<uint>,op=<"rx|tx|echo|fwd">,\
 laddr=<ip>,lport=<uint16>,raddr=<ip>,rport=<uint16>,\
-[txlen=<uint>,fwladdr=<ip>,fwlport=<uint16>,fwraddr=<ip>,fwrport=<uint16>
+[txlen=<uint>,fwladdr=<ip>,fwlport=<uint16>,fwraddr=<ip>,fwrport=<uint16>,\
+belcore=<uint>]
 
-lcore -		EAL lcore to manage that stream(s).
+lcore -		EAL lcore to manage that stream(s) in the FE.
 op -		operation to perform on that stream:
 		"rx" - do receive only on that stream.
 		"tx" - do send only on that stream.
@@ -118,6 +124,7 @@ fwraddr -	remote address for the forwarding stream(s) to open
 		("fwd mode only).
 fwrport -	remote port for the forwarding stream(s) to open
 		("fwd mode only).
+belcore -		EAL lcore to manage that stream(s) in the BE.
 
 Refer to fe.cfg for an example.
 
