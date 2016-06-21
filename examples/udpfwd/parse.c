@@ -328,6 +328,7 @@ netbe_parse_dest(const char *fname, struct netbe_dest_prm *prm)
 				rc = -ENOMEM;
 				break;
 			}
+			memset(&dp[n], 0, sizeof(dp[0]) * (num - n));
 		}
 
 		dp[n].line = ln + 1;
@@ -560,6 +561,7 @@ netfe_parse_cfg(const char *fname, struct netfe_lcore_prm *lp)
 				rc = -ENOMEM;
 				break;
 			}
+			memset(&sp[n], 0, sizeof(sp[0]) * (num - n));
 		}
 
 		sp[n].line = ln + 1;
