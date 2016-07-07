@@ -45,6 +45,21 @@ _mbuf_tx_offload(uint64_t il2, uint64_t il3, uint64_t il4, uint64_t tso,
 }
 
 /*
+ * Given the value of mbuf's tx_offload, calculate L4 payload offset.
+ */
+static inline uint32_t
+_tx_offload_l4_offset(uint64_t ofl)
+{
+	uint32_t l2, l3, l4;
+
+	l2 = ofl & 0x7f;
+	l3 = ofl >> 7 & 0x1ff;
+	l4 = ofl >> 16 & UINT8_MAX;
+
+	return l2 + l3 + l4;
+}
+
+/*
  * Routines to calculate L3/L4 checksums in SW.
  * Pretty similar to ones from DPDK librte_net/rte_ip.h,
  * but provide better performance (at least for tested configurations),

@@ -84,6 +84,7 @@ struct tle_udp_ctx_param {
 	uint32_t max_streams;      /**< max number of streams in context. */
 	uint32_t max_stream_rbufs; /**< max recv mbufs per stream. */
 	uint32_t max_stream_sbufs; /**< max send mbufs per stream. */
+	uint32_t send_bulk_size;   /**< expected # of packets per send call. */
 
 	int (*lookup4)(void *opaque, const struct in_addr *addr,
 		struct tle_udp_dest *res);

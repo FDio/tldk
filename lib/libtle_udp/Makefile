@@ -31,7 +31,6 @@ EXPORT_MAP := tle_udp_version.map
 LIBABIVER := 1
 
 #source files
-SRCS-y += buf_cage.c
 SRCS-y += event.c
 SRCS-y += udp_ctl.c
 SRCS-y += udp_rxtx.c
@@ -40,11 +39,7 @@ SRCS-y += udp_rxtx.c
 SYMLINK-y-include += tle_udp_impl.h
 SYMLINK-y-include += tle_event.h
 
-# this library depends on
-DEPDIRS-y += $(RTE_SDK)/lib/librte_eal
-DEPDIRS-y += $(RTE_SDK)/lib/librte_ether
-DEPDIRS-y += $(RTE_SDK)/lib/librte_mbuf
-DEPDIRS-y += $(RTE_SDK)lib/librte_net
-DEPDIRS-y += $(RTE_SDK)lib/librte_ip_frag
+# this lib dependencies
+DEPDIRS-y += lib/libtle_dring
 
 include $(RTE_SDK)/mk/rte.extlib.mk
