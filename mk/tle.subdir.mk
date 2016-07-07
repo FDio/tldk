@@ -11,28 +11,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-TLDK_ROOT := $(CURDIR)
-export TLDK_ROOT
-
-DPDK_VERSION=16.04
-LOCAL_RTE_SDK=$(TLDK_ROOT)/dpdk/_build/dpdk-$(DPDK_VERSION)/
-
-ifeq ($(RTE_SDK),)
-	export RTE_SDK=$(LOCAL_RTE_SDK)
-endif
-
-# Default target, can be overriden by command line or environment
-RTE_TARGET ?= x86_64-native-linuxapp-gcc
-
-DIRS-y += lib
-DIRS-y += examples
-
-MAKEFLAGS += --no-print-directory
-
-# output directory
-O ?= $(TLDK_ROOT)/${RTE_TARGET}
-BASE_OUTPUT ?= $(abspath $(O))
-
 .PHONY: all
 all: $(DIRS-y)
 
@@ -40,7 +18,7 @@ all: $(DIRS-y)
 clean: $(DIRS-y)
 
 .PHONY: $(DIRS-y)
-$(DIRS-y): $(RTE_SDK)/mk/rte.vars.mk
+$(DIRS-y):
 	@echo "== $@"
 	$(Q)$(MAKE) -C $(@) \
 		M=$(CURDIR)/$(@)/Makefile \
@@ -50,9 +28,4 @@ $(DIRS-y): $(RTE_SDK)/mk/rte.vars.mk
 		S=$(CURDIR)/$(@) \
 		RTE_TARGET=$(RTE_TARGET) \
 		$(filter-out $(DIRS-y),$(MAKECMDGOALS))
-
-$(RTE_SDK)/mk/rte.vars.mk:
-ifeq ($(RTE_SDK),$(LOCAL_RTE_SDK)) 
-	@make RTE_TARGET=$(RTE_TARGET) config all -C $(TLDK_ROOT)/dpdk/
-endif
 
