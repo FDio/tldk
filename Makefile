@@ -26,6 +26,7 @@ RTE_TARGET ?= x86_64-native-linuxapp-gcc
 
 DIRS-y += lib
 DIRS-y += examples
+DIRS-y += test
 
 MAKEFLAGS += --no-print-directory
 
