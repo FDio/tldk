@@ -34,6 +34,9 @@
 #define RX_CSUM_OFFLOAD	(DEV_RX_OFFLOAD_IPV4_CKSUM | DEV_RX_OFFLOAD_UDP_CKSUM)
 #define TX_CSUM_OFFLOAD	(DEV_TX_OFFLOAD_IPV4_CKSUM | DEV_TX_OFFLOAD_UDP_CKSUM)
 
+#define	OPT_SHORT_SBULK		'B'
+#define	OPT_LONG_SBULK		"sburst"
+
 #define	OPT_SHORT_PROMISC	'P'
 #define	OPT_LONG_PROMISC	"promisc"
 
@@ -62,6 +65,7 @@ static const struct option long_opt[] = {
 	{OPT_LONG_PROMISC, 0, 0, OPT_SHORT_PROMISC},
 	{OPT_LONG_RBUFS, 1, 0, OPT_SHORT_RBUFS},
 	{OPT_LONG_SBUFS, 1, 0, OPT_SHORT_SBUFS},
+	{OPT_LONG_SBULK, 1, 0, OPT_SHORT_SBULK},
 	{OPT_LONG_STREAMS, 1, 0, OPT_SHORT_STREAMS},
 	{NULL, 0, 0, 0}
 };
@@ -1704,14 +1708,23 @@ main(int argc, char *argv[])
 			"%s: rte_eal_init failed with error code: %d\n",
 			__func__, rc);
 
+	memset(&ctx_prm, 0, sizeof(ctx_prm));
+
 	argc -= rc;
 	argv += rc;
 
 	optind = 0;
 	optarg = NULL;
-	while ((opt = getopt_long(argc, argv, "PR:S:b:f:s:", long_opt,
+	while ((opt = getopt_long(argc, argv, "B:PR:S:b:f:s:", long_opt,
 			&opt_idx)) != EOF) {
-		if (opt == OPT_SHORT_PROMISC) {
+		if (opt == OPT_SHORT_SBULK) {
+			rc = parse_uint_val(NULL, optarg, &v);
+			if (rc < 0)
+				rte_exit(EXIT_FAILURE, "%s: invalid value: %s "
+					"for option: \'%c\'\n",
+					__func__, optarg, opt);
+			ctx_prm.send_bulk_size = v;
+		} else if (opt == OPT_SHORT_PROMISC) {
 			becfg.promisc = 1;
 		} else if (opt == OPT_SHORT_RBUFS) {
 			rc = parse_uint_val(NULL, optarg, &v);

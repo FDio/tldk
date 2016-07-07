@@ -18,10 +18,10 @@
 
 #include <rte_spinlock.h>
 #include <rte_vect.h>
+#include <tle_dring.h>
 #include <tle_udp_impl.h>
 #include <tle_event.h>
 
-#include "buf_cage.h"
 #include "port_bitmap.h"
 #include "osdep.h"
 
@@ -104,15 +104,23 @@ struct tle_udp_stream {
 
 	struct {
 		rte_atomic32_t use;
-		rte_spinlock_t lock;
+		struct {
+			uint32_t nb_elem;  /* number of obects per drb. */
+			uint32_t nb_max;   /* number of drbs per stream. */
+			struct rte_ring *r;
+		} drb;
 		struct tle_event *ev;
 		struct tle_udp_stream_cb cb;
-		struct bcg_store *st;
-		struct buf_cage *cg[RTE_MAX_ETHPORTS];
 	} tx __rte_cache_aligned;
 
 	struct tle_udp_stream_param prm;
 } __rte_cache_aligned;
+
+#define UDP_STREAM_TX_PENDING(s)	\
+	((s)->tx.drb.nb_max != rte_ring_count((s)->tx.drb.r))
+
+#define UDP_STREAM_TX_FINISHED(s)	\
+	((s)->tx.drb.nb_max == rte_ring_count((s)->tx.drb.r))
 
 struct tle_udp_dport {
 	struct udp_pbm use; /* ports in use. */
@@ -128,11 +136,9 @@ struct tle_udp_dev {
 		/* used by FE. */
 		uint64_t ol_flags[TLE_UDP_VNUM];
 		rte_atomic32_t packet_id[TLE_UDP_VNUM];
-		struct bcg_queue feq;
 
-		/* used by BE only. */
-		struct bcg_queue beq __rte_cache_min_aligned;
-		struct buf_cage *bc;
+		/* used by FE & BE. */
+		struct tle_dring dr;
 	} tx;
 	struct tle_udp_dev_param prm; /* copy of device paramaters. */
 	struct tle_udp_dport *dp[TLE_UDP_VNUM]; /* device udp ports */
@@ -140,7 +146,7 @@ struct tle_udp_dev {
 
 struct tle_udp_ctx {
 	struct tle_udp_ctx_param prm;
-
+	struct rte_mempool *dpool;  /* drbs pool */
 	struct {
 		rte_spinlock_t lock;
 		uint32_t nb_free; /* number of free streams. */

@@ -23,6 +23,17 @@
 extern "C" {
 #endif
 
+/*
+ * internal defines.
+ */
+#define	MAX_PKT_BURST	0x20
+
+#define	MAX_DRB_BURST	4
+
+/*
+ * logging related macros.
+ */
+
 #define UDP_LOG(lvl, fmt, args...)      RTE_LOG(lvl, USER1, fmt, ##args)
 
 /*
