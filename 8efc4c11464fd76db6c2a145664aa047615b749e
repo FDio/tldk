@@ -1,0 +1,55 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "9a0e1d27_cc548bcc",
+        "filename": "lib/libtle_udp/udp_ctl.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 340,
+      "author": {
+        "id": 29
+      },
+      "writtenOn": "2016-07-08T01:18:13Z",
+      "side": 1,
+      "message": "Should the empty_dring() routine not be a static inline in the tle_dring header or is this routine not generic which anyone could?",
+      "revId": "8efc4c11464fd76db6c2a145664aa047615b749e",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "9a0e1d27_8c5e93e8",
+        "filename": "lib/libtle_udp/udp_rxtx.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 355,
+      "author": {
+        "id": 29
+      },
+      "writtenOn": "2016-07-08T01:18:13Z",
+      "side": 1,
+      "message": "Why not move the \u0027\u0026\u0027 part to line 348 instead as you need to move the flag value anyway?",
+      "revId": "8efc4c11464fd76db6c2a145664aa047615b749e",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "9a0e1d27_0c72837c",
+        "filename": "lib/libtle_udp/udp_rxtx.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 392,
+      "author": {
+        "id": 29
+      },
+      "writtenOn": "2016-07-08T01:18:13Z",
+      "side": 1,
+      "message": "Does it make more sense to move the compress into the recv_pkt_process() as you could have a flag to determine if you need to compress the pkt list?",
+      "revId": "8efc4c11464fd76db6c2a145664aa047615b749e",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    }
+  ]
+}
