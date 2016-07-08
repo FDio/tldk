@@ -19,6 +19,24 @@
     },
     {
       "key": {
+        "uuid": "9a0e1d27_802bf781",
+        "filename": "lib/libtle_udp/udp_ctl.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 340,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2016-07-08T10:57:21Z",
+      "side": 1,
+      "message": "It is not really a generic. It is a helper function to cleanup things in udp_del_dev(). Right now no-one else uses it. About inline - it is used by control path, so no need to make it super-fast.",
+      "parentUuid": "9a0e1d27_cc548bcc",
+      "revId": "8efc4c11464fd76db6c2a145664aa047615b749e",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "9a0e1d27_8c5e93e8",
         "filename": "lib/libtle_udp/udp_rxtx.c",
         "patchSetId": 2
@@ -36,6 +54,24 @@
     },
     {
       "key": {
+        "uuid": "9a0e1d27_203aebcd",
+        "filename": "lib/libtle_udp/udp_rxtx.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 355,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2016-07-08T10:57:21Z",
+      "side": 1,
+      "message": "to minimize stalls by laod latencies.",
+      "parentUuid": "9a0e1d27_8c5e93e8",
+      "revId": "8efc4c11464fd76db6c2a145664aa047615b749e",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "9a0e1d27_0c72837c",
         "filename": "lib/libtle_udp/udp_rxtx.c",
         "patchSetId": 2
@@ -47,6 +83,24 @@
       "writtenOn": "2016-07-08T01:18:13Z",
       "side": 1,
       "message": "Does it make more sense to move the compress into the recv_pkt_process() as you could have a flag to determine if you need to compress the pkt list?",
+      "revId": "8efc4c11464fd76db6c2a145664aa047615b749e",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "9a0e1d27_0037e7e4",
+        "filename": "lib/libtle_udp/udp_rxtx.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 392,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2016-07-08T10:57:21Z",
+      "side": 1,
+      "message": "not really, both recv_pkt_process() and compress_pkt_list are inline functions anyway.",
+      "parentUuid": "9a0e1d27_0c72837c",
       "revId": "8efc4c11464fd76db6c2a145664aa047615b749e",
       "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
       "unresolved": false
