@@ -19,6 +19,23 @@
     },
     {
       "key": {
+        "uuid": "9a0e1d27_0c6de332",
+        "filename": "lib/Makefile",
+        "patchSetId": 2
+      },
+      "lineNbr": 24,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2016-07-08T10:44:54Z",
+      "side": 1,
+      "message": "Depdirs are specified on a per library basis.\nLet say udp lib depends on dring one,\nso inside lib/libtle_udp/Makefile:\nDEPDIRS-y +\u003d lib/libtle_dring",
+      "revId": "a633eec74619a96925285ac4dcf0154fbfafb855",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "9a0e1d27_0cc4c390",
         "filename": "lib/libtle_dring/Makefile",
         "patchSetId": 2
@@ -30,6 +47,24 @@
       "writtenOn": "2016-07-08T01:03:34Z",
       "side": 1,
       "message": "Does this build depend on other directories?",
+      "revId": "a633eec74619a96925285ac4dcf0154fbfafb855",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "9a0e1d27_8c60d336",
+        "filename": "lib/libtle_dring/Makefile",
+        "patchSetId": 2
+      },
+      "lineNbr": 37,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2016-07-08T10:44:54Z",
+      "side": 1,
+      "message": "No.",
+      "parentUuid": "9a0e1d27_0cc4c390",
       "revId": "a633eec74619a96925285ac4dcf0154fbfafb855",
       "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
       "unresolved": false
@@ -53,6 +88,24 @@
     },
     {
       "key": {
+        "uuid": "9a0e1d27_4c5abb84",
+        "filename": "lib/libtle_dring/tle_dring.h",
+        "patchSetId": 2
+      },
+      "lineNbr": 54,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2016-07-08T10:44:54Z",
+      "side": 1,
+      "message": "as per comment for that macro:\nRTE_ASSERT was introduced in DPDK 16.07.\nFor dpdk 16.04 (current stable version)\nhave to use rte_VERIFY.",
+      "parentUuid": "9a0e1d27_ecc06f7e",
+      "revId": "a633eec74619a96925285ac4dcf0154fbfafb855",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "9a0e1d27_ccbdab04",
         "filename": "lib/libtle_dring/tle_dring.h",
         "patchSetId": 2
@@ -64,6 +117,24 @@
       "writtenOn": "2016-07-08T01:03:34Z",
       "side": 1,
       "message": "What are the objs here, struct tle_dring pointers?\nI would like to see a type other then void *, but I could live with it guess.",
+      "revId": "a633eec74619a96925285ac4dcf0154fbfafb855",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "9a0e1d27_2c5f8774",
+        "filename": "lib/libtle_dring/tle_dring.h",
+        "patchSetId": 2
+      },
+      "lineNbr": 65,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2016-07-08T10:44:54Z",
+      "side": 1,
+      "message": "No, it is a pointer to objects you want to put into the queue. Could be anything (that\u0027s why it is void *), but right now I used it to queue packets that need to be TX-ed.\nBasically it provides functionlity very similar to what DPDK rte_ring does. In fact even internal structure looks similar.\nAs I stated in the comment, the main difference: dring is boundless.",
+      "parentUuid": "9a0e1d27_ccbdab04",
       "revId": "a633eec74619a96925285ac4dcf0154fbfafb855",
       "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
       "unresolved": false
@@ -87,6 +158,24 @@
     },
     {
       "key": {
+        "uuid": "9a0e1d27_0c54c352",
+        "filename": "lib/libtle_dring/tle_dring.h",
+        "patchSetId": 2
+      },
+      "lineNbr": 70,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2016-07-08T10:44:54Z",
+      "side": 1,
+      "message": "You mean between tail and crb?\nNo there would be no hole here, as prod is 64B aligned, then head 4B, then tail 4B, then crb 8B.\nBut there are a lot of holes in that strcuture left intentionaly. As you can see both prod and cons are on separate cache lines - to avoid false sharing and minimise cache contention.\nIn fact dring occupies 4 cache lines:\nfirst - some common metadata (only unused flags right now)\nsecond - fields updated by producer\nthird - fields updated by consumer\nfourth - dummy drb",
+      "parentUuid": "9a0e1d27_acba7708",
+      "revId": "a633eec74619a96925285ac4dcf0154fbfafb855",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "9a0e1d27_6c3c5f94",
         "filename": "test/dring/Makefile",
         "patchSetId": 2
@@ -104,6 +193,24 @@
     },
     {
       "key": {
+        "uuid": "9a0e1d27_cc4dabc6",
+        "filename": "test/dring/Makefile",
+        "patchSetId": 2
+      },
+      "lineNbr": 32,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2016-07-08T10:44:54Z",
+      "side": 1,
+      "message": "Might be in future.\nRight now the project is so small, that I don\u0027t see a need to create a config for it. Just 2 libraries, one is depend on another.",
+      "parentUuid": "9a0e1d27_6c3c5f94",
+      "revId": "a633eec74619a96925285ac4dcf0154fbfafb855",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "9a0e1d27_8c37b3b0",
         "filename": "test/dring/Makefile",
         "patchSetId": 2
@@ -115,6 +222,24 @@
       "writtenOn": "2016-07-08T01:03:34Z",
       "side": 1,
       "message": "I thought -O3 was the default value for DPDK, is this not the case here?",
+      "revId": "a633eec74619a96925285ac4dcf0154fbfafb855",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "9a0e1d27_2cd667c6",
+        "filename": "test/dring/Makefile",
+        "patchSetId": 2
+      },
+      "lineNbr": 40,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2016-07-08T10:44:54Z",
+      "side": 1,
+      "message": "My understanding it is a default, because most apps and libs have -O3 in their CFLAGS. So I just followed the dpdk convention here.",
+      "parentUuid": "9a0e1d27_8c37b3b0",
       "revId": "a633eec74619a96925285ac4dcf0154fbfafb855",
       "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
       "unresolved": false
