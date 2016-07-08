@@ -1,0 +1,123 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "9a0e1d27_2ccf87b2",
+        "filename": "lib/Makefile",
+        "patchSetId": 2
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 29
+      },
+      "writtenOn": "2016-07-08T01:03:34Z",
+      "side": 1,
+      "message": "Do you need some type of DEPDIRS-y or are the directories able to be built independently when using \u0027make -j\u0027?",
+      "revId": "a633eec74619a96925285ac4dcf0154fbfafb855",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "9a0e1d27_0cc4c390",
+        "filename": "lib/libtle_dring/Makefile",
+        "patchSetId": 2
+      },
+      "lineNbr": 37,
+      "author": {
+        "id": 29
+      },
+      "writtenOn": "2016-07-08T01:03:34Z",
+      "side": 1,
+      "message": "Does this build depend on other directories?",
+      "revId": "a633eec74619a96925285ac4dcf0154fbfafb855",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "9a0e1d27_ecc06f7e",
+        "filename": "lib/libtle_dring/tle_dring.h",
+        "patchSetId": 2
+      },
+      "lineNbr": 54,
+      "author": {
+        "id": 29
+      },
+      "writtenOn": "2016-07-08T01:03:34Z",
+      "side": 1,
+      "message": "What do you need to create macros or macros, what does it buy you?",
+      "revId": "a633eec74619a96925285ac4dcf0154fbfafb855",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "9a0e1d27_ccbdab04",
+        "filename": "lib/libtle_dring/tle_dring.h",
+        "patchSetId": 2
+      },
+      "lineNbr": 65,
+      "author": {
+        "id": 29
+      },
+      "writtenOn": "2016-07-08T01:03:34Z",
+      "side": 1,
+      "message": "What are the objs here, struct tle_dring pointers?\nI would like to see a type other then void *, but I could live with it guess.",
+      "revId": "a633eec74619a96925285ac4dcf0154fbfafb855",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "9a0e1d27_acba7708",
+        "filename": "lib/libtle_dring/tle_dring.h",
+        "patchSetId": 2
+      },
+      "lineNbr": 70,
+      "author": {
+        "id": 29
+      },
+      "writtenOn": "2016-07-08T01:03:34Z",
+      "side": 1,
+      "message": "Does this not cause a hole in the structure some place as we have pointers and uint32_t types?",
+      "revId": "a633eec74619a96925285ac4dcf0154fbfafb855",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "9a0e1d27_6c3c5f94",
+        "filename": "test/dring/Makefile",
+        "patchSetId": 2
+      },
+      "lineNbr": 32,
+      "author": {
+        "id": 29
+      },
+      "writtenOn": "2016-07-08T01:03:34Z",
+      "side": 1,
+      "message": "Are you going to use config file options to enable build different parts of TLDK, if so we need to not use -y and use the config variable name.",
+      "revId": "a633eec74619a96925285ac4dcf0154fbfafb855",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "9a0e1d27_8c37b3b0",
+        "filename": "test/dring/Makefile",
+        "patchSetId": 2
+      },
+      "lineNbr": 40,
+      "author": {
+        "id": 29
+      },
+      "writtenOn": "2016-07-08T01:03:34Z",
+      "side": 1,
+      "message": "I thought -O3 was the default value for DPDK, is this not the case here?",
+      "revId": "a633eec74619a96925285ac4dcf0154fbfafb855",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    }
+  ]
+}
