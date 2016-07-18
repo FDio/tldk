@@ -328,6 +328,7 @@ compress_pkt_list(struct rte_mbuf *pkt[], uint32_t nb_pkt, uint32_t nb_zero)
 
 			nb_pkt -= j - i;
 			nb_zero -= j - i;
+			j = i + 1;
 		}
 	}
 
@@ -359,10 +360,10 @@ recv_pkt_process(struct rte_mbuf *m[], uint32_t num, uint32_t type)
 			rte_pktmbuf_free(m[i]);
 			m[i] = NULL;
 			k++;
+		} else {
+			m[i]->ol_flags ^= f;
+			rte_pktmbuf_adj(m[i], _tx_offload_l4_offset(ofl[i]));
 		}
-
-		m[i]->ol_flags ^= f;
-		rte_pktmbuf_adj(m[i], _tx_offload_l4_offset(ofl[i]));
 	}
 
 	return k;

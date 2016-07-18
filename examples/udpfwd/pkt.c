@@ -175,9 +175,20 @@ fill_eth_hdr_len(struct rte_mbuf *m)
 		m->packet_type = RTE_PTYPE_UNKNOWN;
 }
 
-static inline void
-fix_reassembled(struct rte_mbuf *m)
+static inline uint16_t
+ipv4x_cksum(const void *iph, size_t len)
 {
+        uint16_t cksum;
+
+        cksum = rte_raw_cksum(iph, len);
+        return (cksum == 0xffff) ? cksum : ~cksum;
+}
+
+static inline void
+fix_reassembled(struct rte_mbuf *m, int32_t hwcsum)
+{
+	struct ipv4_hdr *iph;
+
 	/* update packet type. */
 	m->packet_type &= ~RTE_PTYPE_L4_MASK;
 	m->packet_type |= RTE_PTYPE_L4_UDP;
@@ -188,12 +199,26 @@ fix_reassembled(struct rte_mbuf *m)
 	/* fix l3_len after reassemble. */
 	if (RTE_ETH_IS_IPV6_HDR(m->packet_type))
 		m->l3_len = m->l3_len - sizeof(struct ipv6_extension_fragment);
+
+	/* recalculate ipv4 cksum after reassemble. */
+	else if (hwcsum == 0 && RTE_ETH_IS_IPV4_HDR(m->packet_type)) {
+		iph = rte_pktmbuf_mtod_offset(m, struct ipv4_hdr *, m->l2_len);
+		iph->hdr_checksum = ipv4x_cksum(iph, m->l3_len);
+	}
 }
 
 static struct rte_mbuf *
-reassemble(struct rte_mbuf *m, struct rte_ip_frag_tbl *tbl,
-	struct rte_ip_frag_death_row *dr, uint64_t tms)
+reassemble(struct rte_mbuf *m, struct netbe_lcore *lc, uint64_t tms,
+	uint8_t port)
 {
+	uint32_t l3cs;
+	struct rte_ip_frag_tbl *tbl;
+	struct rte_ip_frag_death_row *dr;
+
+	tbl = lc->ftbl;
+	dr = &lc->death_row;
+	l3cs = lc->prt[port].port.rx_offload & DEV_RX_OFFLOAD_IPV4_CKSUM;
+
 	if (RTE_ETH_IS_IPV4_HDR(m->packet_type)) {
 
 		struct ipv4_hdr *iph;
@@ -228,7 +253,7 @@ reassemble(struct rte_mbuf *m, struct rte_ip_frag_tbl *tbl,
 
 	/* got reassembled packet. */
 	if (m != NULL)
-		fix_reassembled(m);
+		fix_reassembled(m, l3cs);
 
 	return m;
 }
@@ -253,6 +278,7 @@ compress_pkt_list(struct rte_mbuf *pkt[], uint32_t nb_pkt, uint32_t nb_zero)
 
 			nb_pkt -= j - i;
 			nb_zero -= j - i;
+			j = i + 1;
 		}
 	}
 
@@ -331,8 +357,7 @@ type0_rx_callback(__rte_unused uint8_t port, __rte_unused uint16_t queue,
 		if ((pkt[j]->packet_type & RTE_PTYPE_L4_MASK) ==
 				RTE_PTYPE_L4_FRAG) {
 			cts = (cts == 0) ? rte_rdtsc() : cts;
-			pkt[j] = reassemble(pkt[j], lc->ftbl, &lc->death_row,
-				cts);
+			pkt[j] = reassemble(pkt[j], lc, cts, port);
 			x += (pkt[j] == NULL);
 		}
 	}
@@ -355,7 +380,7 @@ type0_rx_callback(__rte_unused uint8_t port, __rte_unused uint16_t queue,
  * HW can recognise L2/L3/L4 and fragments (i40e).
  */
 static uint16_t
-type1_rx_callback(__rte_unused uint8_t port, __rte_unused uint16_t queue,
+type1_rx_callback(uint8_t port, __rte_unused uint16_t queue,
 	struct rte_mbuf *pkt[], uint16_t nb_pkts,
 	__rte_unused uint16_t max_pkts, void *user_param)
 {
@@ -409,8 +434,7 @@ type1_rx_callback(__rte_unused uint8_t port, __rte_unused uint16_t queue,
 		if ((pkt[j]->packet_type & RTE_PTYPE_L4_MASK) ==
 				RTE_PTYPE_L4_FRAG) {
 			cts = (cts == 0) ? rte_rdtsc() : cts;
-			pkt[j] = reassemble(pkt[j], lc->ftbl, &lc->death_row,
-				cts);
+			pkt[j] = reassemble(pkt[j], lc, cts, port);
 			x += (pkt[j] == NULL);
 		}
 	}
@@ -433,7 +457,7 @@ type1_rx_callback(__rte_unused uint8_t port, __rte_unused uint16_t queue,
  * generic, assumes HW doesn't recognise any packet type.
  */
 static uint16_t
-typen_rx_callback(__rte_unused uint8_t port, __rte_unused uint16_t queue,
+typen_rx_callback(uint8_t port, __rte_unused uint16_t queue,
 	struct rte_mbuf *pkt[], uint16_t nb_pkts,
 	__rte_unused uint16_t max_pkts, void *user_param)
 {
@@ -458,8 +482,7 @@ typen_rx_callback(__rte_unused uint8_t port, __rte_unused uint16_t queue,
 		if ((pkt[j]->packet_type & RTE_PTYPE_L4_MASK) ==
 				RTE_PTYPE_L4_FRAG) {
 			cts = (cts == 0) ? rte_rdtsc() : cts;
-			pkt[j] = reassemble(pkt[j], lc->ftbl, &lc->death_row,
-				cts);
+			pkt[j] = reassemble(pkt[j], lc, cts, port);
 			x += (pkt[j] == NULL);
 		}
 	}
