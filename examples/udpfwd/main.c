@@ -55,6 +55,7 @@
 #define	OPT_SHORT_BECFG	'b'
 #define	OPT_LONG_BECFG	"becfg"
 
+RTE_DEFINE_PER_LCORE(struct netbe_lcore *, _be);
 RTE_DEFINE_PER_LCORE(struct netfe_lcore *, _fe);
 
 #include "fwdtbl.h"
@@ -176,10 +177,6 @@ check_lcore(uint32_t lc)
 {
 	if (rte_lcore_is_enabled(lc) == 0) {
 		RTE_LOG(ERR, USER1, "lcore %u is not enabled\n", lc);
-		return -EINVAL;
-	}
-	if (rte_get_master_lcore() == lc) {
-		RTE_LOG(ERR, USER1, "lcore %u is not slave\n", lc);
 		return -EINVAL;
 	}
 	if (rte_eal_get_lcore_state(lc) == RUNNING) {
@@ -1225,19 +1222,17 @@ netfe_rxtx_process(__rte_unused uint32_t lcore, struct netfe_stream *fes)
 }
 
 static int
-netfe_lcore(void *arg)
+netfe_lcore_init(const struct netfe_lcore_prm *prm)
 {
 	size_t sz;
 	int32_t rc;
-	uint32_t i, j, n, lcore, snum;
-	const struct netfe_lcore_prm *prm;
+	uint32_t i, lcore, snum;
 	struct netfe_lcore *fe;
 	struct tle_evq_param eprm;
 	struct tle_udp_stream_param sprm;
-	struct netfe_stream *fes, *fs[MAX_PKT_BURST];
+	struct netfe_stream *fes;
 
 	lcore = rte_lcore_id();
-	prm = arg;
 
 	snum = prm->max_streams;
 	RTE_LOG(NOTICE, USER1, "%s(lcore=%u, nb_streams=%u, max_streams=%u)\n",
@@ -1265,7 +1260,7 @@ netfe_lcore(void *arg)
 	fe->rxeq = tle_evq_create(&eprm);
 	fe->txeq = tle_evq_create(&eprm);
 
-	RTE_LOG(ERR, USER1, "%s(%u) rx evq=%p, tx evq=%p\n",
+	RTE_LOG(INFO, USER1, "%s(%u) rx evq=%p, tx evq=%p\n",
 		__func__, lcore, fe->rxeq, fe->txeq);
 	if (fe->rxeq == NULL || fe->txeq == NULL)
 		return -ENOMEM;
@@ -1311,39 +1306,57 @@ netfe_lcore(void *arg)
 		}
 	}
 
-	while (fe->sidx >= prm->nb_streams && force_quit == 0) {
+	return rc;
+}
 
-		n = tle_evq_get(fe->rxeq, (const void **)(uintptr_t)fs,
-			RTE_DIM(fs));
+static inline void
+netfe_lcore(void)
+{
+	struct netfe_lcore *fe;
+	uint32_t j, n, lcore;
+	struct netfe_stream *fs[MAX_PKT_BURST];
 
-		if (n != 0) {
-			NETFE_TRACE("%s(%u): tle_evq_get(rxevq=%p) "
-				"returns %u\n",
-				__func__, lcore, fe->rxeq, n);
-			for (j = 0; j != n; j++)
-				netfe_rx_process(lcore, fs[j]);
-		}
+	fe = RTE_PER_LCORE(_fe);
+	if (fe == NULL)
+		return;
 
-		n = tle_evq_get(fe->txeq, (const void **)(uintptr_t)fs,
-			RTE_DIM(fs));
+	lcore = rte_lcore_id();
 
-		if (n != 0) {
-			NETFE_TRACE("%s(%u): tle_evq_get(txevq=%p) "
-				"returns %u\n",
-				__func__, lcore, fe->txeq, n);
-			for (j = 0; j != n; j++) {
-				if (fs[j]->op == RXTX)
-					netfe_rxtx_process(lcore, fs[j]);
-				else if (fs[j]->op == FWD)
-					netfe_fwd(lcore, fs[j]);
-				else if (fs[j]->op == TXONLY)
-					netfe_tx_process(lcore, fs[j]);
-			}
-		}
+	n = tle_evq_get(fe->rxeq, (const void **)(uintptr_t)fs, RTE_DIM(fs));
+
+	if (n != 0) {
+		NETFE_TRACE("%s(%u): tle_evq_get(rxevq=%p) returns %u\n",
+			__func__, lcore, fe->rxeq, n);
+		for (j = 0; j != n; j++)
+			netfe_rx_process(lcore, fs[j]);
 	}
 
-	RTE_LOG(NOTICE, USER1, "%s(lcore=%u) finish\n",
-		__func__, lcore);
+	n = tle_evq_get(fe->txeq, (const void **)(uintptr_t)fs, RTE_DIM(fs));
+
+	if (n != 0) {
+		NETFE_TRACE("%s(%u): tle_evq_get(txevq=%p) returns %u\n",
+			__func__, lcore, fe->txeq, n);
+		for (j = 0; j != n; j++) {
+			if (fs[j]->op == RXTX)
+				netfe_rxtx_process(lcore, fs[j]);
+			else if (fs[j]->op == FWD)
+				netfe_fwd(lcore, fs[j]);
+			else if (fs[j]->op == TXONLY)
+				netfe_tx_process(lcore, fs[j]);
+		}
+	}
+}
+
+
+static void
+netfe_lcore_fini(void)
+{
+	struct netfe_lcore *fe;
+	uint32_t i;
+
+	fe = RTE_PER_LCORE(_fe);
+	if (fe == NULL)
+		return;
 
 	while (fe->sidx != 0) {
 
@@ -1354,9 +1367,8 @@ netfe_lcore(void *arg)
 
 	tle_evq_destroy(fe->txeq);
 	tle_evq_destroy(fe->rxeq);
+	RTE_PER_LCORE(_fe) = NULL;
 	rte_free(fe);
-
-	return rc;
 }
 
 static inline void
@@ -1434,13 +1446,11 @@ netbe_tx(struct netbe_lcore *lc, uint32_t pidx)
 }
 
 static int
-netbe_lcore(void *arg)
+netbe_lcore_setup(struct netbe_lcore *lc)
 {
-	uint32_t i, j;
+	uint32_t i;
 	int32_t rc;
-	struct netbe_lcore *lc;
 
-	lc = arg;
 	RTE_LOG(NOTICE, USER1, "%s(lcore=%u, udp_ctx: %p) start\n",
 		__func__, lc->id, lc->ctx);
 
@@ -1454,20 +1464,43 @@ netbe_lcore(void *arg)
 	 */
 	rte_delay_ms(10);
 
-	for (i = 0; i != lc->prt_num; i++) {
+	rc = 0;
+	for (i = 0; i != lc->prt_num && rc == 0; i++) {
 		RTE_LOG(NOTICE, USER1, "%s:%u(port=%u, udp_dev: %p)\n",
 			__func__, i, lc->prt[i].port.id, lc->prt[i].dev);
 		rc = setup_rx_cb(&lc->prt[i].port, lc);
-		if (rc < 0)
-			sig_handle(SIGQUIT);
 	}
 
-	while (force_quit == 0) {
-		for (i = 0; i != lc->prt_num; i++) {
-			netbe_rx(lc, i);
-			netbe_tx(lc, i);
-		}
+	if (rc == 0)
+		RTE_PER_LCORE(_be) = lc;
+	return rc;
+}
+
+static inline void
+netbe_lcore(void)
+{
+	uint32_t i;
+	struct netbe_lcore *lc;
+
+	lc = RTE_PER_LCORE(_be);
+	if (lc == NULL)
+		return;
+
+	for (i = 0; i != lc->prt_num; i++) {
+		netbe_rx(lc, i);
+		netbe_tx(lc, i);
 	}
+}
+
+static void
+netbe_lcore_clear(void)
+{
+	uint32_t i, j;
+	struct netbe_lcore *lc;
+
+	lc = RTE_PER_LCORE(_be);
+	if (lc == NULL)
+		return;
 
 	RTE_LOG(NOTICE, USER1, "%s(lcore=%u, udp_ctx: %p) finish\n",
 		__func__, lc->id, lc->ctx);
@@ -1492,8 +1525,51 @@ netbe_lcore(void *arg)
 			rte_pktmbuf_free(lc->prt[i].tx_buf.pkt[j]);
 	}
 
-	return 0;
+	RTE_PER_LCORE(_be) = NULL;
 }
+
+static int
+lcore_main(void *arg)
+{
+	int32_t rc;
+	uint32_t lcore;
+	struct lcore_prm *prm;
+
+	prm = arg;
+	lcore = rte_lcore_id();
+
+	RTE_LOG(NOTICE, USER1, "%s(lcore=%u) start\n",
+		__func__, lcore);
+
+	rc = 0;
+
+	/* lcore FE init. */
+	if (prm->fe.max_streams != 0)
+		rc = netfe_lcore_init(&prm->fe);
+
+	/* lcore FE init. */
+	if (rc == 0 && prm->be.lc != NULL) {
+		rc = netbe_lcore_setup(prm->be.lc);
+	}
+
+	if (rc != 0)
+		sig_handle(SIGQUIT);
+
+	while (force_quit == 0) {
+		netfe_lcore();
+		netbe_lcore();
+	}
+
+	RTE_LOG(NOTICE, USER1, "%s(lcore=%u) finish\n",
+		__func__, lcore);
+
+	netfe_lcore_fini();
+	netbe_lcore_clear();
+
+	return rc;
+}
+
+
 
 static int
 netfe_lcore_cmp(const void *s1, const void *s2)
@@ -1615,10 +1691,10 @@ netfe_sprm_flll_be(struct netfe_sprm *sp, uint32_t line)
 
 /* start front-end processing. */
 static int
-netfe_launch(struct netfe_lcore_prm *lprm)
+netfe_lcore_fill(struct lcore_prm prm[RTE_MAX_LCORE],
+	struct netfe_lcore_prm *lprm)
 {
-	uint32_t i, j, k, lc, ln, mi;
-	struct netfe_lcore_prm feprm[RTE_MAX_LCORE];
+	uint32_t i, j, lc, ln;
 
 	/* determine on what BE each stream should be open. */
 	for (i = 0; i != lprm->nb_streams; i++) {
@@ -1635,12 +1711,9 @@ netfe_launch(struct netfe_lcore_prm *lprm)
 
 	/* group all fe parameters by lcore. */
 
-	memset(feprm, 0, sizeof(feprm));
 	qsort(lprm->stream, lprm->nb_streams, sizeof(lprm->stream[0]),
 		netfe_lcore_cmp);
 
-	k = 0;
-	mi = UINT32_MAX;
 	for (i = 0; i != lprm->nb_streams; i = j) {
 
 		lc = lprm->stream[i].lcore;
@@ -1653,9 +1726,8 @@ netfe_launch(struct netfe_lcore_prm *lprm)
 			return -EINVAL;
 		}
 
-		if (rte_get_master_lcore() == lc)
-			mi = k;
-		else if (rte_eal_get_lcore_state(lc) == RUNNING) {
+		if (rte_get_master_lcore() != lc &&
+				rte_eal_get_lcore_state(lc) == RUNNING) {
 			RTE_LOG(ERR, USER1,
 				"%s(line=%u): lcore %u already in use\n",
 				__func__, ln, lc);
@@ -1667,22 +1739,10 @@ netfe_launch(struct netfe_lcore_prm *lprm)
 				j++)
 			;
 
-		feprm[k].max_streams = lprm->max_streams;
-		feprm[k].nb_streams = j - i;
-		feprm[k].stream = lprm->stream + i;
-		k++;
+		prm[lc].fe.max_streams = lprm->max_streams;
+		prm[lc].fe.nb_streams = j - i;
+		prm[lc].fe.stream = lprm->stream + i;
 	}
-
-	/* launch all slave FE lcores. */
-	for (i = 0; i != k; i++) {
-		if (i != mi)
-			rte_eal_remote_launch(netfe_lcore, feprm + i,
-				feprm[i].stream[0].lcore);
-	}
-
-	/* launch FE at master lcore. */
-	if (mi != UINT32_MAX)
-		netfe_lcore(feprm + mi);
 
 	return 0;
 }
@@ -1698,9 +1758,11 @@ main(int argc, char *argv[])
 	struct rte_eth_stats stats;
 	char fecfg_fname[PATH_MAX + 1];
 	char becfg_fname[PATH_MAX + 1];
+	struct lcore_prm prm[RTE_MAX_LCORE];
 
 	fecfg_fname[0] = 0;
 	becfg_fname[0] = 0;
+	memset(prm, 0, sizeof(prm));
 
 	rc = rte_eal_init(argc, argv);
 	if (rc < 0)
@@ -1786,12 +1848,22 @@ main(int argc, char *argv[])
 		sig_handle(SIGQUIT);
 
 	for (i = 0; rc == 0 && i != becfg.cpu_num; i++) {
-		 rte_eal_remote_launch(netbe_lcore, becfg.cpu + i,
-			becfg.cpu[i].id);
+		prm[becfg.cpu[i].id].be.lc = becfg.cpu + i;
 	}
 
-	if (rc == 0 && (rc = netfe_launch(&feprm)) != 0)
+	if (rc == 0 && (rc = netfe_lcore_fill(prm, &feprm)) != 0)
 		sig_handle(SIGQUIT);
+
+	/* launch all slave lcores. */
+	RTE_LCORE_FOREACH_SLAVE(i) {
+		if (prm[i].be.lc != NULL || prm[i].fe.max_streams != 0)
+			rte_eal_remote_launch(lcore_main, prm + i, i);
+	}
+
+	/* launch master lcore. */
+	i = rte_get_master_lcore();
+	if (prm[i].be.lc != NULL || prm[i].fe.max_streams != 0)
+		lcore_main(prm + i);
 
 	rte_eal_mp_wait_lcore();
 
