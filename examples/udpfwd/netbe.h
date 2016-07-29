@@ -187,6 +187,13 @@ struct netfe_lcore {
 	struct netfe_stream *fs;
 };
 
+struct lcore_prm {
+	struct {
+		struct netbe_lcore *lc;
+	} be;
+	struct netfe_lcore_prm fe;
+};
+
 /*
  * debug/trace macros.
  */
