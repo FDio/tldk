@@ -16,12 +16,18 @@
 #include "netbe.h"
 #include <netinet/ip6.h>
 
+static inline uint64_t
+_mbuf_tx_offload(uint64_t il2, uint64_t il3, uint64_t il4, uint64_t tso,
+	uint64_t ol3, uint64_t ol2)
+{
+	return il2 | il3 << 7 | il4 << 16 | tso << 24 | ol3 << 40 | ol2 << 49;
+}
+
+
 static inline void
 fill_pkt_hdr_len(struct rte_mbuf *m, uint32_t l2, uint32_t l3, uint32_t l4)
 {
-	m->l2_len = l2;
-	m->l3_len = l3;
-	m->l4_len = l4;
+	m->tx_offload = _mbuf_tx_offload(l2, l3, l4, 0, 0, 0);
 }
 
 static inline int
