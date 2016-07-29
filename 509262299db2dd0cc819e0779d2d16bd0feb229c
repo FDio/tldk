@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "9a0e1d27_7692d258",
+        "filename": "examples/udpfwd/netbe.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 192,
+      "author": {
+        "id": 29
+      },
+      "writtenOn": "2016-07-29T15:21:29Z",
+      "side": 1,
+      "message": "Why a struct within a struct, did you expect more members later?",
+      "range": {
+        "startLine": 192,
+        "startChar": 0,
+        "endLine": 192,
+        "endChar": 2
+      },
+      "revId": "509262299db2dd0cc819e0779d2d16bd0feb229c",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    }
+  ]
+}
