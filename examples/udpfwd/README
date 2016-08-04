@@ -25,9 +25,6 @@ Each BE lcore can serve multiple DPDK ports, TLDK UDP contexts.
 FE responsibility is to open configured UDP streams and perform
 send/recv over them. These streams can belong to different UDP contexts.
 
-Right now each lcore can act as BE or FE (but not both simultaneously).
-Master lcore can act as FE only.
-
 Usage
 =====
 
