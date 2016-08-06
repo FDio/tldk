@@ -34,18 +34,22 @@ TLDK project scope is:
    the resulting host stack easily usable by existing non-vpp aware software.
 
 INSTALLATION GUIDE
-=================
+==================
 
-1. Obtain latest DPDK.
+1. Obtain latest DPDK and build it.
    (refer to http://dpdk.org for information how to download and build it).
 2. Make sure that RTE_SDK and RTE_TARGET DPDK related environment variables
    are setup correctly.
 3. Go to the TLDK root directory and type: 'make all'.
 4. Run sample applications.
 
+For enabling unit tests application using GoogleTest please see:
+./test/gtest/README
+
 As an example:
 export RTE_SDK=/opt/DPDK
 export RTE_TARGET=x86_64-native-linuxapp-gcc
+
 cd tldk
 make all
 ./x86_64-native-linuxapp-gcc/app/udpfwd ...
@@ -65,6 +69,9 @@ $(TLDK_ROOT)
 |      |
 |      +--udpfwd - sample app to demonstrate and test libtle_udp usage
 |            (refer to examples/udpfwd/README for more information)
+|
 +----test - unit-tests
 |      |
-|      +--dring - UT for libtle_dring
+|      +--dring - UT for libtle_dring (standalone app)
+|      |
+|      +--gtest - UT for libtle_dring and libtle_udp (googletest)
