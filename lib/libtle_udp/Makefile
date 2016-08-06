@@ -42,4 +42,4 @@ SYMLINK-y-include += tle_event.h
 # this lib dependencies
 DEPDIRS-y += lib/libtle_dring
 
-include $(RTE_SDK)/mk/rte.extlib.mk
+include $(TLDK_ROOT)/mk/tle.lib.mk

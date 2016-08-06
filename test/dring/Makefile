@@ -39,4 +39,4 @@ LDLIBS += -ltle_dring
 
 EXTRA_CFLAGS += -O3
 
-include $(RTE_SDK)/mk/rte.extapp.mk
+include $(TLDK_ROOT)/mk/tle.app.mk

@@ -11,19 +11,35 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-.PHONY: all
-all: $(DIRS-y)
+ifeq ($(RTE_TOOLCHAIN), clang)
+CXX = $(CROSS)clang++
+ifeq ("$(origin CXX)", "command line")
+HOSTCXX = $(CXX)
+else
+HOSTCXX = clang++
+endif
+endif
 
-.PHONY: clean
-clean: $(DIRS-y)
+ifeq ($(RTE_TOOLCHAIN), icc)
+CXX = icc
+ifeq ("$(origin CXX)", "command line")
+HOSTCXX = $(CXX)
+else
+HOSTCXX = icc
+endif
+endif
 
-.PHONY: $(DIRS-y)
-$(DIRS-y):
-	@echo "== $@"
-	$(Q)$(MAKE) -C $(@) \
-		M=$(CURDIR)/$(@)/Makefile \
-		CUR_SUBDIR=$(CUR_SUBDIR)/$(@) \
-		S=$(CURDIR)/$(@) \
-		RTE_TARGET=$(RTE_TARGET) \
-		$(filter-out $(DIRS-y),$(MAKECMDGOALS))
+ifeq ($(RTE_TOOLCHAIN), gcc)
+CXX = $(CROSS)g++
+ifeq ("$(origin CXX)", "command line")
+HOSTCXX = $(CXX)
+else
+HOSTCXX = g++
+endif
+endif
 
+TOOLCHAIN_CXXFLAGS =
+
+CXXFLAGS := $(CFLAGS)
+
+export CXX CXXFLAGS TOOLCHAIN_CXXFLAGS

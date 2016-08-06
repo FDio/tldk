@@ -35,4 +35,4 @@ SRCS-y += dring.c
 
 SYMLINK-y-include += tle_dring.h
 
-include $(RTE_SDK)/mk/rte.extlib.mk
+include $(TLDK_ROOT)/mk/tle.lib.mk

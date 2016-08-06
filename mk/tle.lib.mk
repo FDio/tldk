@@ -11,19 +11,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-.PHONY: all
-all: $(DIRS-y)
+EXTLIB_BUILD := y
 
-.PHONY: clean
-clean: $(DIRS-y)
+# we must create the output dir first and recall the same Makefile
+# from this directory
+ifeq ($(NOT_FIRST_CALL),)
 
-.PHONY: $(DIRS-y)
-$(DIRS-y):
-	@echo "== $@"
-	$(Q)$(MAKE) -C $(@) \
-		M=$(CURDIR)/$(@)/Makefile \
-		CUR_SUBDIR=$(CUR_SUBDIR)/$(@) \
-		S=$(CURDIR)/$(@) \
-		RTE_TARGET=$(RTE_TARGET) \
-		$(filter-out $(DIRS-y),$(MAKECMDGOALS))
+NOT_FIRST_CALL = 1
+export NOT_FIRST_CALL
 
+BDIR := $(RTE_OUTPUT)/build/$(CUR_SUBDIR)
+
+all:
+	$(Q)mkdir -p $(BDIR)
+	$(Q)$(MAKE) -C $(BDIR) -f $(RTE_EXTMK) \
+		S=$(RTE_SRCDIR) O=$(RTE_OUTPUT) SRCDIR=$(RTE_SRCDIR)
+
+%::
+	$(Q)mkdir -p $(BDIR)
+	$(Q)$(MAKE) -C $(BDIR) -f $(RTE_EXTMK) $@ \
+		S=$(RTE_SRCDIR) O=$(RTE_OUTPUT) SRCDIR=$(RTE_SRCDIR)
+else
+include $(RTE_SDK)/mk/rte.lib.mk
+endif
