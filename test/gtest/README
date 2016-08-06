@@ -1,0 +1,41 @@
+OVERVIEW
+========
+
+This application is a set of API unit tests for libtle_dring and libtle_udp
+libraries, plus a small set of functional tests for RX/TX functions in
+libtle_udp library.
+UT application needs GoogleTest C++ testing framework to compile, please
+follow installation steps below to enable them.
+
+INSTALLATION GUIDE
+==================
+Assumes that user had finished initial installation from TLDK root
+directory README.
+
+1. TLDK unit tests require pcap PMD to be available, enable it in DPDK and
+	rebuild it.
+	(http://dpdk.org/doc/quick-start has information how to do it)
+2. Obtain GoogleTest and build it. Some additional dependencies might be
+	needed.
+	(refer to https://github.com/google/googletest for information how to
+	 download and build it)
+3. Make sure that GTEST_DIR and GMOCK_DIR environment variables are set.
+4. Rebuild TLDK.
+
+Example:
+cd dpdk
+make config T=x86_64-native-linuxapp-gcc
+sed -ri 's,(PMD_PCAP=).*,\1y,' build/.config
+make install
+
+git clone https://github.com/google/googletest.git
+cd ../googletest
+export GTEST_DIR=`pwd`/googletest
+export GMOCK_DIR=`pwd`/googlemock
+cmake CMakeLists.txt
+make
+
+cd ../tldk
+make clean
+make all
+./x86_64-native-linuxapp-gcc/app/gtest-rfc --lcores=0
