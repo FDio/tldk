@@ -1,0 +1,169 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "3a1d315d_9220d79c",
+        "filename": "examples/udpfwd/main.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 138,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2016-09-05T18:32:54Z",
+      "side": 1,
+      "message": "as a nit: s/8/CHAR_BIT/\nalso pls keep space between oprator and operands (i.e: \u0027a * b\u0027, not \u0027a*b\u0027, etc.",
+      "revId": "e9540edc32e1592a4bd6c83c756c5495c5590972",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "3a1d315d_3237c3e5",
+        "filename": "examples/udpfwd/main.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 193,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2016-09-05T18:32:54Z",
+      "side": 1,
+      "message": "as a nit: I think you can have const struct rte_ethe_dev_info *dev_info here.",
+      "revId": "e9540edc32e1592a4bd6c83c756c5495c5590972",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "3a1d315d_d2264fba",
+        "filename": "examples/udpfwd/main.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 195,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2016-09-05T18:32:54Z",
+      "side": 1,
+      "message": "as a nit: s#8#ETH_RSS_RETA_SIZE_512 / RTE_RETA_GROUP_SIZE#",
+      "range": {
+        "startLine": 195,
+        "startChar": 9,
+        "endLine": 195,
+        "endChar": 32
+      },
+      "revId": "e9540edc32e1592a4bd6c83c756c5495c5590972",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "3a1d315d_b252b311",
+        "filename": "examples/udpfwd/main.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 365,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2016-09-05T18:32:54Z",
+      "side": 1,
+      "message": "same nit: nb_lcore - 1\nstrange that checkpatch didn\u0027t comlain",
+      "revId": "e9540edc32e1592a4bd6c83c756c5495c5590972",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "3a1d315d_9257b702",
+        "filename": "examples/udpfwd/main.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 383,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2016-09-05T18:32:54Z",
+      "side": 1,
+      "message": "s/RTE_LOG/printf - be consistent.",
+      "revId": "e9540edc32e1592a4bd6c83c756c5495c5590972",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "3a1d315d_323ea3b9",
+        "filename": "examples/udpfwd/main.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 542,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2016-09-05T18:32:54Z",
+      "side": 1,
+      "message": "I suppose you need \u0027return rc;\u0027 either here and on line 548, or at line 562",
+      "revId": "e9540edc32e1592a4bd6c83c756c5495c5590972",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "3a1d315d_f2470b4a",
+        "filename": "examples/udpfwd/main.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 880,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2016-09-05T18:32:54Z",
+      "side": 1,
+      "message": "forgot to rte_free(bl_ports);",
+      "revId": "e9540edc32e1592a4bd6c83c756c5495c5590972",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "3a1d315d_d2740f9e",
+        "filename": "examples/udpfwd/main.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 1120,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2016-09-05T18:32:54Z",
+      "side": 1,
+      "message": "pls move var definition the top of the block.",
+      "range": {
+        "startLine": 1120,
+        "startChar": 17,
+        "endLine": 1120,
+        "endChar": 18
+      },
+      "revId": "e9540edc32e1592a4bd6c83c756c5495c5590972",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "3a1d315d_f7e37d31",
+        "filename": "lib/libtle_udp/udp_ctl.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 51,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2016-09-05T18:32:54Z",
+      "side": 1,
+      "message": "just as a nit, could we add here ... || (nb_bl_ports !\u003d 0 \u0026\u0026 bl_ports \u003d\u003d NULL)",
+      "revId": "e9540edc32e1592a4bd6c83c756c5495c5590972",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    }
+  ]
+}
