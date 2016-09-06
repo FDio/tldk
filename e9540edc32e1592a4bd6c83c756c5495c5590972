@@ -19,6 +19,24 @@
     },
     {
       "key": {
+        "uuid": "3a1d315d_d2d3ef36",
+        "filename": "examples/udpfwd/main.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 138,
+      "author": {
+        "id": 407
+      },
+      "writtenOn": "2016-09-06T09:41:25Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "3a1d315d_9220d79c",
+      "revId": "e9540edc32e1592a4bd6c83c756c5495c5590972",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "3a1d315d_3237c3e5",
         "filename": "examples/udpfwd/main.c",
         "patchSetId": 1
@@ -30,6 +48,24 @@
       "writtenOn": "2016-09-05T18:32:54Z",
       "side": 1,
       "message": "as a nit: I think you can have const struct rte_ethe_dev_info *dev_info here.",
+      "revId": "e9540edc32e1592a4bd6c83c756c5495c5590972",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "3a1d315d_92dd7745",
+        "filename": "examples/udpfwd/main.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 193,
+      "author": {
+        "id": 407
+      },
+      "writtenOn": "2016-09-06T09:41:25Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "3a1d315d_3237c3e5",
       "revId": "e9540edc32e1592a4bd6c83c756c5495c5590972",
       "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
       "unresolved": false
@@ -59,6 +95,30 @@
     },
     {
       "key": {
+        "uuid": "3a1d315d_b2d87354",
+        "filename": "examples/udpfwd/main.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 195,
+      "author": {
+        "id": 407
+      },
+      "writtenOn": "2016-09-06T09:41:25Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "3a1d315d_d2264fba",
+      "range": {
+        "startLine": 195,
+        "startChar": 9,
+        "endLine": 195,
+        "endChar": 32
+      },
+      "revId": "e9540edc32e1592a4bd6c83c756c5495c5590972",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "3a1d315d_b252b311",
         "filename": "examples/udpfwd/main.c",
         "patchSetId": 1
@@ -70,6 +130,24 @@
       "writtenOn": "2016-09-05T18:32:54Z",
       "side": 1,
       "message": "same nit: nb_lcore - 1\nstrange that checkpatch didn\u0027t comlain",
+      "revId": "e9540edc32e1592a4bd6c83c756c5495c5590972",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "3a1d315d_72e2db04",
+        "filename": "examples/udpfwd/main.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 365,
+      "author": {
+        "id": 407
+      },
+      "writtenOn": "2016-09-06T09:41:25Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "3a1d315d_b252b311",
       "revId": "e9540edc32e1592a4bd6c83c756c5495c5590972",
       "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
       "unresolved": false
@@ -93,6 +171,24 @@
     },
     {
       "key": {
+        "uuid": "3a1d315d_9258d7fb",
+        "filename": "examples/udpfwd/main.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 383,
+      "author": {
+        "id": 407
+      },
+      "writtenOn": "2016-09-06T09:41:25Z",
+      "side": 1,
+      "message": "another RTE_LOG print the USER1 info in between the prints. It will look good in the current state.",
+      "parentUuid": "3a1d315d_9257b702",
+      "revId": "e9540edc32e1592a4bd6c83c756c5495c5590972",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "3a1d315d_323ea3b9",
         "filename": "examples/udpfwd/main.c",
         "patchSetId": 1
@@ -110,6 +206,24 @@
     },
     {
       "key": {
+        "uuid": "3a1d315d_52e7df12",
+        "filename": "examples/udpfwd/main.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 542,
+      "author": {
+        "id": 407
+      },
+      "writtenOn": "2016-09-06T09:41:25Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "3a1d315d_323ea3b9",
+      "revId": "e9540edc32e1592a4bd6c83c756c5495c5590972",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "3a1d315d_f2470b4a",
         "filename": "examples/udpfwd/main.c",
         "patchSetId": 1
@@ -121,6 +235,24 @@
       "writtenOn": "2016-09-05T18:32:54Z",
       "side": 1,
       "message": "forgot to rte_free(bl_ports);",
+      "revId": "e9540edc32e1592a4bd6c83c756c5495c5590972",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "3a1d315d_32e4630c",
+        "filename": "examples/udpfwd/main.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 880,
+      "author": {
+        "id": 407
+      },
+      "writtenOn": "2016-09-06T09:41:25Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "3a1d315d_f2470b4a",
       "revId": "e9540edc32e1592a4bd6c83c756c5495c5590972",
       "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
       "unresolved": false
@@ -150,6 +282,30 @@
     },
     {
       "key": {
+        "uuid": "3a1d315d_12f167cd",
+        "filename": "examples/udpfwd/main.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 1120,
+      "author": {
+        "id": 407
+      },
+      "writtenOn": "2016-09-06T09:41:25Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "3a1d315d_d2740f9e",
+      "range": {
+        "startLine": 1120,
+        "startChar": 17,
+        "endLine": 1120,
+        "endChar": 18
+      },
+      "revId": "e9540edc32e1592a4bd6c83c756c5495c5590972",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "3a1d315d_7273fbb1",
         "filename": "examples/udpfwd/main.c",
         "patchSetId": 1
@@ -161,6 +317,24 @@
       "writtenOn": "2016-09-05T18:38:02Z",
       "side": 1,
       "message": "I don\u0027t think you need it here: lcore_main() should take care of it.",
+      "revId": "e9540edc32e1592a4bd6c83c756c5495c5590972",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "3a1d315d_f2edcbf0",
+        "filename": "examples/udpfwd/main.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 1725,
+      "author": {
+        "id": 407
+      },
+      "writtenOn": "2016-09-06T09:41:25Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "3a1d315d_7273fbb1",
       "revId": "e9540edc32e1592a4bd6c83c756c5495c5590972",
       "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
       "unresolved": false
@@ -184,6 +358,24 @@
     },
     {
       "key": {
+        "uuid": "3a1d315d_d2bacfe0",
+        "filename": "examples/udpfwd/main.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 1872,
+      "author": {
+        "id": 407
+      },
+      "writtenOn": "2016-09-06T09:41:25Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "3a1d315d_32ac63ed",
+      "revId": "e9540edc32e1592a4bd6c83c756c5495c5590972",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "3a1d315d_b2875361",
         "filename": "examples/udpfwd/main.c",
         "patchSetId": 1
@@ -195,6 +387,24 @@
       "writtenOn": "2016-09-06T00:28:01Z",
       "side": 1,
       "message": "sig_handle instead?",
+      "revId": "e9540edc32e1592a4bd6c83c756c5495c5590972",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "3a1d315d_b2bf53d0",
+        "filename": "examples/udpfwd/main.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 2168,
+      "author": {
+        "id": 407
+      },
+      "writtenOn": "2016-09-06T09:41:25Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "3a1d315d_b2875361",
       "revId": "e9540edc32e1592a4bd6c83c756c5495c5590972",
       "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
       "unresolved": false
@@ -218,6 +428,24 @@
     },
     {
       "key": {
+        "uuid": "3a1d315d_b23193a4",
+        "filename": "examples/udpfwd/main.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 2187,
+      "author": {
+        "id": 407
+      },
+      "writtenOn": "2016-09-06T09:41:25Z",
+      "side": 1,
+      "message": "Are you talking about the update_rss_conf() in port_init()?",
+      "parentUuid": "3a1d315d_d282cf51",
+      "revId": "e9540edc32e1592a4bd6c83c756c5495c5590972",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "3a1d315d_12b9672e",
         "filename": "examples/udpfwd/main.c",
         "patchSetId": 1
@@ -235,6 +463,24 @@
     },
     {
       "key": {
+        "uuid": "3a1d315d_92b457f3",
+        "filename": "examples/udpfwd/main.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 2188,
+      "author": {
+        "id": 407
+      },
+      "writtenOn": "2016-09-06T09:41:25Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "3a1d315d_12b9672e",
+      "revId": "e9540edc32e1592a4bd6c83c756c5495c5590972",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "3a1d315d_f7e37d31",
         "filename": "lib/libtle_udp/udp_ctl.c",
         "patchSetId": 1
@@ -246,6 +492,24 @@
       "writtenOn": "2016-09-05T18:32:54Z",
       "side": 1,
       "message": "just as a nit, could we add here ... || (nb_bl_ports !\u003d 0 \u0026\u0026 bl_ports \u003d\u003d NULL)",
+      "revId": "e9540edc32e1592a4bd6c83c756c5495c5590972",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "3a1d315d_72b9bbe8",
+        "filename": "lib/libtle_udp/udp_ctl.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 51,
+      "author": {
+        "id": 407
+      },
+      "writtenOn": "2016-09-06T09:41:25Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "3a1d315d_f7e37d31",
       "revId": "e9540edc32e1592a4bd6c83c756c5495c5590972",
       "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
       "unresolved": false
