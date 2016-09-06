@@ -184,6 +184,40 @@
     },
     {
       "key": {
+        "uuid": "3a1d315d_b2875361",
+        "filename": "examples/udpfwd/main.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 2168,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2016-09-06T00:28:01Z",
+      "side": 1,
+      "message": "sig_handle instead?",
+      "revId": "e9540edc32e1592a4bd6c83c756c5495c5590972",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "3a1d315d_d282cf51",
+        "filename": "examples/udpfwd/main.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 2187,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2016-09-06T00:28:01Z",
+      "side": 1,
+      "message": "as we call update_rss_reta() here, can we remove the first call at port_init()?",
+      "revId": "e9540edc32e1592a4bd6c83c756c5495c5590972",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "3a1d315d_12b9672e",
         "filename": "examples/udpfwd/main.c",
         "patchSetId": 1
