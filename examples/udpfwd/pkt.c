@@ -293,8 +293,8 @@ compress_pkt_list(struct rte_mbuf *pkt[], uint32_t nb_pkt, uint32_t nb_zero)
 /*
  * HW can recognise L2/L3 with/without extentions/L4 (ixgbe/igb/fm10k)
  */
-static uint16_t
-type0_rx_callback(__rte_unused uint8_t port, __rte_unused uint16_t queue,
+static uint16_t __rte_unused
+type0_rx_callback(uint8_t port, __rte_unused uint16_t queue,
 	struct rte_mbuf *pkt[], uint16_t nb_pkts,
 	__rte_unused uint16_t max_pkts, void *user_param)
 {
@@ -384,7 +384,7 @@ type0_rx_callback(__rte_unused uint8_t port, __rte_unused uint16_t queue,
 /*
  * HW can recognise L2/L3/L4 and fragments (i40e).
  */
-static uint16_t
+static uint16_t __rte_unused
 type1_rx_callback(uint8_t port, __rte_unused uint16_t queue,
 	struct rte_mbuf *pkt[], uint16_t nb_pkts,
 	__rte_unused uint16_t max_pkts, void *user_param)
@@ -506,103 +506,4 @@ typen_rx_callback(uint8_t port, __rte_unused uint16_t queue,
 	return compress_pkt_list(pkt, nb_pkts, x);
 }
 
-int
-setup_rx_cb(const struct netbe_port *uprt, struct netbe_lcore *lc,
-	uint16_t qid)
-{
-	int32_t i, rc;
-	uint32_t smask;
-	void *cb;
-
-	const uint32_t pmask = RTE_PTYPE_L2_MASK | RTE_PTYPE_L3_MASK |
-		RTE_PTYPE_L4_MASK;
-
-	enum {
-		ETHER_PTYPE = 0x1,
-		IPV4_PTYPE = 0x2,
-		IPV4_EXT_PTYPE = 0x4,
-		IPV6_PTYPE = 0x8,
-		IPV6_EXT_PTYPE = 0x10,
-		UDP_PTYPE = 0x20,
-	};
-
-	static const struct {
-		uint32_t mask;
-		const char *name;
-		rte_rx_callback_fn fn;
-	} ptype2cb[] = {
-		{
-			.mask = ETHER_PTYPE | IPV4_PTYPE | IPV4_EXT_PTYPE |
-				IPV6_PTYPE | IPV6_EXT_PTYPE | UDP_PTYPE,
-			.name = "HW l2/l3x/l4 ptype",
-			.fn = type0_rx_callback,
-		},
-		{
-			.mask = ETHER_PTYPE | IPV4_PTYPE | IPV6_PTYPE |
-				UDP_PTYPE,
-			.name = "HW l2/l3/l4 ptype",
-			.fn = type1_rx_callback,
-		},
-		{
-			.mask = 0,
-			.name = "no HW ptype",
-			.fn = typen_rx_callback,
-		},
-	};
-
-	rc = rte_eth_dev_get_supported_ptypes(uprt->id, pmask, NULL, 0);
-	if (rc < 0) {
-		RTE_LOG(ERR, USER1,
-			"%s(port=%u) failed to get supported ptypes;\n",
-			__func__, uprt->id);
-		return rc;
-	}
-
-	uint32_t ptype[rc];
-	rc = rte_eth_dev_get_supported_ptypes(uprt->id, pmask, ptype, rc);
-
-	smask = 0;
-	for (i = 0; i != rc; i++) {
-		switch (ptype[i]) {
-		case RTE_PTYPE_L2_ETHER:
-			smask |= ETHER_PTYPE;
-			break;
-		case RTE_PTYPE_L3_IPV4:
-		case RTE_PTYPE_L3_IPV4_EXT_UNKNOWN:
-			smask |= IPV4_PTYPE;
-			break;
-		case RTE_PTYPE_L3_IPV4_EXT:
-			smask |= IPV4_EXT_PTYPE;
-			break;
-		case RTE_PTYPE_L3_IPV6:
-		case RTE_PTYPE_L3_IPV6_EXT_UNKNOWN:
-			smask |= IPV6_PTYPE;
-			break;
-		case RTE_PTYPE_L3_IPV6_EXT:
-			smask |= IPV6_EXT_PTYPE;
-			break;
-		case RTE_PTYPE_L4_UDP:
-			smask |= UDP_PTYPE;
-			break;
-		}
-	}
-
-	for (i = 0; i != RTE_DIM(ptype2cb); i++) {
-		if ((smask & ptype2cb[i].mask) == ptype2cb[i].mask) {
-			cb = rte_eth_add_rx_callback(uprt->id, qid,
-				ptype2cb[i].fn, lc);
-			rc = -rte_errno;
-			RTE_LOG(ERR, USER1,
-				"%s(port=%u), setup RX callback \"%s\" "
-				"returns %p;\n",
-				__func__, uprt->id,  ptype2cb[i].name, cb);
-				return ((cb == NULL) ? rc : 0);
-		}
-	}
-
-	/* no proper callback found. */
-	RTE_LOG(ERR, USER1,
-		"%s(port=%u) failed to find an appropriate callback;\n",
-		__func__, uprt->id);
-	return -ENOENT;
-}
+#include "pkt_dpdk_legacy.h"

@@ -116,6 +116,7 @@ static const struct rte_eth_conf port_conf_default = {
 };
 
 #include "parse.h"
+#include "main_dpdk_legacy.h"
 
 static void
 sig_handle(int signum)
@@ -580,29 +581,6 @@ netbe_port_init(struct netbe_cfg *cfg, int argc, char *argv[])
 }
 
 /*
- * UDP IPv4 destination lookup callback.
- */
-static int
-lpm4_dst_lookup(void *data, const struct in_addr *addr,
-	struct tle_udp_dest *res)
-{
-	int32_t rc;
-	uint32_t idx;
-	struct netbe_lcore *lc;
-	struct tle_udp_dest *dst;
-
-	lc = data;
-
-	rc = rte_lpm_lookup(lc->lpm4, rte_be_to_cpu_32(addr->s_addr), &idx);
-	if (rc == 0) {
-		dst = &lc->dst4[idx];
-		rte_memcpy(res, dst, dst->l2_len + dst->l3_len +
-			offsetof(struct tle_udp_dest, hdr));
-	}
-	return rc;
-}
-
-/*
  * UDP IPv6 destination lookup callback.
  */
 static int
@@ -680,39 +658,6 @@ netbe_add_ipv6_route(struct netbe_lcore *lc, const struct netbe_dest *dst,
 	return rc;
 }
 
-static int
-lcore_lpm_init(struct netbe_lcore *lc)
-{
-	int32_t sid;
-	char str[RTE_LPM_NAMESIZE];
-	const struct rte_lpm_config lpm4_cfg = {
-		.max_rules = MAX_RULES,
-		.number_tbl8s = MAX_TBL8,
-	};
-	const struct rte_lpm6_config lpm6_cfg = {
-		.max_rules = MAX_RULES,
-		.number_tbl8s = MAX_TBL8,
-	};
-
-	sid = rte_lcore_to_socket_id(lc->id);
-
-	snprintf(str, sizeof(str), "LPM4%u\n", lc->id);
-	lc->lpm4 = rte_lpm_create(str, sid, &lpm4_cfg);
-	RTE_LOG(NOTICE, USER1, "%s(lcore=%u): lpm4=%p;\n",
-		__func__, lc->id, lc->lpm4);
-	if (lc->lpm4 == NULL)
-		return -ENOMEM;
-
-	snprintf(str, sizeof(str), "LPM6%u\n", lc->id);
-	lc->lpm6 = rte_lpm6_create(str, sid, &lpm6_cfg);
-	RTE_LOG(NOTICE, USER1, "%s(lcore=%u): lpm6=%p;\n",
-		__func__, lc->id, lc->lpm6);
-	if (lc->lpm6 == NULL)
-		return -ENOMEM;
-
-	return 0;
-}
-
 static void
 fill_dst(struct tle_udp_dest *dst, struct netbe_dev *bed,
 	const struct netbe_dest *bdp, uint16_t l3_type, int32_t sid)
@@ -756,8 +701,7 @@ fill_dst(struct tle_udp_dest *dst, struct netbe_dev *bed,
 }
 
 static int
-create_context(struct netbe_lcore *lc,
-				const struct tle_udp_ctx_param *ctx_prm)
+create_context(struct netbe_lcore *lc, const struct tle_udp_ctx_param *ctx_prm)
 {
 	uint32_t rc = 0, sid;
 	uint64_t frag_cycles;
@@ -1860,89 +1804,6 @@ netfe_lcore_cmp(const void *s1, const void *s2)
 	return p1->lcore - p2->lcore;
 }
 
-/*
- * Helper functions, verify the queue for corresponding UDP port.
- */
-static uint8_t
-varify_queue_for_port(const struct netbe_dev *prtq, const uint16_t lport)
-{
-	uint32_t align_nb_q, qid;
-
-	align_nb_q = rte_align32pow2(prtq->port.nb_lcore);
-	qid = (lport % align_nb_q) % prtq->port.nb_lcore;
-	if (prtq->rxqid == qid)
-		return 1;
-
-	return 0;
-}
-
-/*
- * Helper functions, finds BE by given local and remote addresses.
- */
-static int
-netbe_find4(const struct in_addr *laddr, const uint16_t lport,
-	const struct in_addr *raddr, const uint32_t be_lc)
-{
-	uint32_t i, j;
-	uint32_t idx;
-	struct netbe_lcore *bc;
-
-	/* we have exactly one BE, use it for all traffic */
-	if (becfg.cpu_num == 1)
-		return 0;
-
-	/* search by provided be_lcore */
-	if (be_lc != LCORE_ID_ANY) {
-		for (i = 0; i != becfg.cpu_num; i++) {
-			bc = becfg.cpu + i;
-			if (be_lc == bc->id)
-				return i;
-		}
-		RTE_LOG(NOTICE, USER1, "%s: no stream with be_lcore=%u\n",
-			__func__, be_lc);
-		return -ENOENT;
-	}
-
-	/* search by local address */
-	if (laddr->s_addr != INADDR_ANY) {
-		for (i = 0; i != becfg.cpu_num; i++) {
-			bc = becfg.cpu + i;
-			/* search by queue for the local port */
-			for (j = 0; j != bc->prtq_num; j++) {
-				if (laddr->s_addr == bc->prtq[j].port.ipv4) {
-
-					if (lport == 0)
-						return i;
-
-					if (varify_queue_for_port(bc->prtq + j, lport) != 0)
-						return i;
-				}
-			}
-		}
-	}
-
-	/* search by remote address */
-	if (raddr->s_addr != INADDR_ANY) {
-		for (i = 0; i != becfg.cpu_num; i++) {
-			bc = becfg.cpu + i;
-			if (rte_lpm_lookup(bc->lpm4,
-					rte_be_to_cpu_32(raddr->s_addr),
-					&idx) == 0) {
-
-				if (lport == 0)
-					return i;
-
-				/* search by queue for the local port */
-				for (j = 0; j != bc->prtq_num; j++)
-					if (varify_queue_for_port(bc->prtq + j, lport) != 0)
-						return i;
-			}
-		}
-	}
-
-	return -ENOENT;
-}
-
 static int
 netbe_find6(const struct in6_addr *laddr, uint16_t lport,
 	const struct in6_addr *raddr, uint32_t be_lc)
@@ -1979,7 +1840,8 @@ netbe_find6(const struct in6_addr *laddr, uint16_t lport,
 					if (lport == 0)
 						return i;
 
-					if (varify_queue_for_port(bc->prtq + j, lport) != 0)
+					if (verify_queue_for_port(bc->prtq + j,
+							lport) != 0)
 						return i;
 				}
 			}
@@ -1999,7 +1861,8 @@ netbe_find6(const struct in6_addr *laddr, uint16_t lport,
 
 				/* search by queue for the local port */
 				for (j = 0; j != bc->prtq_num; j++)
-					if (varify_queue_for_port(bc->prtq + j, lport) != 0)
+					if (verify_queue_for_port(bc->prtq + j,
+							lport) != 0)
 						return i;
 			}
 		}

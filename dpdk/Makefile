@@ -16,29 +16,22 @@ SHELL := /bin/bash
 
 DPDK_VERSION ?= 16.04
 DPDK_BUILD_DIR        ?= $(CURDIR)/_build
-DPDK_INSTALL_DIR      ?= $(DPDK_BUILD_DIR)/dpdk-$(DPDK_VERSION)/$(RTE_TARGET)
+DPDK_INSTALL_DIR      ?= $(DPDK_BUILD_DIR)/dpdk/$(RTE_TARGET)
 DPDK_PKTMBUF_HEADROOM ?= 128
-DPDK_DOWNLOAD_DIR     ?= $(HOME)/Downloads
 DPDK_MARCH            ?= native
 DPDK_TUNE             ?= generic
 DPDK_DEBUG            ?= n
 
 B := $(DPDK_BUILD_DIR)
 I := $(DPDK_INSTALL_DIR)
-DPDK_BASE_URL ?= https://nexus.fd.io/content/repositories/thirdparty/
-DPDK_TARBALL := dpdk-$(DPDK_VERSION).tar.gz
-DPDK_TAR_URL := $(DPDK_BASE_URL)/$(DPDK_TARBALL)
-DPDK_2.1.0_TARBALL_MD5_CKSUM := 205a0d12bfd6eb717d57506272f43519
-DPDK_2.2.0_TARBALL_MD5_CKSUM := 22e2fd68cd5504f43fe9a5a6fd6dd938
-DPDK_16.04_TARBALL_MD5_CKSUM := 0728d506d7f56eb64233e824fa3c098a
-DPDK_SOURCE := $(B)/dpdk-$(DPDK_VERSION)
+DPDK_GIT_REPO ?= http://dpdk.org/git/dpdk
+DPDK_SOURCE := $(B)/dpdk
 
 ifneq (,$(findstring clang,$(CC)))
 DPDK_CC=clang
 else
 DPDK_CC=gcc
 endif
-
 
 ifeq (,$(DPDK_TARGET))
 DPDK_TARGET := x86_64-native-linuxapp-$(DPDK_CC)
@@ -87,7 +80,8 @@ DPDK_MAKE_ARGS := -C $(DPDK_SOURCE) -j $(JOBS) \
 	CPU_LDFLAGS="$(DPDK_CPU_LDFLAGS)" \
         $(DPDK_MAKE_EXTRA_ARGS)
 
-DPDK_SOURCE_FILES := $(shell  [ -e $(DPDK_SOURCE) ] && find $(DPDK_SOURCE) -name "*.[chS]")  
+DPDK_SOURCE_FILES := $(shell  [ -e $(DPDK_SOURCE) ] && \
+						find $(DPDK_SOURCE) -name "*.[chS]")
 
 define set
 @if grep -q CONFIG_$1 $@ ; \
@@ -99,8 +93,10 @@ endef
 all: build
 
 $(B)/custom-config: $(B)/.patch.ok Makefile
-	@echo --- generating custom config from $(DPDK_SOURCE)/config/defconfig_$(DPDK_TARGET) ---
-	@cpp -undef -ffreestanding -x assembler-with-cpp $(DPDK_SOURCE)/config/defconfig_$(DPDK_TARGET) $@
+	@echo --- generating custom config from \
+		$(DPDK_SOURCE)/config/defconfig_$(DPDK_TARGET) --- $@
+	@cpp -undef -ffreestanding -x assembler-with-cpp \
+		$(DPDK_SOURCE)/config/defconfig_$(DPDK_TARGET) $@
 	$(call set,RTE_MACHINE,$(DPDK_MACHINE))
 	@# modify options
 	$(call set,RTE_MAX_LCORE,256)
@@ -131,33 +127,22 @@ $(B)/custom-config: $(B)/.patch.ok Makefile
 	$(call set,RTE_KNI_KMOD,n)
 	@rm -f .config.ok
 
-$(CURDIR)/$(DPDK_TARBALL):
+$(B)/.download.ok:
 	@mkdir -p $(B)
-	@if [ -e $(DPDK_DOWNLOAD_DIR)/$(DPDK_TARBALL) ] ; \
-		then cp $(DPDK_DOWNLOAD_DIR)/$(DPDK_TARBALL) $(CURDIR) ; \
-		else curl -o $(CURDIR)/$(DPDK_TARBALL) -LO $(DPDK_TAR_URL) ; \
+	@if [ -e $(DPDK_SOURCE) ] ; \
+		then rm -rf $(DPDK_SOURCE) ; \
 	fi
-	@rm -f $(B)/.download.ok
-
-$(B)/.download.ok: $(CURDIR)/$(DPDK_TARBALL)
-	@openssl md5 $< | cut -f 2 -d " " - > $(B)/$(DPDK_TARBALL).md5sum
-	@([ "$$(<$(B)/$(DPDK_TARBALL).md5sum)" = "$(DPDK_$(DPDK_VERSION)_TARBALL_MD5_CKSUM)" ] || \
-	( echo "Bad Checksum! Please remove $< and retry" && \
-		rm $(B)/$(DPDK_TARBALL).md5sum && false ))
+ifeq ($(DPDK_VERSION),master)
+	@git clone $(DPDK_GIT_REPO) --branch $(DPDK_VERSION) $(DPDK_SOURCE)
+else
+	@git clone $(DPDK_GIT_REPO) --branch v$(DPDK_VERSION) $(DPDK_SOURCE)
+endif
 	@touch $@
 
 .PHONY: download
 download: $(B)/.download.ok
 
-$(B)/.extract.ok: $(B)/.download.ok
-	@echo --- extracting $(DPDK_TARBALL) ---
-	@tar --directory $(B) --extract --file $(CURDIR)/$(DPDK_TARBALL) --gzip
-	@touch $@
-
-.PHONY: extract
-extract: $(B)/.extract.ok
-
-$(B)/.patch.ok: $(B)/.extract.ok
+$(B)/.patch.ok: $(B)/.download.ok
 ifneq ($(wildcard $(CURDIR)/dpdk-$(DPDK_VERSION)_patches/*.patch),)
 	@echo --- patching ---
 	for f in $(CURDIR)/dpdk-$(DPDK_VERSION)_patches/*.patch ; do \
@@ -178,7 +163,8 @@ $(B)/.config.ok: $(B)/.patch.ok $(B)/custom-config
 config: $(B)/.config.ok
 
 $(B)/.build.ok: $(DPDK_SOURCE_FILES)
-	@if [ ! -e $(B)/.config.ok ] ; then echo 'Please run "make config" first' && false ; fi
+	@if [ ! -e $(B)/.config.ok ] ; then echo 'Please run "make config" \
+		first' && false ; fi
 	@make $(DPDK_MAKE_ARGS) install
 	@cp $(I)/.config $(B)/.config
 	@touch $@
@@ -189,4 +175,3 @@ build: $(B)/.build.ok
 .PHONY: clean
 clean:
 	@rm -rf $(B) $(I)
-

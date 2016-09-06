@@ -14,14 +14,12 @@
 TLDK_ROOT := $(CURDIR)
 export TLDK_ROOT
 
-DPDK_VERSION=16.04
-LOCAL_RTE_SDK=$(TLDK_ROOT)/dpdk/_build/dpdk-$(DPDK_VERSION)/
+LOCAL_RTE_SDK=$(TLDK_ROOT)/dpdk/_build/dpdk
 
 ifeq ($(RTE_SDK),)
 	export RTE_SDK=$(LOCAL_RTE_SDK)
 endif
 
-# Default target, can be overriden by command line or environment
 RTE_TARGET ?= x86_64-native-linuxapp-gcc
 
 DIRS-y += lib
@@ -53,7 +51,6 @@ $(DIRS-y): $(RTE_SDK)/mk/rte.vars.mk
 		$(filter-out $(DIRS-y),$(MAKECMDGOALS))
 
 $(RTE_SDK)/mk/rte.vars.mk:
-ifeq ($(RTE_SDK),$(LOCAL_RTE_SDK)) 
+ifeq ($(RTE_SDK),$(LOCAL_RTE_SDK))
 	@make RTE_TARGET=$(RTE_TARGET) config all -C $(TLDK_ROOT)/dpdk/
 endif
-
