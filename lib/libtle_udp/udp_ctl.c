@@ -48,8 +48,12 @@ check_dev_prm(const struct tle_udp_dev_param *dev_prm)
 		return -EINVAL;
 
 	/* all the ports are blocked. */
-	if (dev_prm->nb_bl_ports > UINT16_MAX ||
-		(dev_prm->nb_bl_ports != 0 && dev_prm->bl_ports == NULL))
+	if (dev_prm->bl4.nb_port > UINT16_MAX ||
+		(dev_prm->bl4.nb_port != 0 && dev_prm->bl4.port == NULL))
+		return -EINVAL;
+
+	if (dev_prm->bl6.nb_port > UINT16_MAX ||
+		(dev_prm->bl6.nb_port != 0 && dev_prm->bl6.port == NULL))
 		return -EINVAL;
 
 	return 0;
@@ -245,12 +249,20 @@ tle_udp_ctx_invalidate(struct tle_udp_ctx *ctx)
 	RTE_SET_USED(ctx);
 }
 
+static void
+fill_pbm(struct udp_pbm *pbm, const struct tle_bl_port *blp)
+{
+	uint32_t i;
+
+	for (i = 0; i != blp->nb_port; i++)
+		udp_pbm_set(pbm, blp->port[i]);
+}
+
 static int
 init_dev_proto(struct tle_udp_dev *dev, uint32_t idx, int32_t socket_id,
-		uint16_t *bl_ports, uint32_t nb_bl_ports)
+	const struct tle_bl_port *blp)
 {
 	size_t sz;
-	uint32_t i;
 
 	sz = sizeof(*dev->dp[idx]);
 	dev->dp[idx] = rte_zmalloc_socket(NULL, sz, RTE_CACHE_LINE_SIZE,
@@ -264,10 +276,7 @@ init_dev_proto(struct tle_udp_dev *dev, uint32_t idx, int32_t socket_id,
 	}
 
 	udp_pbm_init(&dev->dp[idx]->use, LPORT_START_BLK);
-
-	if (bl_ports != NULL)
-		for (i = 0; i < nb_bl_ports; i++)
-			udp_pbm_set(&dev->dp[idx]->use, bl_ports[i]);
+	fill_pbm(&dev->dp[idx]->use, blp);
 
 	return 0;
 }
@@ -293,7 +302,6 @@ tle_udp_add_dev(struct tle_udp_ctx *ctx,
 	const struct tle_udp_dev_param *dev_prm)
 {
 	int32_t rc;
-	uint32_t i;
 	struct tle_udp_dev *dev;
 
 	if (ctx == NULL || dev_prm == NULL || check_dev_prm(dev_prm) != 0) {
@@ -309,20 +317,18 @@ tle_udp_add_dev(struct tle_udp_ctx *ctx,
 	/* device can handle IPv4 traffic */
 	if (dev_prm->local_addr4.s_addr != INADDR_ANY) {
 		rc = init_dev_proto(dev, TLE_UDP_V4, ctx->prm.socket_id,
-				dev_prm->bl_ports, dev_prm->nb_bl_ports);
-		for (i = 0; i < dev_prm->nb_bl_ports; i++)
-			udp_pbm_set(&ctx->use[TLE_UDP_V4],
-				dev_prm->bl_ports[i]);
+				&dev_prm->bl4);
+		if (rc == 0)
+			fill_pbm(&ctx->use[TLE_UDP_V4], &dev_prm->bl4);
 	}
 
 	/* device can handle IPv6 traffic */
 	if (rc == 0 && memcmp(&dev_prm->local_addr6, &tle_udp6_any,
 			sizeof(tle_udp6_any)) != 0) {
 		rc = init_dev_proto(dev, TLE_UDP_V6, ctx->prm.socket_id,
-				dev_prm->bl_ports, dev_prm->nb_bl_ports);
-		for (i = 0; i < dev_prm->nb_bl_ports; i++)
-			udp_pbm_set(&ctx->use[TLE_UDP_V6],
-				dev_prm->bl_ports[i]);
+				&dev_prm->bl6);
+		if (rc == 0)
+			fill_pbm(&ctx->use[TLE_UDP_V6], &dev_prm->bl6);
 	}
 
 	if (rc != 0) {

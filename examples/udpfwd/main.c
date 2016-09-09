@@ -751,7 +751,7 @@ create_context(struct netbe_lcore *lc, const struct tle_udp_ctx_param *ctx_prm)
  */
 static int
 lcore_init(struct netbe_lcore *lc, const struct tle_udp_ctx_param *ctx_prm,
-	const uint32_t prtqid, uint16_t *bl_ports, uint32_t nb_bl_ports)
+	const uint32_t prtqid, const uint16_t *bl_ports, uint32_t nb_bl_ports)
 {
 	int32_t rc = 0;
 	struct tle_udp_dev_param dprm;
@@ -765,8 +765,10 @@ lcore_init(struct netbe_lcore *lc, const struct tle_udp_ctx_param *ctx_prm,
 		dprm.local_addr4.s_addr = lc->prtq[prtqid].port.ipv4;
 		memcpy(&dprm.local_addr6,  &lc->prtq[prtqid].port.ipv6,
 			sizeof(lc->prtq[prtqid].port.ipv6));
-		dprm.nb_bl_ports = nb_bl_ports;
-		dprm.bl_ports = bl_ports;
+		dprm.bl4.nb_port = nb_bl_ports;
+		dprm.bl4.port = bl_ports;
+		dprm.bl6.nb_port = nb_bl_ports;
+		dprm.bl6.port = bl_ports;
 
 		lc->prtq[prtqid].dev = tle_udp_add_dev(lc->ctx, &dprm);
 
@@ -814,13 +816,12 @@ netbe_lcore_init(struct netbe_cfg *cfg,
 	const struct tle_udp_ctx_param *ctx_prm)
 {
 	int32_t rc;
-	uint32_t i, j, nb_bl_ports, sz;
+	uint32_t i, j, nb_bl_ports = 0, sz;
 	struct netbe_lcore *lc;
 	static uint16_t *bl_ports;
 
 	/* Create the udp context and attached queue for each lcore. */
 	rc = 0;
-	nb_bl_ports = 0;
 	sz = sizeof(uint16_t) * UINT16_MAX;
 	bl_ports = rte_zmalloc(NULL, sz, RTE_CACHE_LINE_SIZE);
 	for (i = 0; i < cfg->cpu_num; i++) {
@@ -830,7 +831,8 @@ netbe_lcore_init(struct netbe_cfg *cfg,
 			/* create list of blocked ports based on q */
 			nb_bl_ports = create_blocklist(&lc->prtq[j].port,
 				bl_ports, lc->prtq[j].rxqid);
-			RTE_LOG(NOTICE, USER1, "lc=%u, q=%u, nb_bl_ports4=%u\n",
+			RTE_LOG(NOTICE, USER1,
+				"lc=%u, q=%u, nb_bl_ports=%u\n",
 				lc->id, lc->prtq[j].rxqid, nb_bl_ports);
 
 			rc = lcore_init(lc, ctx_prm, j, bl_ports, nb_bl_ports);
