@@ -101,6 +101,16 @@ static const struct option long_opt[] = {
  */
 #define RSS_RETA_CONF_ARRAY_SIZE (ETH_RSS_RETA_SIZE_512/RTE_RETA_GROUP_SIZE)
 
+#define NETBE_REALLOC(loc, n) do { \
+	(loc) = rte_realloc((loc), sizeof(*(loc)) * (n), RTE_CACHE_LINE_SIZE); \
+	if ((loc) == NULL) { \
+		RTE_LOG(ERR, USER1, \
+			"%s: failed to reallocate memory\n", \
+			__func__); \
+		return -ENOMEM; \
+	} \
+} while (0)
+
 static volatile int force_quit;
 
 static struct netbe_cfg becfg;
@@ -490,14 +500,16 @@ calculate_nb_prtq(struct netbe_cfg *cfg)
 
 			lc = find_initilized_lcore(cfg, prt->lcore[j]);
 			if (lc == NULL) {
+				NETBE_REALLOC(cfg->cpu, cfg->cpu_num + 1);
 				lc = &cfg->cpu[cfg->cpu_num];
 				lc->id = prt->lcore[j];
 				cfg->cpu_num++;
 			}
+
+			NETBE_REALLOC(lc->prtq, lc->prtq_num + 1);
 			lc->prtq[lc->prtq_num].rxqid = j;
 			lc->prtq[lc->prtq_num].txqid = j;
 			lc->prtq[lc->prtq_num].port = *prt;
-
 			lc->prtq_num++;
 		}
 	}
@@ -515,10 +527,11 @@ netbe_port_init(struct netbe_cfg *cfg, int argc, char *argv[])
 	uint32_t i, n, sid, j;
 	struct netbe_port *prt;
 
-	n = RTE_MIN(RTE_DIM(cfg->prt), (uint32_t)argc);
+	n = (uint32_t)argc;
 
 	rc = 0;
 	for (i = 0; i != n; i++) {
+		NETBE_REALLOC(cfg->prt, cfg->prt_num + 1);
 		rc = parse_netbe_arg(cfg->prt + i, argv[i]);
 		if (rc != 0) {
 			RTE_LOG(ERR, USER1,
@@ -526,8 +539,8 @@ netbe_port_init(struct netbe_cfg *cfg, int argc, char *argv[])
 				__func__, argv[i], rc);
 			return rc;
 		}
+		cfg->prt_num++;
 	}
-	cfg->prt_num = i;
 
 	/* calculate number of queues per lcore. */
 	rc = calculate_nb_prtq(cfg);
@@ -788,6 +801,10 @@ lcore_init(struct netbe_lcore *lc, const struct tle_udp_ctx_param *ctx_prm,
 			rte_ip_frag_table_destroy(lc->ftbl);
 			rte_lpm_free(lc->lpm4);
 			rte_lpm6_free(lc->lpm6);
+			rte_free(lc->prtq[prtqid].port.lcore);
+			lc->prtq[prtqid].port.nb_lcore = 0;
+			rte_free(lc->prtq);
+			lc->prtq_num = 0;
 			return rc;
 		}
 	}
@@ -860,10 +877,19 @@ netbe_lcore_fini(struct netbe_cfg *cfg)
 		rte_ip_frag_table_destroy(cfg->cpu[i].ftbl);
 		rte_lpm_free(cfg->cpu[i].lpm4);
 		rte_lpm6_free(cfg->cpu[i].lpm6);
+
+		rte_free(cfg->cpu[i].prtq);
+		cfg->cpu[i].prtq_num = 0;
 	}
 
-	memset(cfg->cpu, 0, sizeof(cfg->cpu));
+	rte_free(cfg->cpu);
 	cfg->cpu_num = 0;
+	for (i = 0; i != cfg->prt_num; i++) {
+		rte_free(cfg->prt[i].lcore);
+		cfg->prt[i].nb_lcore = 0;
+	}
+	rte_free(cfg->prt);
+	cfg->prt_num = 0;
 }
 
 static int

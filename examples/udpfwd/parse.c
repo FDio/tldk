@@ -201,7 +201,7 @@ int
 parse_netbe_arg(struct netbe_port *prt, const char *arg)
 {
 	int32_t rc;
-	uint32_t i, j;
+	uint32_t i, j, nc;
 
 	static const char *keys_man[] = {
 		"port",
@@ -237,10 +237,17 @@ parse_netbe_arg(struct netbe_port *prt, const char *arg)
 		return rc;
 
 	prt->id = val[0].u64;
+
+	for (i = 0, nc = 0; i < RTE_MAX_LCORE; i++)
+		nc += CPU_ISSET(i, &val[1].cpuset);
+	prt->lcore = rte_zmalloc(NULL, nc * sizeof(prt->lcore[0]),
+		RTE_CACHE_LINE_SIZE);
+	prt->nb_lcore = nc;
+
 	for (i = 0, j = 0; i < RTE_MAX_LCORE; i++)
 		if (CPU_ISSET(i, &val[1].cpuset))
 			prt->lcore[j++] = i;
-	prt->nb_lcore = j;
+
 	prt->mtu = val[2].u64;
 	prt->rx_offload = val[3].u64;
 	prt->tx_offload = val[4].u64;

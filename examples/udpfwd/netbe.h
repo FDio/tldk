@@ -54,7 +54,7 @@
 struct netbe_port {
 	uint32_t id;
 	uint32_t nb_lcore;
-	uint32_t lcore[RTE_MAX_LCORE];
+	uint32_t *lcore;
 	uint32_t mtu;
 	uint32_t rx_offload;
 	uint32_t tx_offload;
@@ -118,7 +118,7 @@ struct netbe_lcore {
 	uint32_t prtq_num;
 	uint32_t dst4_num;
 	uint32_t dst6_num;
-	struct netbe_dev prtq[RTE_MAX_ETHPORTS * RTE_MAX_LCORE];
+	struct netbe_dev *prtq;
 	struct tle_udp_dest dst4[LCORE_MAX_DST];
 	struct tle_udp_dest dst6[LCORE_MAX_DST];
 	struct rte_ip_frag_death_row death_row;
@@ -128,8 +128,8 @@ struct netbe_cfg {
 	uint32_t promisc;
 	uint32_t prt_num;
 	uint32_t cpu_num;
-	struct netbe_port prt[RTE_MAX_ETHPORTS];
-	struct netbe_lcore cpu[RTE_MAX_LCORE];
+	struct netbe_port *prt;
+	struct netbe_lcore *cpu;
 };
 
 /*
