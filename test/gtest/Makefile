@@ -68,12 +68,14 @@ OBJ = gtest-rfc.o
 
 # all source are stored in SRCS-y
 SRCS-y += main.cpp
+SRCS-y += test_common.cpp
 SRCS-y += test_tle_dring.cpp
 SRCS-y += test_tle_udp_ctx.cpp
 SRCS-y += test_tle_udp_dev.cpp
 SRCS-y += test_tle_udp_destroy.cpp
 SRCS-y += test_tle_udp_event.cpp
 SRCS-y += test_tle_udp_stream.cpp
+SRCS-y += test_tle_udp_stream_gen.cpp
 
 CXXFLAGS += -std=c++11
 CXXFLAGS += -I$(GTEST_DIR)/include
