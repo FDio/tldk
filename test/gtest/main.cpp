@@ -13,23 +13,53 @@
  * limitations under the License.
  */
 
+#include <iostream>
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
-#include <iostream>
+
 #include <rte_common.h>
 #include <rte_eal.h>
+#include <rte_ethdev.h>
+#include <rte_cycles.h>
+#include <rte_lcore.h>
+#include <rte_mbuf.h>
+#include <rte_errno.h>
+
+#include "test_common.h"
+
+struct rte_mempool *mbuf_pool;
+struct rte_mempool *frag_mp;
 
 int main(int argc, char *argv[])
 {
+	uint8_t nb_ports = 1;
+	int rc = 0;
+
 	/* Initialize GoogleTest&Mock and parse any args */
 	testing::InitGoogleMock(&argc, argv);
-
 	/* Initialize EAL */
 	int ret = rte_eal_init(argc, argv);
 	if (ret < 0)
 		rte_exit(EXIT_FAILURE, "Invalid EAL arguments\n");
 	argc -= ret;
 	argv += ret;
+
+	/* Creates a new mempool in memory to hold the mbufs. */
+	mbuf_pool = rte_pktmbuf_pool_create("MBUF_POOL", NUM_MBUFS * nb_ports,
+	MBUF_CACHE_SIZE, 0, RTE_MBUF_DEFAULT_BUF_SIZE, rte_socket_id());
+	if (mbuf_pool == NULL) {
+		rc = -rte_errno;
+		printf("Mempool was not created, rc=%d\n", rc);
+		return rc;
+	}
+
+	frag_mp = rte_pktmbuf_pool_create("FRAG_POOL", NUM_MBUFS * nb_ports,
+			MBUF_CACHE_SIZE, 0, RTE_MBUF_DEFAULT_BUF_SIZE, rte_socket_id());
+	if (frag_mp == NULL) {
+			rc = -rte_errno;
+			printf("Frag-Mempool was not created, rc=%d\n", rc);
+			return rc;
+		}
 
 	return RUN_ALL_TESTS();
 }
