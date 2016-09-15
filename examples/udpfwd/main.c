@@ -500,7 +500,6 @@ calculate_nb_prtq(struct netbe_cfg *cfg)
 
 			lc = find_initilized_lcore(cfg, prt->lcore[j]);
 			if (lc == NULL) {
-				NETBE_REALLOC(cfg->cpu, cfg->cpu_num + 1);
 				lc = &cfg->cpu[cfg->cpu_num];
 				lc->id = prt->lcore[j];
 				cfg->cpu_num++;
@@ -526,21 +525,29 @@ netbe_port_init(struct netbe_cfg *cfg, int argc, char *argv[])
 	int32_t rc;
 	uint32_t i, n, sid, j;
 	struct netbe_port *prt;
+	rte_cpuset_t cpuset;
+	uint32_t nc;
 
 	n = (uint32_t)argc;
+	cfg->prt = rte_zmalloc(NULL, sizeof(struct netbe_port) * n,
+		RTE_CACHE_LINE_SIZE);
+	cfg->prt_num = n;
 
 	rc = 0;
 	for (i = 0; i != n; i++) {
-		NETBE_REALLOC(cfg->prt, cfg->prt_num + 1);
-		rc = parse_netbe_arg(cfg->prt + i, argv[i]);
+		rc = parse_netbe_arg(cfg->prt + i, argv[i], &cpuset);
 		if (rc != 0) {
 			RTE_LOG(ERR, USER1,
 				"%s: processing of \"%s\" failed with error code: %d\n",
 				__func__, argv[i], rc);
 			return rc;
 		}
-		cfg->prt_num++;
 	}
+
+	for (i = 0, nc = 0; i < RTE_MAX_LCORE; i++)
+		nc += CPU_ISSET(i, &cpuset);
+	cfg->cpu = rte_zmalloc(NULL, sizeof(struct netbe_lcore) * nc,
+		RTE_CACHE_LINE_SIZE);
 
 	/* calculate number of queues per lcore. */
 	rc = calculate_nb_prtq(cfg);

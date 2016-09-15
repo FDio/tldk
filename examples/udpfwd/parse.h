@@ -16,6 +16,8 @@
 #ifndef __PARSE_H__
 #define __PARSE_H__
 
+#include <sched.h>
+
 #define PARSE_LIST_DELIM "-"
 
 union parse_val {
@@ -68,7 +70,8 @@ format_addr(const struct sockaddr_storage *sp, char buf[], size_t len)
 	return inet_ntop(sp->ss_family, addr, buf, len);
 }
 
-int parse_netbe_arg(struct netbe_port *prt, const char *arg);
+int parse_netbe_arg(struct netbe_port *prt, const char *arg,
+	rte_cpuset_t *cpuset);
 
 int netbe_parse_dest(const char *fname, struct netbe_dest_prm *prm);
 

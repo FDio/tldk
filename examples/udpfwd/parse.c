@@ -13,7 +13,6 @@
  * limitations under the License.
  */
 
-#include <sched.h>
 #include "netbe.h"
 #include "parse.h"
 
@@ -198,7 +197,7 @@ parse_kvargs(const char *arg, const char *keys_man[], uint32_t nb_man,
 }
 
 int
-parse_netbe_arg(struct netbe_port *prt, const char *arg)
+parse_netbe_arg(struct netbe_port *prt, const char *arg, rte_cpuset_t *cpuset)
 {
 	int32_t rc;
 	uint32_t i, j, nc;
@@ -247,6 +246,7 @@ parse_netbe_arg(struct netbe_port *prt, const char *arg)
 	for (i = 0, j = 0; i < RTE_MAX_LCORE; i++)
 		if (CPU_ISSET(i, &val[1].cpuset))
 			prt->lcore[j++] = i;
+	CPU_OR(cpuset, cpuset, &val[1].cpuset);
 
 	prt->mtu = val[2].u64;
 	prt->rx_offload = val[3].u64;
