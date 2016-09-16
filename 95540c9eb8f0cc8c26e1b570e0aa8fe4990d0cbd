@@ -2,6 +2,80 @@
   "comments": [
     {
       "key": {
+        "uuid": "3a1d315d_138958eb",
+        "filename": "doc/l4_api_desc.txt",
+        "patchSetId": 1
+      },
+      "lineNbr": 4,
+      "author": {
+        "id": 407
+      },
+      "writtenOn": "2016-09-16T15:39:35Z",
+      "side": 1,
+      "message": "do we need to put a space after # sign in first four lines?",
+      "range": {
+        "startLine": 1,
+        "startChar": 0,
+        "endLine": 4,
+        "endChar": 41
+      },
+      "revId": "95540c9eb8f0cc8c26e1b570e0aa8fe4990d0cbd",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "3a1d315d_b3774402",
+        "filename": "doc/l4_api_desc.txt",
+        "patchSetId": 1
+      },
+      "lineNbr": 17,
+      "author": {
+        "id": 407
+      },
+      "writtenOn": "2016-09-16T15:39:35Z",
+      "side": 1,
+      "message": "just for beautification, probably we can join following lines and keep close to 80 char?",
+      "revId": "95540c9eb8f0cc8c26e1b570e0aa8fe4990d0cbd",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "3a1d315d_937448fe",
+        "filename": "doc/l4_api_desc.txt",
+        "patchSetId": 1
+      },
+      "lineNbr": 22,
+      "author": {
+        "id": 407
+      },
+      "writtenOn": "2016-09-16T15:39:35Z",
+      "side": 1,
+      "message": "remove trailing space?",
+      "revId": "95540c9eb8f0cc8c26e1b570e0aa8fe4990d0cbd",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "3a1d315d_7361ac38",
+        "filename": "doc/l4_api_desc.txt",
+        "patchSetId": 1
+      },
+      "lineNbr": 41,
+      "author": {
+        "id": 407
+      },
+      "writtenOn": "2016-09-16T15:39:35Z",
+      "side": 1,
+      "message": "a",
+      "revId": "95540c9eb8f0cc8c26e1b570e0aa8fe4990d0cbd",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "3a1d315d_f36dbc33",
         "filename": "doc/l4_api_desc.txt",
         "patchSetId": 1
@@ -13,6 +87,52 @@
       "writtenOn": "2016-09-16T15:05:38Z",
       "side": 1,
       "message": "This block of text could use some reformatting, a bit more blank lines would be nice as well. Please define the \u0027tle\u0027 and other abbreviations.",
+      "revId": "95540c9eb8f0cc8c26e1b570e0aa8fe4990d0cbd",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "3a1d315d_d38640b9",
+        "filename": "doc/l4_api_desc.txt",
+        "patchSetId": 1
+      },
+      "lineNbr": 53,
+      "author": {
+        "id": 407
+      },
+      "writtenOn": "2016-09-16T15:39:35Z",
+      "side": 1,
+      "message": "do we need them here?",
+      "range": {
+        "startLine": 52,
+        "startChar": 0,
+        "endLine": 53,
+        "endChar": 15
+      },
+      "revId": "95540c9eb8f0cc8c26e1b570e0aa8fe4990d0cbd",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "3a1d315d_f3549c55",
+        "filename": "doc/l4_api_desc.txt",
+        "patchSetId": 1
+      },
+      "lineNbr": 64,
+      "author": {
+        "id": 407
+      },
+      "writtenOn": "2016-09-16T15:39:35Z",
+      "side": 1,
+      "message": "we have them in struct tle_bl_port bl4 and bl6.\nmay need to update with latest changes?",
+      "range": {
+        "startLine": 63,
+        "startChar": 0,
+        "endLine": 64,
+        "endChar": 51
+      },
       "revId": "95540c9eb8f0cc8c26e1b570e0aa8fe4990d0cbd",
       "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
       "unresolved": false
@@ -36,6 +156,29 @@
     },
     {
       "key": {
+        "uuid": "3a1d315d_d351a063",
+        "filename": "doc/l4_api_desc.txt",
+        "patchSetId": 1
+      },
+      "lineNbr": 74,
+      "author": {
+        "id": 407
+      },
+      "writtenOn": "2016-09-16T15:39:35Z",
+      "side": 1,
+      "message": "typo: length",
+      "range": {
+        "startLine": 74,
+        "startChar": 33,
+        "endLine": 74,
+        "endChar": 39
+      },
+      "revId": "95540c9eb8f0cc8c26e1b570e0aa8fe4990d0cbd",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "3a1d315d_13603831",
         "filename": "doc/l4_api_desc.txt",
         "patchSetId": 1
@@ -47,6 +190,29 @@
       "writtenOn": "2016-09-16T15:05:38Z",
       "side": 1,
       "message": "length",
+      "revId": "95540c9eb8f0cc8c26e1b570e0aa8fe4990d0cbd",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "3a1d315d_b34e24c0",
+        "filename": "doc/l4_api_desc.txt",
+        "patchSetId": 1
+      },
+      "lineNbr": 75,
+      "author": {
+        "id": 407
+      },
+      "writtenOn": "2016-09-16T15:39:35Z",
+      "side": 1,
+      "message": "typo: length",
+      "range": {
+        "startLine": 75,
+        "startChar": 33,
+        "endLine": 75,
+        "endChar": 39
+      },
       "revId": "95540c9eb8f0cc8c26e1b570e0aa8fe4990d0cbd",
       "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
       "unresolved": false
@@ -70,6 +236,121 @@
     },
     {
       "key": {
+        "uuid": "3a1d315d_73c88c22",
+        "filename": "doc/l4_api_desc.txt",
+        "patchSetId": 1
+      },
+      "lineNbr": 117,
+      "author": {
+        "id": 407
+      },
+      "writtenOn": "2016-09-16T15:39:35Z",
+      "side": 1,
+      "message": "trailing spaces?",
+      "range": {
+        "startLine": 117,
+        "startChar": 2,
+        "endLine": 117,
+        "endChar": 5
+      },
+      "revId": "95540c9eb8f0cc8c26e1b570e0aa8fe4990d0cbd",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "3a1d315d_33e9f480",
+        "filename": "doc/l4_api_desc.txt",
+        "patchSetId": 1
+      },
+      "lineNbr": 187,
+      "author": {
+        "id": 407
+      },
+      "writtenOn": "2016-09-16T15:39:35Z",
+      "side": 1,
+      "message": "will udp still be in the naming?",
+      "range": {
+        "startLine": 187,
+        "startChar": 10,
+        "endLine": 187,
+        "endChar": 41
+      },
+      "revId": "95540c9eb8f0cc8c26e1b570e0aa8fe4990d0cbd",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "3a1d315d_d3ff6033",
+        "filename": "doc/l4_api_desc.txt",
+        "patchSetId": 1
+      },
+      "lineNbr": 191,
+      "author": {
+        "id": 407
+      },
+      "writtenOn": "2016-09-16T15:39:35Z",
+      "side": 1,
+      "message": "typo: behaviour",
+      "range": {
+        "startLine": 191,
+        "startChar": 27,
+        "endLine": 191,
+        "endChar": 35
+      },
+      "revId": "95540c9eb8f0cc8c26e1b570e0aa8fe4990d0cbd",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "3a1d315d_13eef888",
+        "filename": "doc/l4_api_desc.txt",
+        "patchSetId": 1
+      },
+      "lineNbr": 193,
+      "author": {
+        "id": 407
+      },
+      "writtenOn": "2016-09-16T15:39:35Z",
+      "side": 1,
+      "message": "same here, _udp_ in the name.",
+      "range": {
+        "startLine": 193,
+        "startChar": 3,
+        "endLine": 193,
+        "endChar": 46
+      },
+      "revId": "95540c9eb8f0cc8c26e1b570e0aa8fe4990d0cbd",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "3a1d315d_f3025c3d",
+        "filename": "doc/l4_api_desc.txt",
+        "patchSetId": 1
+      },
+      "lineNbr": 196,
+      "author": {
+        "id": 407
+      },
+      "writtenOn": "2016-09-16T15:39:35Z",
+      "side": 1,
+      "message": "same here, _udp_ in the name",
+      "range": {
+        "startLine": 196,
+        "startChar": 3,
+        "endLine": 196,
+        "endChar": 46
+      },
+      "revId": "95540c9eb8f0cc8c26e1b570e0aa8fe4990d0cbd",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "3a1d315d_5366b052",
         "filename": "doc/l4_api_desc.txt",
         "patchSetId": 1
@@ -81,6 +362,236 @@
       "writtenOn": "2016-09-16T15:05:38Z",
       "side": 1,
       "message": "Maybe this looks better in the code, but the format for a doc is not very easy to read.",
+      "revId": "95540c9eb8f0cc8c26e1b570e0aa8fe4990d0cbd",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "3a1d315d_73bd2c68",
+        "filename": "doc/l4_api_desc.txt",
+        "patchSetId": 1
+      },
+      "lineNbr": 208,
+      "author": {
+        "id": 407
+      },
+      "writtenOn": "2016-09-16T15:39:35Z",
+      "side": 1,
+      "message": "do we need them here?",
+      "range": {
+        "startLine": 207,
+        "startChar": 0,
+        "endLine": 208,
+        "endChar": 18
+      },
+      "revId": "95540c9eb8f0cc8c26e1b570e0aa8fe4990d0cbd",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "3a1d315d_f35edc44",
+        "filename": "doc/l4_api_desc.txt",
+        "patchSetId": 1
+      },
+      "lineNbr": 323,
+      "author": {
+        "id": 407
+      },
+      "writtenOn": "2016-09-16T15:39:35Z",
+      "side": 1,
+      "message": "/** to make it doxygen compatible?",
+      "range": {
+        "startLine": 323,
+        "startChar": 0,
+        "endLine": 323,
+        "endChar": 2
+      },
+      "revId": "95540c9eb8f0cc8c26e1b570e0aa8fe4990d0cbd",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "3a1d315d_336e9402",
+        "filename": "doc/l4_api_desc.txt",
+        "patchSetId": 1
+      },
+      "lineNbr": 337,
+      "author": {
+        "id": 407
+      },
+      "writtenOn": "2016-09-16T15:39:35Z",
+      "side": 1,
+      "message": "fields",
+      "range": {
+        "startLine": 337,
+        "startChar": 32,
+        "endLine": 337,
+        "endChar": 38
+      },
+      "revId": "95540c9eb8f0cc8c26e1b570e0aa8fe4990d0cbd",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "3a1d315d_d37400d1",
+        "filename": "doc/l4_api_desc.txt",
+        "patchSetId": 1
+      },
+      "lineNbr": 368,
+      "author": {
+        "id": 407
+      },
+      "writtenOn": "2016-09-16T15:39:35Z",
+      "side": 1,
+      "message": "data_off not defined.\n\nis it an well-known term?",
+      "range": {
+        "startLine": 368,
+        "startChar": 3,
+        "endLine": 368,
+        "endChar": 11
+      },
+      "revId": "95540c9eb8f0cc8c26e1b570e0aa8fe4990d0cbd",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "3a1d315d_937e88ad",
+        "filename": "doc/l4_api_desc.txt",
+        "patchSetId": 1
+      },
+      "lineNbr": 399,
+      "author": {
+        "id": 407
+      },
+      "writtenOn": "2016-09-16T15:39:35Z",
+      "side": 1,
+      "message": "trailing space",
+      "range": {
+        "startLine": 399,
+        "startChar": 44,
+        "endLine": 399,
+        "endChar": 45
+      },
+      "revId": "95540c9eb8f0cc8c26e1b570e0aa8fe4990d0cbd",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "3a1d315d_734bec87",
+        "filename": "doc/l4_api_desc.txt",
+        "patchSetId": 1
+      },
+      "lineNbr": 443,
+      "author": {
+        "id": 407
+      },
+      "writtenOn": "2016-09-16T15:39:35Z",
+      "side": 1,
+      "message": "type: responsibility",
+      "range": {
+        "startLine": 443,
+        "startChar": 9,
+        "endLine": 443,
+        "endChar": 22
+      },
+      "revId": "95540c9eb8f0cc8c26e1b570e0aa8fe4990d0cbd",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "3a1d315d_5350f031",
+        "filename": "doc/l4_api_desc.txt",
+        "patchSetId": 1
+      },
+      "lineNbr": 472,
+      "author": {
+        "id": 407
+      },
+      "writtenOn": "2016-09-16T15:39:35Z",
+      "side": 1,
+      "message": "typo: elements",
+      "range": {
+        "startLine": 472,
+        "startChar": 50,
+        "endLine": 472,
+        "endChar": 59
+      },
+      "revId": "95540c9eb8f0cc8c26e1b570e0aa8fe4990d0cbd",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "3a1d315d_33457470",
+        "filename": "doc/l4_api_desc.txt",
+        "patchSetId": 1
+      },
+      "lineNbr": 517,
+      "author": {
+        "id": 407
+      },
+      "writtenOn": "2016-09-16T15:39:35Z",
+      "side": 1,
+      "message": "trailing space",
+      "range": {
+        "startLine": 517,
+        "startChar": 52,
+        "endLine": 517,
+        "endChar": 53
+      },
+      "revId": "95540c9eb8f0cc8c26e1b570e0aa8fe4990d0cbd",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "3a1d315d_134a7880",
+        "filename": "doc/l4_api_desc.txt",
+        "patchSetId": 1
+      },
+      "lineNbr": 561,
+      "author": {
+        "id": 407
+      },
+      "writtenOn": "2016-09-16T15:39:35Z",
+      "side": 1,
+      "message": "change to upper case",
+      "range": {
+        "startLine": 561,
+        "startChar": 3,
+        "endLine": 561,
+        "endChar": 4
+      },
+      "revId": "95540c9eb8f0cc8c26e1b570e0aa8fe4990d0cbd",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "3a1d315d_d35be052",
+        "filename": "doc/l4_api_desc.txt",
+        "patchSetId": 1
+      },
+      "lineNbr": 685,
+      "author": {
+        "id": 407
+      },
+      "writtenOn": "2016-09-16T15:39:35Z",
+      "side": 1,
+      "message": "/**",
+      "range": {
+        "startLine": 685,
+        "startChar": 0,
+        "endLine": 685,
+        "endChar": 2
+      },
       "revId": "95540c9eb8f0cc8c26e1b570e0aa8fe4990d0cbd",
       "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
       "unresolved": false
