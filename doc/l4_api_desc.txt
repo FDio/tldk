@@ -1,0 +1,734 @@
+#Copyright (c) 2016  Intel Corporation.
+#Licensed under the Apache License, Version 2.0 (the "License");
+#you may not use this file except in compliance with the License.
+#You may obtain a copy of the License at:
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+Introduction
+------------
+
+This file contains a brief description of public API
+for L4 packet procesing library (UDP and TCP).
+The intention is to keep configuration API (context creation/deletion,
+add/delete device, etc.) common for all L4 protocols supported.
+BackEnd (BE) datapath and FrontEnd (FE) APIs differs,
+but whenever possible similar syntax (and semantics) is preserved. 
+
+1. tle_ctx.h
+------------
+
+/**
+ * <tle_ctx>  - each such ctx represents an 'independent copy of the stack'.
+ * It owns set of <stream>s and <dev>s entities and provides
+ * (de)multiplexing input/output packets from/into devices into/from streams.
+ * <dev> is an abstraction for the underlying device, that is able
+ * to RX/TX packets and may provide some HW offload capabilities.
+ * It is a user responsibility to add to the <ctx> all <dev>s,
+ * that context has to manage, before starting to do stream operations
+ * (open/send/recv,close) over that context.
+ * Right now adding/deleting <dev>s to the context with open
+ * streams is not supported.
+ * <stream> represents an L4(UDP/TCP, etc.) endpoint <addr, port> and
+ * is an analogy to socket entity.
+ * As with a socket, there are ability to do recv/send over it.
+ * <stream> belongs to particular <ctx> but is visible globally across
+ * the process, i.e. any thread within the process can do recv/send over it
+ * without any further synchronisation.
+ * While 'upper' layer API is thread safe, lower layer API (rx_bulk/tx_bulk)
+ * is not thread safe and is not supposed to be run on multiple threads
+ * in parallel.
+ * So single thread can drive multiple <ctx>s and do IO for them,
+ * but multiple threads can't drive same <ctx> without some
+ * explicit synchronization.
+ */
+
+struct tle_ctx;
+struct tle_dev;
+
+/**
+ * device parameters.
+ */
+struct tle_dev_param {
+	uint32_t rx_offload; /**< DEV_RX_OFFLOAD_* supported. */
+	uint32_t tx_offload; /**< DEV_TX_OFFLOAD_* supported. */
+	struct in_addr local_addr4;  /**< local IPv4 address assigned. */
+	struct in6_addr local_addr6; /**< local IPv6 address assigned. */
+	uint32_t nb_bl_ports; /**< number of blocked ports. */
+	uint16_t *bl_ports; /**< list of blocked ports. */
+};
+
+#define TLE_DST_MAX_HDR	0x60
+
+struct tle_dest {
+	struct rte_mempool *head_mp;
+	/**< MP for fragment headers and control packets. */
+	struct tle_dev *dev;     /**< device to send packets through. */
+	uint16_t mtu;                /**< MTU for given destination. */
+	uint8_t l2_len;  /**< L2 header lenght. */
+	uint8_t l3_len;  /**< L3 header lenght. */
+	uint8_t hdr[TLE_DST_MAX_HDR]; /**< L2/L3 headers. */
+};
+
+/**
+ * context creation parameters.
+ */
+
+enum {
+	TLE_PROTO_UDP,
+	TLE_PROTO_TCP,
+	TLE_PROTO_NUM
+};
+
+struct tle_ctx_param {
+	int32_t socket_id;         /**< socket ID to allocate memory for. */
+	uint32_t proto;            /**< L4 proto to handle. */
+	uint32_t max_streams;      /**< max number of streams in context. */
+	uint32_t max_stream_rbufs; /**< max recv mbufs per stream. */
+	uint32_t max_stream_sbufs; /**< max send mbufs per stream. */
+	uint32_t send_bulk_size;   /**< expected # of packets per send call. */
+
+	int (*lookup4)(void *opaque, const struct in_addr *addr,
+		struct tle_dest *res);
+	/**< will be called by send() to get IPv4 packet destination info. */
+	void *lookup4_data;
+	/**< opaque data pointer for lookup4() callback. */
+
+	int (*lookup6)(void *opaque, const struct in6_addr *addr,
+		struct tle_dest *res);
+	/**< will be called by send() to get IPv6 packet destination info. */
+	void *lookup6_data;
+	/**< opaque data pointer for lookup6() callback. */
+};
+
+/**
+ * create L4 processing context.
+ * @param ctx_prm
+ *   Parameters used to create and initialise the L4 context.
+ * @return
+ *   Pointer to context structure that can be used in future operations,
+ *   or NULL on error, with error code set in rte_errno.
+ *   
+ *   Possible rte_errno errors include:
+ *   - EINVAL - invalid parameter passed to function
+ *   - ENOMEM - out of memory
+ */
+struct tle_ctx *
+tle_ctx_create(const struct tle_ctx_param *ctx_prm);
+
+/**
+ * Destroy given context.
+ *
+ * @param ctx
+ *   context to destroy
+ */
+void tle_ctx_destroy(struct tle_ctx *ctx);
+
+/**
+ * Add new device into the given context.
+ * This function is not multi-thread safe.
+ *
+ * @param ctx
+ *   context to add new device into.
+ * @param dev_prm
+ *   Parameters used to create and initialise new device inside the context.
+ * @return
+ *   Pointer to device structure that can be used in future operations,
+ *   or NULL on error, with error code set in rte_errno.
+ *   Possible rte_errno errors include:
+ *   - EINVAL - invalid parameter passed to function
+ *   - ENODEV - max possible value of open devices is reached
+ *   - ENOMEM - out of memory
+ */
+struct tle_dev *
+tle_add_dev(struct tle_ctx *ctx, const struct tle_dev_param *dev_prm);
+
+/**
+ * Remove and destroy previously added device from the given context.
+ * This function is not multi-thread safe.
+ *
+ * @param dev
+ *   device to remove and destroy.
+ * @return
+ *   zero on successful completion.
+ *   - -EINVAL - invalid parameter passed to function
+ */
+int tle_del_dev(struct tle_dev *dev);
+
+/**
+ * Flags to the context that destinations info might be changed,
+ * so if it has any destinations data cached, then
+ * it has to be invalidated.
+ * @param ctx
+ *   context to invalidate.
+ */
+void tle_ctx_invalidate(struct tle_ctx *ctx);
+
+/**
+ * Stream asynchronous notification mechanisms:
+ * a) recv/send callback.
+ * Stream recv/send notification callbacks behaviour is edge-triggered (ET).
+ * recv callback will be invoked if stream receive buffer was empty and
+ * new packet(s) have arrived.
+ * send callback will be invoked when stream send buffer was full,
+ * and some packets belonging to that stream were sent
+ * (part of send buffer became free again).
+ * Note that both recv and send callbacks are called with sort of read lock
+ * held on that stream. So it is not permitted to call stream_close()
+ * within the callback function. Doing that would cause a deadlock.
+ * While it is allowed to call stream send/recv functions within the
+ * callback, it is not recommended: callback function will be invoked
+ * within tle_udp_rx_bulk/tle_udp_tx_bulk context and some heavy processing
+ * within the callback functions might cause performance degradation
+ * or even loss of packets for further streams.
+ * b) recv/send event.
+ * Stream recv/send events behavour is level-triggered (LT).
+ * receive event will be raised by either
+ * tle_udp_rx_burst() or tle_udp_stream_recv() as long as there are any
+ * remaining packets inside stream receive buffer.
+ * send event will be raised by either
+ * tle_udp_tx_burst() or tle_udp_stream_send() as long as there are any
+ * free space inside stream send buffer.
+ * Note that callback and event are mutually exclusive on <stream, op> basis.
+ * It is not possible to  open a stream with both recv event and callback
+ * specified.
+ * Though it is possible to open a stream with recv callback and send event,
+ * or visa-versa.
+ * If the user doesn't need any notification mechanism for that stream,
+ * both event and callback could be set to zero.
+ */
+
+struct tle_event;
+struct tle_stream;
+
+/**
+ * Stream recv/send callback function and data.
+ */
+struct tle_stream_cb {
+	void (*func)(void *, struct tle_stream *);
+	void *data;
+};
+
+2. tle_tcp.h
+------------
+
+/**
+ * TCP stream creation parameters.
+ */
+struct tle_tcp_stream_param {
+	struct sockaddr_storage local_addr;  /**< stream local address. */
+	struct sockaddr_storage remote_addr; /**< stream remote address. */
+
+	uint64_t linger_cycles;  /**< number of cycles to linger. */
+	uint32_t nb_retries;     /**< max number of retransmission attempts. */
+
+	/* _cb and _ev are mutually exclusive */
+	struct tle_event *err_ev;      /**< error event to use.  */
+	struct tle_stream_cb err_cb;   /**< error callback to use. */
+
+	struct tle_event *recv_ev;      /**< recv event to use.  */
+	struct tle_stream_cb recv_cb;   /**< recv callback to use. */
+
+	struct tle_event *send_ev;      /**< send event to use. */
+	struct tle_stream_cb send_cb;   /**< send callback to use. */
+};
+
+/**
+ * create a new stream within given TCP context.
+ * @param ctx
+ *   TCP context to create new stream within.
+ * @param prm
+ *   Parameters used to create and initialise the new stream.
+ * @return
+ *   Pointer to TCP stream structure that can be used in future TCP API calls,
+ *   or NULL on error, with error code set in rte_errno.
+ *   Possible rte_errno errors include:
+ *   - EINVAL - invalid parameter passed to function
+ *   - ENOFILE - max limit of open streams reached for that context
+ */
+struct tle_stream *
+tle_tcp_stream_open(struct tle_ctx *ctx,
+	const struct tle_tcp_stream_param *prm);
+
+/**
+ * close an open stream.
+ * if the stream is in connected state, then:
+ * - connection termination would be performed.
+ * - if stream contains unsent data, then actual close will be postponed
+ * till either remaining data will be TX-ed, or linger timeout will expire.
+ * All packets that belong to that stream and remain in the device
+ * TX queue will be kept for father transmission.
+ * @param s
+ *   Pointer to the stream to close.
+ * @return
+ *   zero on successful completion.
+ *   - -EINVAL - invalid parameter passed to function
+ */
+int tle_tcp_stream_close(struct tle_stream *s);
+
+/**
+ * get open stream parameters.
+ * @param s
+ *   Pointer to the stream.
+ * @return
+ *   zero on successful completion.
+ *   - EINVAL - invalid parameter passed to function
+ */
+int
+tle_tcp_stream_get_param(const struct tle_stream *s,
+	struct tle_tcp_stream_param *prm);
+
+/**
+ * abort the connection and close an open stream.
+ * if the stream is in connected state, then:
+ * any queued data is thrown away and a reset segment is sent to the peer.
+ * All packets that belong to that stream and remain in the device
+ * TX queue will be kept for father transmission.
+ * @param s
+ *   Pointer to the stream to abort.
+ * @return
+ *   zero on successful completion.
+ *   - -EINVAL - invalid parameter passed to function
+ */
+int tle_tcp_stream_abort(struct tle_stream *s);
+
+/**
+ * Client mode connect API.
+ */
+
+/**
+ * Attempt to establish connection with the destination TCP endpoint.
+ * Stream write event (or callback) will fire, if the conenction will be
+ * established successfully.
+ * Note that stream in listen state or stream with already established
+ * connection, can't be subject of connect() call.
+ * In case of unsuccessful attempt, error event (or callback) will be
+ * activated.
+ * @param s
+ *   Pointer to the stream.
+ * @param addr
+ *   Address of the destination endpoint.
+ * @return
+ *   zero on successful completion.
+ *   - -EINVAL - invalid parameter passed to function
+ */
+int tle_tcp_stream_connect(struct tle_stream *s, const struct sockaddr *addr);
+
+/*
+ * Server mode connect API.
+ * Basic scheme for server mode API usage:
+ *
+ * <stream open happens here>
+ * tle_tcp_stream_listen(stream_to_listen);
+ * <wait for read event/callback on that stream>
+ * n = tle_tcp_synreqs(stream_to_listen, syn_reqs, sizeof(syn_reqs));
+ * for (i = 0, k = 0; i != n; i++) {
+ * 	rc = <decide should connection from that endpoint be allowed>;
+ * 	if (rc == 0) {
+ * 		//proceed with connection establishment
+ * 		k++;
+ * 		accept_param[k].syn = syn_reqs[i];
+ * 		<fill rest of accept_param fileds for k-th connection>
+ *	} else {
+ *		//silently ignore connection requests from that endpoint
+ * 		rte_pktmbuf_free(syn_reqs[i]);
+ *	}
+ * }
+ *	//accept k new connections
+ * 	rc = tle_tcp_accept(stream_to_listen, accept_param, new_con_streams, k);
+ * 	<handle errors>
+ */
+
+/**
+ * Set stream into the listen state (passive opener), i.e. make stream ready
+ * to accept new connections.
+ * Stream read event (or callback) will be activated as new SYN requests
+ * will arrive.
+ * Note that stream with already established (or establishing) connection
+ * can't be subject of listen() call.
+ * @param s
+ *   Pointer to the stream.
+ * @return
+ *   zero on successful completion.
+ *   - -EINVAL - invalid parameter passed to function
+ */
+int tle_tcp_stream_listen(struct tle_stream *s);
+
+/**
+ * return up to *num* mbufs with SYN requests that were received
+ * for given TCP endpoint.
+ * Note that the stream has to be in listen state.
+ * For each returned mbuf:
+ * data_off set to the start of the packet
+ * l2_len, l3_len, l4_len are setup properly
+ * (so user can still extract L2/L3/L4 header info if needed)
+ * packet_type RTE_PTYPE_L2/L3/L4 bits are setup properly.
+ * L3/L4 checksum is verified.
+ * @param s
+ *   TCP stream to receive packets from.
+ * @param pkt
+ *   An array of pointers to *rte_mbuf* structures that
+ *   must be large enough to store up to *num* pointers in it.
+ * @param num
+ *   Number of elements in the *pkt* array.
+ * @return
+ *   number of of entries filled inside *pkt* array.
+ */
+uint16_t tle_tcp_stream_synreqs(struct tle_stream *s, struct rte_mbuf *pkt[],
+	uint32_t num);
+
+struct tle_tcp_accept_param {
+	struct rte_mbuf *syn;  /*< mbuf with incoming SYN request. */
+	struct tle_tcp_stream_param prm; /*< stream open parameters. */
+};
+
+/**
+ * Accept connection requests for the given stream.
+ * Note that the stream has to be in listen state.
+ * For each new connection a new stream will be open.
+ * @param s
+ *   TCP listen stream.
+ * @param prm
+ *   An array of *tle_tcp_accept_param* structures that
+ *   contains at least *num* elements in it. 
+ * @param pkt
+ *   An array of pointers to *tle_stream* structures that
+ *   must be large enough to store up to *num* pointers in it.
+ * @param num
+ *   Number of elements in the *prm* and *rs* arrays.
+ * @return
+ *   number of of entries filled inside *rs* array.
+ *   In case of error, error code set in rte_errno.
+ *   Possible rte_errno errors include:
+ *   - EINVAL - invalid parameter passed to function
+ *   - ENFILE - no more streams are avaialble to open.
+ */
+int tle_tcp_stream_accept(struct tle_stream *s,
+	const struct tle_tcp_accept_param prm[], struct tle_stream *rs[],
+	uint32_t num);
+
+/**
+ * return up to *num* mbufs that was received for given TCP stream.
+ * Note that the stream has to be in connected state.
+ * Data ordering is preserved.
+ * For each returned mbuf:
+ * data_off set to the start of the packet's TCP data
+ * l2_len, l3_len, l4_len are setup properly
+ * (so user can still extract L2/L3 address info if needed)
+ * packet_type RTE_PTYPE_L2/L3/L4 bits are setup properly.
+ * L3/L4 checksum is verified.
+ * @param s
+ *   TCP stream to receive packets from.
+ * @param pkt
+ *   An array of pointers to *rte_mbuf* structures that
+ *   must be large enough to store up to *num* pointers in it.
+ * @param num
+ *   Number of elements in the *pkt* array.
+ * @return
+ *   number of of entries filled inside *pkt* array.
+ */
+uint16_t tle_tcp_stream_recv(struct tle_stream *s, struct rte_mbuf *pkt[],
+	uint16_t num);
+
+/**
+ * Consume and queue up to *num* packets, that will be sent eventually
+ * by tle_tcp_tx_bulk().
+ * Note that the stream has to be in connected state.
+ * It is resposibility of that function is to determine over which TCP dev
+ * given packets have to be sent out and do necessary preparations for that.
+ * Based on the *dst_addr* it does route lookup, fills L2/L3/L4 headers,
+ * and, if necessary, fragments packets.
+ * Depending on the underlying device information, it either does
+ * IP/TCP checksum calculations in SW or sets mbuf TX checksum
+ * offload fields properly.
+ * For each input mbuf the following conditions have to be met:
+ *	- data_off point to the start of packet's TCP data.
+ *	- there is enough header space to prepend L2/L3/L4 headers.
+ * @param s
+ *   TCP stream to send packets over.
+ * @param pkt
+ *   The burst of output packets that need to be send.
+ * @param num
+ *   Number of elements in the *pkt* array.
+ * @return
+ *   number of packets successfully queued in the stream send buffer.
+ */
+uint16_t tle_tcp_stream_send(struct tle_stream *s, struct rte_mbuf *pkt[],
+	uint16_t num);
+
+/**
+ * reads up to *iovcnt* buffers from the given TCP stream.
+ * Note that the stream has to be in connected state.
+ * @param s
+ *   TCP stream to read data from.
+ * @param iov
+ *   An array of *iovec* structures that
+ *   must be large enough to store up to *iovcnt* elemtents.
+ * @param iovcnt
+ *   Number of elements in the *iov* array.
+ * @return
+ *   number of bytes read on successful completion.
+ *   - EINVAL - invalid parameter passed to function
+ *   - ENOTCONN - stream is not connected
+ */
+ssize_t tle_tcp_readv(struct tle_stream *s, const struct iovec iov[],
+	int iovcnt);
+
+/**
+ * writes up to *iovcnt* buffers to the given TCP stream.
+ * Note that the stream has to be in connected state.
+ * @param s
+ *   TCP stream to read data from.
+ * @param mp
+ *   Mempool to allocate mbufs from.
+ * @param iov
+ *   An array of *iovec* structures that
+ *   must be large enough to store up to *iovcnt* elemtents.
+ * @param iovcnt
+ *   Number of elements in the *iov* array.
+ * @return
+ *   number of bytes written on successful completion.
+ *   - EINVAL - invalid parameter passed to function
+ *   - ENOTCONN - stream is not connected
+ */
+ssize_t tle_tcp_writev(struct tle_stream *s, struct rte_mempool *mp,
+	const struct iovec iov[], int iovcnt);
+
+/**
+ * Back End (BE) API.
+ * BE API functions are not multi-thread safe.
+ * Supposed to be called by the L2/L3 processing layer.
+ */
+
+/**
+ * Take input mbufs and distribute them to open TCP streams.
+ * expects that for each input packet:
+ *	- l2_len, l3_len, l4_len are setup correctly
+ *	- (packet_type & (RTE_PTYPE_L3_IPV4 | RTE_PTYPE_L3_IPV6)) != 0,
+ *	- (packet_type & RTE_PTYPE_L4_TCP) != 0,
+ * During delivery L3/L4 checksums will be verified
+ * (either relies on HW offload or in SW).
+ * May cause some extra packets to be queued for TX. 
+ * This function is not multi-thread safe.
+ * @param dev
+ *   TCP device the packets were received from.
+ * @param pkt
+ *   The burst of input packets that need to be processed.
+ * @param rp
+ *   The array that will contain pointers of unprocessed packets at return.
+ *   Should contain at least *num* elements.
+ * @param rc
+ *   The array that will contain error code for corresponding rp[] entry:
+ *   - ENOENT - no open stream matching this packet.
+ *   - ENOBUFS - receive buffer of the destination stream is full.
+ *   Should contain at least *num* elements.
+ * @param num
+ *   Number of elements in the *pkt* input array.
+ * @return
+ *   number of packets delivered to the TCP streams.
+ */
+uint16_t tle_tcp_rx_bulk(struct tle_dev *dev, struct rte_mbuf *pkt[],
+	struct rte_mbuf *rp[], int32_t rc[], uint16_t num);
+
+/**
+ * Fill *pkt* with pointers to the packets that have to be transmitted
+ * over given TCP device.
+ * Output packets have to be ready to be passed straight to rte_eth_tx_burst()
+ * without any extra processing.
+ * TCP/IPv4 checksum either already calculated or appropriate mbuf fields set
+ * properly for HW offload.
+ * This function is not multi-thread safe.
+ * @param dev
+ *   TCP device the output packets will be transmitted over.
+ * @param pkt
+ *   An array of pointers to *rte_mbuf* structures that
+ *   must be large enough to store up to *num* pointers in it.
+ * @param num
+ *   Number of elements in the *pkt* array.
+ * @return
+ *   number of of entries filled inside *pkt* array.
+ */
+uint16_t tle_tcp_tx_bulk(struct tle_dev *dev, struct rte_mbuf *pkt[],
+	uint16_t num);
+
+/**
+ * perform internal processing for given TCP context.
+ * Checks which timers are expired and performs the required actions
+ * (retransmission/connection abort, etc.)
+ * May cause some extra packets to be queued for TX.
+ * This function is not multi-thread safe.
+ * @param ctx
+ *   TCP context to process.
+ * @return
+ *   zero on successful completion.
+ *   - EINVAL - invalid parameter passed to function
+ * @return
+ */
+int tle_tcp_process(struct tle_ctx *ctx);
+
+3. tle_udp.h
+------------
+
+/**
+ * UDP stream creation parameters.
+ */
+struct tle_udp_stream_param {
+	struct sockaddr_storage local_addr;  /**< stream local address. */
+	struct sockaddr_storage remote_addr; /**< stream remote address. */
+
+	/* _cb and _ev are mutually exclusive */
+	struct tle_event *recv_ev;          /**< recv event to use.  */
+	struct tle_stream_cb recv_cb;   /**< recv callback to use. */
+
+	struct tle_event *send_ev;          /**< send event to use. */
+	struct tle_stream_cb send_cb;   /**< send callback to use. */
+};
+
+/**
+ * create a new stream within given UDP context.
+ * @param ctx
+ *   UDP context to create new stream within.
+ * @param prm
+ *   Parameters used to create and initialise the new stream.
+ * @return
+ *   Pointer to UDP stream structure that can be used in future UDP API calls,
+ *   or NULL on error, with error code set in rte_errno.
+ *   Possible rte_errno errors include:
+ *   - EINVAL - invalid parameter passed to function
+ *   - ENOFILE - max limit of open streams reached for that context
+ */
+struct tle_stream *
+tle_udp_stream_open(struct tle_ctx *ctx,
+	const struct tle_udp_stream_param *prm);
+
+/**
+ * close an open stream.
+ * All packets still remaining in stream receive buffer will be freed.
+ * All packets still remaining in stream transmit buffer will be kept
+ * for father transmission.
+ * @param s
+ *   Pointer to the stream to close.
+ * @return
+ *   zero on successful completion.
+ *   - -EINVAL - invalid parameter passed to function
+ */
+int tle_udp_stream_close(struct tle_stream *s);
+
+/**
+ * get open stream parameters.
+ * @param s
+ *   Pointer to the stream.
+ * @return
+ *   zero on successful completion.
+ *   - EINVAL - invalid parameter passed to function
+ */
+int
+tle_udp_stream_get_param(const struct tle_stream *s,
+	struct tle_udp_stream_param *prm);
+
+/**
+ * Take input mbufs and distribute them to open UDP streams.
+ * expects that for each input packet:
+ *	- l2_len, l3_len, l4_len are setup correctly
+ *	- (packet_type & (RTE_PTYPE_L3_IPV4 | RTE_PTYPE_L3_IPV6)) != 0,
+ *	- (packet_type & RTE_PTYPE_L4_UDP) != 0,
+ * During delivery L3/L4 checksums will be verified
+ * (either relies on HW offload or in SW).
+ * This function is not multi-thread safe.
+ * @param dev
+ *   UDP device the packets were received from.
+ * @param pkt
+ *   The burst of input packets that need to be processed.
+ * @param rp
+ *   The array that will contain pointers of unprocessed packets at return.
+ *   Should contain at least *num* elements.
+ * @param rc
+ *   The array that will contain error code for corresponding rp[] entry:
+ *   - ENOENT - no open stream matching this packet.
+ *   - ENOBUFS - receive buffer of the destination stream is full.
+ *   Should contain at least *num* elements.
+ * @param num
+ *   Number of elements in the *pkt* input array.
+ * @return
+ *   number of packets delivered to the UDP streams.
+ */
+uint16_t tle_udp_rx_bulk(struct tle_dev *dev, struct rte_mbuf *pkt[],
+	struct rte_mbuf *rp[], int32_t rc[], uint16_t num);
+
+/**
+ * Fill *pkt* with pointers to the packets that have to be transmitted
+ * over given UDP device.
+ * Output packets have to be ready to be passed straight to rte_eth_tx_burst()
+ * without any extra processing.
+ * UDP/IPv4 checksum either already calculated or appropriate mbuf fields set
+ * properly for HW offload.
+ * This function is not multi-thread safe.
+ * @param dev
+ *   UDP device the output packets will be transmitted over.
+ * @param pkt
+ *   An array of pointers to *rte_mbuf* structures that
+ *   must be large enough to store up to *num* pointers in it.
+ * @param num
+ *   Number of elements in the *pkt* array.
+ * @return
+ *   number of of entries filled inside *pkt* array.
+ */
+uint16_t tle_udp_tx_bulk(struct tle_dev *dev, struct rte_mbuf *pkt[],
+	uint16_t num);
+
+/*
+ * return up to *num* mbufs that was received for given UDP stream.
+ * For each returned mbuf:
+ * data_off set to the start of the packet's UDP data
+ * l2_len, l3_len, l4_len are setup properly
+ * (so user can still extract L2/L3 address info if needed)
+ * packet_type RTE_PTYPE_L2/L3/L4 bits are setup properly.
+ * L3/L4 checksum is verified.
+ * Packets with invalid L3/L4 checksum will be silently dropped.
+ * @param s
+ *   UDP stream to receive packets from.
+ * @param pkt
+ *   An array of pointers to *rte_mbuf* structures that
+ *   must be large enough to store up to *num* pointers in it.
+ * @param num
+ *   Number of elements in the *pkt* array.
+ * @return
+ *   number of of entries filled inside *pkt* array.
+ */
+uint16_t tle_udp_stream_recv(struct tle_stream *s, struct rte_mbuf *pkt[],
+	uint16_t num);
+
+/**
+ * Consume and queue up to *num* packets, that will be sent eventually
+ * by tle_udp_tx_bulk().
+ * If *dst_addr* is NULL, then default remote address associated with that
+ * stream (if any) will be used.
+ * The main purpose of that function is to determine over which UDP dev
+ * given packets have to be sent out and do necessary preparations for that.
+ * Based on the *dst_addr* it does route lookup, fills L2/L3/L4 headers,
+ * and, if necessary, fragments packets.
+ * Depending on the underlying device information, it either does
+ * IP/UDP checksum calculations in SW or sets mbuf TX checksum
+ * offload fields properly.
+ * For each input mbuf the following conditions have to be met:
+ *	- data_off point to the start of packet's UDP data.
+ *	- there is enough header space to prepend L2/L3/L4 headers.
+ * @param s
+ *   UDP stream to send packets over.
+ * @param pkt
+ *   The burst of output packets that need to be send.
+ * @param num
+ *   Number of elements in the *pkt* array.
+ * @param dst_addr
+ *   Destination address to send packets to.
+ * @return
+ *   number of packets successfully queued in the stream send buffer.
+ */
+uint16_t tle_udp_stream_send(struct tle_stream *s, struct rte_mbuf *pkt[],
+	uint16_t num, const struct sockaddr *dst_addr);
