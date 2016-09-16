@@ -1,0 +1,89 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "3a1d315d_f36dbc33",
+        "filename": "doc/l4_api_desc.txt",
+        "patchSetId": 1
+      },
+      "lineNbr": 49,
+      "author": {
+        "id": 29
+      },
+      "writtenOn": "2016-09-16T15:05:38Z",
+      "side": 1,
+      "message": "This block of text could use some reformatting, a bit more blank lines would be nice as well. Please define the \u0027tle\u0027 and other abbreviations.",
+      "revId": "95540c9eb8f0cc8c26e1b570e0aa8fe4990d0cbd",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "3a1d315d_335b3489",
+        "filename": "doc/l4_api_desc.txt",
+        "patchSetId": 1
+      },
+      "lineNbr": 74,
+      "author": {
+        "id": 29
+      },
+      "writtenOn": "2016-09-16T15:05:38Z",
+      "side": 1,
+      "message": "length",
+      "revId": "95540c9eb8f0cc8c26e1b570e0aa8fe4990d0cbd",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "3a1d315d_13603831",
+        "filename": "doc/l4_api_desc.txt",
+        "patchSetId": 1
+      },
+      "lineNbr": 75,
+      "author": {
+        "id": 29
+      },
+      "writtenOn": "2016-09-16T15:05:38Z",
+      "side": 1,
+      "message": "length",
+      "revId": "95540c9eb8f0cc8c26e1b570e0aa8fe4990d0cbd",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "3a1d315d_338454d3",
+        "filename": "doc/l4_api_desc.txt",
+        "patchSetId": 1
+      },
+      "lineNbr": 117,
+      "author": {
+        "id": 29
+      },
+      "writtenOn": "2016-09-16T15:05:38Z",
+      "side": 1,
+      "message": "Remove the white space here as this is from a header file and we do not want trailing white space in the code.",
+      "revId": "95540c9eb8f0cc8c26e1b570e0aa8fe4990d0cbd",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "3a1d315d_5366b052",
+        "filename": "doc/l4_api_desc.txt",
+        "patchSetId": 1
+      },
+      "lineNbr": 205,
+      "author": {
+        "id": 29
+      },
+      "writtenOn": "2016-09-16T15:05:38Z",
+      "side": 1,
+      "message": "Maybe this looks better in the code, but the format for a doc is not very easy to read.",
+      "revId": "95540c9eb8f0cc8c26e1b570e0aa8fe4990d0cbd",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    }
+  ]
+}
