@@ -625,17 +625,25 @@ fill_ipv6_am(const struct sockaddr_in6 *in, rte_xmm_t *addr, rte_xmm_t *mask)
 }
 
 static int
-check_stream_prm(const struct tle_udp_stream_param *prm)
+check_stream_prm(const struct tle_udp_ctx *ctx,
+	const struct tle_udp_stream_param *prm)
 {
 	if ((prm->local_addr.ss_family != AF_INET &&
 			prm->local_addr.ss_family != AF_INET6) ||
 			prm->local_addr.ss_family != prm->remote_addr.ss_family)
-		return EINVAL;
+		return -EINVAL;
 
 	/* callback and event notifications mechanisms are mutually exclusive */
 	if ((prm->recv_ev != NULL && prm->recv_cb.func != NULL) ||
 			(prm->send_ev != NULL && prm->send_cb.func != NULL))
-		return EINVAL;
+		return -EINVAL;
+
+	/* check does context support desired address family. */
+	if ((prm->local_addr.ss_family == AF_INET &&
+			ctx->prm.lookup4 == NULL) ||
+			(prm->local_addr.ss_family == AF_INET6 &&
+			ctx->prm.lookup6 == NULL))
+		return -EINVAL;
 
 	return 0;
 }
@@ -648,7 +656,7 @@ tle_udp_stream_open(struct tle_udp_ctx *ctx,
 	const struct sockaddr_in *rin;
 	int32_t rc;
 
-	if (ctx == NULL || prm == NULL || check_stream_prm(prm) != 0) {
+	if (ctx == NULL || prm == NULL || check_stream_prm(ctx, prm) != 0) {
 		rte_errno = EINVAL;
 		return NULL;
 	}
