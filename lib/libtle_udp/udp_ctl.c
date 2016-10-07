@@ -395,11 +395,10 @@ tle_udp_del_dev(struct tle_udp_dev *dev)
 	uint32_t p;
 	struct tle_udp_ctx *ctx;
 
-	ctx = dev->ctx;
-
 	if (dev == NULL || dev->ctx == NULL)
 		return -EINVAL;
 
+	ctx = dev->ctx;
 	p = dev - ctx->dev;
 
 	if (p >= RTE_DIM(ctx->dev) ||
