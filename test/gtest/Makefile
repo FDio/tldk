@@ -78,7 +78,7 @@ SRCS-y += test_tle_udp_stream.cpp
 CXXFLAGS += -std=c++11
 CXXFLAGS += -I$(GTEST_DIR)/include
 CXXFLAGS += -I$(GMOCK_DIR)/include
-CXXFLAGS += -I$(TLDK_ROOT)/$(RTE_TARGET)/include
+CXXFLAGS += -I$(RTE_OUTPUT)/include
 
 LDFLAGS += -lstdc++
 LDFLAGS += -L$(GMOCK_DIR) -lgmock
@@ -105,7 +105,7 @@ LDLIBS += gtest-rfc.o
 
 LDFLAGS += -lstdc++
 LDFLAGS += -L$(GMOCK_DIR) -lgmock
-LDLIBS += -L$(TLDK_ROOT)/$(RTE_TARGET)/lib
+LDLIBS += -L$(RTE_OUTPUT)/lib
 LDLIBS += -ltle_udp -ltle_dring
 
 include $(TLDK_ROOT)/mk/tle.app.mk

@@ -34,9 +34,9 @@ SRCS-y += pkt.c
 SRCS-y += main.c
 
 CFLAGS += $(WERROR_FLAGS)
-CFLAGS += -I$(TLDK_ROOT)/$(RTE_TARGET)/include
+CFLAGS += -I$(RTE_OUTPUT)/include
 
-LDLIBS += -L$(TLDK_ROOT)/$(RTE_TARGET)/lib
+LDLIBS += -L$(RTE_OUTPUT)/lib
 LDLIBS += -ltle_udp
 
 EXTRA_CFLAGS += -O3
