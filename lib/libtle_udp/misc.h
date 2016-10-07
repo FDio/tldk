@@ -25,12 +25,12 @@ ymm_mask_cmp(const _ymm_t *da, const _ymm_t *sa, const _ymm_t *sm)
 {
 	uint64_t ret;
 
-	ret = ((sa->u64[0] & sm->u64[0]) ^ da->u64[0]) |
-		((sa->u64[1] & sm->u64[1]) ^ da->u64[1]) |
-		((sa->u64[2] & sm->u64[2]) ^ da->u64[2]) |
-		((sa->u64[3] & sm->u64[3]) ^ da->u64[3]);
+	ret = ((da->u64[0] & sm->u64[0]) ^ sa->u64[0]) |
+		((da->u64[1] & sm->u64[1]) ^ sa->u64[1]) |
+		((da->u64[2] & sm->u64[2]) ^ sa->u64[2]) |
+		((da->u64[3] & sm->u64[3]) ^ sa->u64[3]);
 
-	return (ret == 0);
+	return (ret != 0);
 }
 
 /*
