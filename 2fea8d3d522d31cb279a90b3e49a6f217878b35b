@@ -19,6 +19,24 @@
     },
     {
       "key": {
+        "uuid": "fa3479d7_9b5117db",
+        "filename": "lib/libtle_udp/udp_ctl.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 642,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2016-10-07T13:49:11Z",
+      "side": 1,
+      "message": "at first if I check that value of ss.family is valid one.\nHere I check that that context support family.",
+      "parentUuid": "fa3479d7_3bca2ba2",
+      "revId": "2fea8d3d522d31cb279a90b3e49a6f217878b35b",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "fa3479d7_3b410b0c",
         "filename": "lib/libtle_udp/udp_ctl.c",
         "patchSetId": 1
@@ -30,6 +48,24 @@
       "writtenOn": "2016-10-07T13:43:33Z",
       "side": 1,
       "message": "personally I would move the check_stream_prm to a new \u0027if\u0027 as this \u0027if\u0027 is testing the input values. Testing the address family and stuff is secondary. This would allow us to remove the tests if we need to for performance later.",
+      "revId": "2fea8d3d522d31cb279a90b3e49a6f217878b35b",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "fa3479d7_7b5e73eb",
+        "filename": "lib/libtle_udp/udp_ctl.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 659,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2016-10-07T13:49:11Z",
+      "side": 1,
+      "message": "I don\u0027t paln to remove them. It is a public APi, and not datapath. We do need to check input parameters",
+      "parentUuid": "fa3479d7_3b410b0c",
       "revId": "2fea8d3d522d31cb279a90b3e49a6f217878b35b",
       "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
       "unresolved": false
