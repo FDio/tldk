@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "fa3479d7_0dc16280",
+        "filename": "vagrant/build_tldk.sh",
+        "patchSetId": 1
+      },
+      "lineNbr": 23,
+      "author": {
+        "id": 29
+      },
+      "writtenOn": "2016-10-13T22:19:39Z",
+      "side": 1,
+      "message": "CD to /tldk is this correct, just looks odd to me. I did not try it.",
+      "revId": "16c1d367a1a4a6ea9b8c068409de4f696d39eee2",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    }
+  ]
+}
