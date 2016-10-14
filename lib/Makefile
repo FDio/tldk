@@ -22,6 +22,7 @@ endif
 include $(RTE_SDK)/mk/rte.vars.mk
 
 DIRS-y += libtle_dring
-DIRS-y += libtle_udp
+DIRS-y += libtle_timer
+DIRS-y += libtle_l4p
 
 include $(TLDK_ROOT)/mk/tle.subdir.mk

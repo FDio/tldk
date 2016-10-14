@@ -17,13 +17,13 @@
 
 TEST(udp_destroy_null, udp_destroy_null)
 {
-	tle_udp_destroy(NULL);
+	tle_ctx_destroy(NULL);
 	EXPECT_EQ(rte_errno, EINVAL);
 }
 
 TEST_F(udp_destroy, udp_destroy_positive)
 {
 	int rc;
-	tle_udp_destroy(ctx);
+	tle_ctx_destroy(ctx);
 	ASSERT_EQ(rte_errno, 0);
 }

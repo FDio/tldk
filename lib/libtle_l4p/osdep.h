@@ -17,6 +17,8 @@
 #define _OSDEP_H_
 
 #include <rte_vect.h>
+#include <rte_memcpy.h>
+#include <rte_spinlock.h>
 #include <rte_log.h>
 
 #ifdef __cplusplus
@@ -35,6 +37,8 @@ extern "C" {
  */
 
 #define UDP_LOG(lvl, fmt, args...)      RTE_LOG(lvl, USER1, fmt, ##args)
+
+#define TCP_LOG(lvl, fmt, args...)      RTE_LOG(lvl, USER1, fmt, ##args)
 
 /*
  * if no AVX support, define _ymm_t here.
