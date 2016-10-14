@@ -1,7 +1,7 @@
 Introduction
 ============
 
-udpfwd is a sample application to demonstrate and test libtle_udp.
+udpfwd is a sample application to demonstrate and test TLDK UDP functionality.
 Depending on configuration it can do simple send/recv or both over
 opened udp streams. Also it implements ability to do UDP datagram
 forwarding between different streams, so it is possible to use that
@@ -38,6 +38,9 @@ udpfwd <EAL parameters> -- \
 	-s | --streams <num>    /* streams to open per context. */ \
 	-b | --becfg <filename> /* backend configuration file. */  \
 	-f | --fecfg <filename> /* frontend configuration file. */ \
+	-U | --udp /* run the app to handle UDP streams only. */ \
+	-T | --tcp /* run the app to handle TCP streams only. */ \
+	-L | --listen /* run app in TCP server mode (if TCP mode is enabled). */ \
 	<port0_params> <port1_params> ... <portN_params>
 
 port_params: port=<uint>,lcore=<uint>[-<uint>],\
@@ -45,7 +48,7 @@ port_params: port=<uint>,lcore=<uint>[-<uint>],\
 
 port_params are used to configure the particular DPDK device (rte_ethdev port),
 and specify BE lcore that will do RX/TX from/to the device and manage
-BE part of corresponding UDP context. Multiple BE lcore can be specified.
+BE part of corresponding TCP/UDP context. Multiple BE lcore can be specified.
 
 port -		DPDK port id (multiple queues are supported when multiple lcore
 		is specified for a port).
@@ -66,13 +69,13 @@ At least one of ipv4/ipv6 values have to be specified for each port.
 As an example:
 udpfwd --lcores='3,6,8' -w 01:00.0 -- \
 --promisc --rbufs 0x1000 --sbufs 0x1000 --streams 0x100 \
---fecfg ./fe.cfg --becfg ./be.cfg \
+--fecfg ./fe.cfg --becfg ./be.cfg -T -L \
 port=0,lcore=6,lcore=8,rx_offload=0xf,tx_offload=0,\
 ipv4=192.168.1.233,ipv6=2001:4860:b002::28
 
-Will create TLDK UDP context on lcore=6 and lcore=8 (BE lcore) to manage
-DPDK port 0. Will assign IPv4 address 192.168.1.233 and IPv6 address
-2001:4860:b002::28 to that port.
+Will create TLDK TCP context on lcore=6 and lcore=8 (BE lcore) to manage
+DPDK port 0 and all the streams will be in server mode. Will assign IPv4
+address 192.168.1.233 and IPv6 address 2001:4860:b002::28 to that port.
 The following supported by DPDK RX HW offloads:
 	DEV_RX_OFFLOAD_VLAN_STRIP,
 	DEV_RX_OFFLOAD_IPV4_CKSUM,
@@ -83,7 +86,7 @@ No HW TX offloads will be enabled.
 
 If multiple lcore is specified per DPDK port, the following RSS hash will
 be enabled on that port:
-	ETH_RSS_UDP
+	ETH_RSS_UDP, or ETH_RSS_TCP
 
 
 Fornt-End (FE) and Back-End (BE) configuration files format:
@@ -105,12 +108,13 @@ laddr=<ip>,lport=<uint16>,raddr=<ip>,rport=<uint16>,\
 belcore=<uint>]
 
 lcore -		EAL lcore to manage that stream(s) in the FE.
+belcore -	EAL lcore to manage that stream(s) in the BE.
 op -		operation to perform on that stream:
-		"rx" - do receive only on that stream.
-		"tx" - do send only on that stream.
-		"echo" - mimic recvfrom(..., &addr);sendto(..., &addr);
-		on that stream.
-		"fwd" - forward packets between streams.
+			"rx" - do receive only on that stream.
+			"tx" - do send only on that stream.
+			"echo" - mimic recvfrom(..., &addr);sendto(..., &addr);
+			on that stream.
+			"fwd" - forward packets between streams.
 laddr -		local address for the stream to open.
 lport -		local port for the stream to open.
 raddr -		remote address for the stream to open.
@@ -124,7 +128,6 @@ fwraddr -	remote address for the forwarding stream(s) to open
 		("fwd mode only).
 fwrport -	remote port for the forwarding stream(s) to open
 		("fwd mode only).
-belcore -		EAL lcore to manage that stream(s) in the BE.
 
 Refer to fe.cfg for an example.
 
@@ -138,4 +141,4 @@ addr -		destionation network address.
 masklen -	desitantion network prefix length.
 mac -		destination ethernet address.
 
-Refer to fe.cfg for an example.
+Refer to be.cfg for an example.

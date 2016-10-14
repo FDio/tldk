@@ -18,51 +18,31 @@
 
 #include "dpdk_version.h"
 
+struct ptype2cb {
+	uint32_t mask;
+	const char *name;
+	rte_rx_callback_fn fn;
+};
+
+enum {
+	ETHER_PTYPE = 0x1,
+	IPV4_PTYPE = 0x2,
+	IPV4_EXT_PTYPE = 0x4,
+	IPV6_PTYPE = 0x8,
+	IPV6_EXT_PTYPE = 0x10,
+	TCP_PTYPE = 0x20,
+	UDP_PTYPE = 0x40,
+};
+
 #ifdef DPDK_VERSION_GE_1604
 
-int
-setup_rx_cb(const struct netbe_port *uprt, struct netbe_lcore *lc,
-	uint16_t qid)
+static uint32_t
+get_ptypes(const struct netbe_port *uprt)
 {
-	int32_t i, rc;
 	uint32_t smask;
-	void *cb;
-
+	int32_t i, rc;
 	const uint32_t pmask = RTE_PTYPE_L2_MASK | RTE_PTYPE_L3_MASK |
 		RTE_PTYPE_L4_MASK;
-
-	enum {
-		ETHER_PTYPE = 0x1,
-		IPV4_PTYPE = 0x2,
-		IPV4_EXT_PTYPE = 0x4,
-		IPV6_PTYPE = 0x8,
-		IPV6_EXT_PTYPE = 0x10,
-		UDP_PTYPE = 0x20,
-	};
-
-	static const struct {
-		uint32_t mask;
-		const char *name;
-		rte_rx_callback_fn fn;
-	} ptype2cb[] = {
-		{
-			.mask = ETHER_PTYPE | IPV4_PTYPE | IPV4_EXT_PTYPE |
-				IPV6_PTYPE | IPV6_EXT_PTYPE | UDP_PTYPE,
-			.name = "HW l2/l3x/l4 ptype",
-			.fn = type0_rx_callback,
-		},
-		{
-			.mask = ETHER_PTYPE | IPV4_PTYPE | IPV6_PTYPE |
-				UDP_PTYPE,
-			.name = "HW l2/l3/l4 ptype",
-			.fn = type1_rx_callback,
-		},
-		{
-			.mask = 0,
-			.name = "no HW ptype",
-			.fn = typen_rx_callback,
-		},
-	};
 
 	smask = 0;
 	rc = rte_eth_dev_get_supported_ptypes(uprt->id, pmask, NULL, 0);
@@ -70,7 +50,7 @@ setup_rx_cb(const struct netbe_port *uprt, struct netbe_lcore *lc,
 		RTE_LOG(ERR, USER1,
 			"%s(port=%u) failed to get supported ptypes;\n",
 			__func__, uprt->id);
-		return rc;
+		return smask;
 	}
 
 	uint32_t ptype[rc];
@@ -95,13 +75,93 @@ setup_rx_cb(const struct netbe_port *uprt, struct netbe_lcore *lc,
 		case RTE_PTYPE_L3_IPV6_EXT:
 			smask |= IPV6_EXT_PTYPE;
 			break;
+		case RTE_PTYPE_L4_TCP:
+			smask |= TCP_PTYPE;
+			break;
 		case RTE_PTYPE_L4_UDP:
 			smask |= UDP_PTYPE;
 			break;
 		}
 	}
 
-	for (i = 0; i != RTE_DIM(ptype2cb); i++) {
+	return smask;
+}
+
+#else
+
+static uint32_t
+get_ptypes(__rte_unused const struct netbe_port *uprt)
+{
+	return 0;
+}
+
+#endif /* DPDK_VERSION_GE_1604 */
+
+int
+setup_rx_cb(const struct netbe_port *uprt, struct netbe_lcore *lc,
+	uint16_t qid)
+{
+	int32_t rc;
+	uint32_t i, n, smask;
+	void *cb;
+	const struct ptype2cb *ptype2cb;
+
+	static const struct ptype2cb tcp_ptype2cb[] = {
+		{
+			.mask = ETHER_PTYPE | IPV4_PTYPE | IPV4_EXT_PTYPE |
+				IPV6_PTYPE | IPV6_EXT_PTYPE | TCP_PTYPE,
+			.name = "HW l2/l3x/l4-tcp ptype",
+			.fn = type0_tcp_rx_callback,
+		},
+		{
+			.mask = ETHER_PTYPE | IPV4_PTYPE | IPV6_PTYPE |
+				TCP_PTYPE,
+			.name = "HW l2/l3/l4-tcp ptype",
+			.fn = type1_tcp_rx_callback,
+		},
+		{
+			.mask = 0,
+			.name = "tcp no HW ptype",
+			.fn = typen_tcp_rx_callback,
+		},
+	};
+
+	static const struct ptype2cb udp_ptype2cb[] = {
+		{
+			.mask = ETHER_PTYPE | IPV4_PTYPE | IPV4_EXT_PTYPE |
+				IPV6_PTYPE | IPV6_EXT_PTYPE | UDP_PTYPE,
+			.name = "HW l2/l3x/l4-udp ptype",
+			.fn = type0_udp_rx_callback,
+		},
+		{
+			.mask = ETHER_PTYPE | IPV4_PTYPE | IPV6_PTYPE |
+				UDP_PTYPE,
+			.name = "HW l2/l3/l4-udp ptype",
+			.fn = type1_udp_rx_callback,
+		},
+		{
+			.mask = 0,
+			.name = "udp no HW ptype",
+			.fn = typen_udp_rx_callback,
+		},
+	};
+
+	smask = get_ptypes(uprt);
+
+	if (lc->proto == TLE_PROTO_TCP) {
+		ptype2cb = tcp_ptype2cb;
+		n = RTE_DIM(tcp_ptype2cb);
+	} else if (lc->proto == TLE_PROTO_UDP) {
+		ptype2cb = udp_ptype2cb;
+		n = RTE_DIM(udp_ptype2cb);
+	} else {
+		RTE_LOG(ERR, USER1,
+			"%s(lc=%u) unsupported proto: %u\n",
+			__func__, lc->id, lc->proto);
+		return -EINVAL;
+	}
+
+	for (i = 0; i != n; i++) {
 		if ((smask & ptype2cb[i].mask) == ptype2cb[i].mask) {
 			cb = rte_eth_add_rx_callback(uprt->id, qid,
 				ptype2cb[i].fn, lc);
@@ -120,26 +180,5 @@ setup_rx_cb(const struct netbe_port *uprt, struct netbe_lcore *lc,
 		__func__, uprt->id);
 	return -ENOENT;
 }
-
-#else
-
-int
-setup_rx_cb(const struct netbe_port *uprt, struct netbe_lcore *lc,
-	uint16_t qid)
-{
-	void *cb;
-	int32_t rc;
-
-	cb = rte_eth_add_rx_callback(uprt->id, qid, typen_rx_callback, lc);
-	rc = -rte_errno;
-	RTE_LOG(ERR, USER1,
-		"%s(port=%u), setup RX callback \"%s\" "
-		"returns %p;\n",
-		__func__, uprt->id, "no HW ptype", cb);
-
-	return ((cb == NULL) ? rc : 0);
-}
-
-#endif /* DPDK_VERSION_GE_1604 */
 
 #endif /* PKT_DPDK_LEGACY_H_ */

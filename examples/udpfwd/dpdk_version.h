@@ -23,7 +23,7 @@
 #define DPDK_VERSION_GE_1604
 #endif
 #elif defined(RTE_VER_YEAR)
-#if RTE_VER_YEAR >= 16 && RTE_VER_MONTH >= 4
+#if RTE_VERSION >= RTE_VERSION_NUM(16,4,0,0)
 #define DPDK_VERSION_GE_1604
 #endif
 #else

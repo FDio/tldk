@@ -20,18 +20,18 @@
 #include <rte_ip_frag.h>
 #include <rte_udp.h>
 
-#include "udp_impl.h"
+#include "udp_stream.h"
 #include "misc.h"
 
 static inline struct tle_udp_stream *
-rx_stream_obtain(struct tle_udp_dev *dev, uint32_t type, uint32_t port)
+rx_stream_obtain(struct tle_dev *dev, uint32_t type, uint32_t port)
 {
 	struct tle_udp_stream *s;
 
-	if (type >= TLE_UDP_VNUM || dev->dp[type] == NULL)
+	if (type >= TLE_VNUM || dev->dp[type] == NULL)
 		return NULL;
 
-	s = dev->dp[type]->streams[port];
+	s = (struct tle_udp_stream *)dev->dp[type]->streams[port];
 	if (s == NULL)
 		return NULL;
 
@@ -49,38 +49,38 @@ get_pkt_type(const struct rte_mbuf *m)
 	v = m->packet_type &
 		(RTE_PTYPE_L3_IPV4 | RTE_PTYPE_L3_IPV6 | RTE_PTYPE_L4_MASK);
 	if (v == (RTE_PTYPE_L3_IPV4 | RTE_PTYPE_L4_UDP))
-		return TLE_UDP_V4;
+		return TLE_V4;
 	else if (v == (RTE_PTYPE_L3_IPV6 | RTE_PTYPE_L4_UDP))
-		return TLE_UDP_V6;
+		return TLE_V6;
 	else
-		return TLE_UDP_VNUM;
+		return TLE_VNUM;
 }
 
-static inline union udp_ports
-pkt_info(const struct tle_udp_dev *dev, struct rte_mbuf *m,
-	union udp_ports *ports, union ipv4_addrs *addr4,
+static inline union l4_ports
+pkt_info(const struct tle_dev *dev, struct rte_mbuf *m,
+	union l4_ports *ports, union ipv4_addrs *addr4,
 	union ipv6_addrs **addr6)
 {
 	uint32_t len;
-	union udp_ports ret, *up;
+	union l4_ports ret, *up;
 	union ipv4_addrs *pa4;
 
 	ret.src = get_pkt_type(m);
 
 	len = m->l2_len;
-	if (ret.src == TLE_UDP_V4) {
+	if (ret.src == TLE_V4) {
 		pa4 = rte_pktmbuf_mtod_offset(m, union ipv4_addrs *,
 			len + offsetof(struct ipv4_hdr, src_addr));
 		addr4->raw = pa4->raw;
-		m->ol_flags |= dev->rx.ol_flags[TLE_UDP_V4];
-	} else if (ret.src == TLE_UDP_V6) {
+		m->ol_flags |= dev->rx.ol_flags[TLE_V4];
+	} else if (ret.src == TLE_V6) {
 		*addr6 = rte_pktmbuf_mtod_offset(m, union ipv6_addrs *,
 			len + offsetof(struct ipv6_hdr, src_addr));
-		m->ol_flags |= dev->rx.ol_flags[TLE_UDP_V6];
+		m->ol_flags |= dev->rx.ol_flags[TLE_V6];
 	}
 
 	len += m->l3_len;
-	up = rte_pktmbuf_mtod_offset(m, union udp_ports *,
+	up = rte_pktmbuf_mtod_offset(m, union l4_ports *,
 		len + offsetof(struct udp_hdr, src_port));
 	ports->raw = up->raw;
 	ret.dst = ports->dst;
@@ -101,7 +101,7 @@ rx_stream(struct tle_udp_stream *s, void *mb[], struct rte_mbuf *rp[],
 
 	/* if RX queue was empty invoke user RX notification callback. */
 	if (s->rx.cb.func != NULL && r != 0 && rte_ring_count(s->rx.q) == r)
-		s->rx.cb.func(s->rx.cb.data, s);
+		s->rx.cb.func(s->rx.cb.data, &s->s);
 
 	for (i = r, k = 0; i != num; i++, k++) {
 		rc[k] = ENOBUFS;
@@ -113,7 +113,7 @@ rx_stream(struct tle_udp_stream *s, void *mb[], struct rte_mbuf *rp[],
 
 static inline uint16_t
 rx_stream6(struct tle_udp_stream *s, struct rte_mbuf *pkt[],
-	union ipv6_addrs *addr[], union udp_ports port[],
+	union ipv6_addrs *addr[], union l4_ports port[],
 	struct rte_mbuf *rp[], int32_t rc[], uint16_t num)
 {
 	uint32_t i, k, n;
@@ -124,9 +124,9 @@ rx_stream6(struct tle_udp_stream *s, struct rte_mbuf *pkt[],
 
 	for (i = 0; i != num; i++) {
 
-		if ((port[i].raw & s->pmsk.raw) != s->port.raw ||
-				ymm_mask_cmp(&addr[i]->raw, &s->ipv6.addr.raw,
-				&s->ipv6.mask.raw) != 0) {
+		if ((port[i].raw & s->s.pmsk.raw) != s->s.port.raw ||
+				ymm_mask_cmp(&addr[i]->raw, &s->s.ipv6.addr.raw,
+				&s->s.ipv6.mask.raw) != 0) {
 			rc[k] = ENOENT;
 			rp[k] = pkt[i];
 			k++;
@@ -141,7 +141,7 @@ rx_stream6(struct tle_udp_stream *s, struct rte_mbuf *pkt[],
 
 static inline uint16_t
 rx_stream4(struct tle_udp_stream *s, struct rte_mbuf *pkt[],
-	union ipv4_addrs addr[], union udp_ports port[],
+	union ipv4_addrs addr[], union l4_ports port[],
 	struct rte_mbuf *rp[], int32_t rc[], uint16_t num)
 {
 	uint32_t i, k, n;
@@ -152,9 +152,9 @@ rx_stream4(struct tle_udp_stream *s, struct rte_mbuf *pkt[],
 
 	for (i = 0; i != num; i++) {
 
-		if ((addr[i].raw & s->ipv4.mask.raw) != s->ipv4.addr.raw ||
-				(port[i].raw & s->pmsk.raw) !=
-				s->port.raw) {
+		if ((addr[i].raw & s->s.ipv4.mask.raw) != s->s.ipv4.addr.raw ||
+				(port[i].raw & s->s.pmsk.raw) !=
+				s->s.port.raw) {
 			rc[k] = ENOENT;
 			rp[k] = pkt[i];
 			k++;
@@ -168,12 +168,12 @@ rx_stream4(struct tle_udp_stream *s, struct rte_mbuf *pkt[],
 }
 
 uint16_t
-tle_udp_rx_bulk(struct tle_udp_dev *dev, struct rte_mbuf *pkt[],
+tle_udp_rx_bulk(struct tle_dev *dev, struct rte_mbuf *pkt[],
 	struct rte_mbuf *rp[], int32_t rc[], uint16_t num)
 {
 	struct tle_udp_stream *s;
 	uint32_t i, j, k, n, p, t;
-	union udp_ports tp[num], port[num];
+	union l4_ports tp[num], port[num];
 	union ipv4_addrs a4[num];
 	union ipv6_addrs *pa6[num];
 
@@ -191,7 +191,7 @@ tle_udp_rx_bulk(struct tle_udp_dev *dev, struct rte_mbuf *pkt[],
 		s = rx_stream_obtain(dev, t, p);
 		if (s != NULL) {
 
-			if (t == TLE_UDP_V4)
+			if (t == TLE_V4)
 				n = rx_stream4(s, pkt + i, a4 + i,
 					port + i, rp + k, rc + k, j - i);
 			else
@@ -233,7 +233,7 @@ stream_drb_release(struct tle_udp_stream *s, struct tle_drb * drb[],
 
 		/* if stream send buffer was full invoke TX callback */
 		else if (s->tx.cb.func != NULL && n == 0)
-			s->tx.cb.func(s->tx.cb.data, s);
+			s->tx.cb.func(s->tx.cb.data, &s->s);
 
 	}
 
@@ -241,7 +241,7 @@ stream_drb_release(struct tle_udp_stream *s, struct tle_drb * drb[],
 }
 
 uint16_t
-tle_udp_tx_bulk(struct tle_udp_dev *dev, struct rte_mbuf *pkt[], uint16_t num)
+tle_udp_tx_bulk(struct tle_dev *dev, struct rte_mbuf *pkt[], uint16_t num)
 {
 	uint32_t i, j, k, n;
 	struct tle_drb *drb[num];
@@ -268,73 +268,6 @@ tle_udp_tx_bulk(struct tle_udp_dev *dev, struct rte_mbuf *pkt[], uint16_t num)
 	return n;
 }
 
-static int
-check_pkt_csum(const struct rte_mbuf *m, uint32_t type)
-{
-	const struct ipv4_hdr *l3h4;
-	const struct ipv6_hdr *l3h6;
-	const struct udp_hdr *l4h;
-	int32_t ret;
-	uint16_t csum;
-
-	ret = 0;
-	l3h4 = rte_pktmbuf_mtod_offset(m, const struct ipv4_hdr *, m->l2_len);
-	l3h6 = rte_pktmbuf_mtod_offset(m, const struct ipv6_hdr *, m->l2_len);
-
-	if ((m->ol_flags & PKT_RX_IP_CKSUM_BAD) != 0) {
-		csum = _ipv4x_cksum(l3h4, m->l3_len);
-		ret = (csum != UINT16_MAX);
-	}
-
-	if (ret == 0 && (m->ol_flags & PKT_RX_L4_CKSUM_BAD) != 0) {
-
-		/*
-		 * for IPv4 it is allowed to have zero UDP cksum,
-		 * for IPv6 valid UDP cksum is mandatory.
-		 */
-		if (type == TLE_UDP_V4) {
-			l4h = (const struct udp_hdr *)((uintptr_t)l3h4 +
-				m->l3_len);
-			csum = (l4h->dgram_cksum == 0) ? UINT16_MAX :
-				_ipv4_udptcp_mbuf_cksum(m,
-				m->l2_len + m->l3_len, l3h4);
-		} else
-			csum = _ipv6_udptcp_mbuf_cksum(m,
-				m->l2_len + m->l3_len, l3h6);
-
-		ret = (csum != UINT16_MAX);
-	}
-
-	return ret;
-}
-
-/* exclude NULLs from the final list of packets. */
-static inline uint32_t
-compress_pkt_list(struct rte_mbuf *pkt[], uint32_t nb_pkt, uint32_t nb_zero)
-{
-	uint32_t i, j, k, l;
-
-	for (j = nb_pkt; nb_zero != 0 && j-- != 0; ) {
-
-		/* found a hole. */
-		if (pkt[j] == NULL) {
-
-			/* find how big is it. */
-			for (i = j; i-- != 0 && pkt[i] == NULL; )
-				;
-			/* fill the hole. */
-			for (k = j + 1, l = i + 1; k != nb_pkt; k++, l++)
-				pkt[l] = pkt[k];
-
-			nb_pkt -= j - i;
-			nb_zero -= j - i;
-			j = i + 1;
-		}
-	}
-
-	return nb_pkt;
-}
-
 /*
  * helper function, do the necessary pre-processing for the received packets
  * before handiing them to the strem_recv caller.
@@ -356,7 +289,8 @@ recv_pkt_process(struct rte_mbuf *m[], uint32_t num, uint32_t type)
 		f = flg[i] & (PKT_RX_IP_CKSUM_BAD | PKT_RX_L4_CKSUM_BAD);
 
 		/* drop packets with invalid cksum(s). */
-		if (f != 0 && check_pkt_csum(m[i], type) != 0) {
+		if (f != 0 && check_pkt_csum(m[i], m[i]->ol_flags, type,
+				IPPROTO_UDP) != 0) {
 			rte_pktmbuf_free(m[i]);
 			m[i] = NULL;
 			k++;
@@ -370,11 +304,12 @@ recv_pkt_process(struct rte_mbuf *m[], uint32_t num, uint32_t type)
 }
 
 uint16_t
-tle_udp_stream_recv(struct tle_udp_stream *s, struct rte_mbuf *pkt[],
-	uint16_t num)
+tle_udp_stream_recv(struct tle_stream *us, struct rte_mbuf *pkt[], uint16_t num)
 {
 	uint32_t k, n;
+	struct tle_udp_stream *s;
 
+	s = UDP_STREAM(us);
 	n = rte_ring_mc_dequeue_burst(s->rx.q, (void **)pkt, num);
 	if (n == 0)
 		return 0;
@@ -389,58 +324,14 @@ tle_udp_stream_recv(struct tle_udp_stream *s, struct rte_mbuf *pkt[],
 		rwl_release(&s->rx.use);
 	}
 
-	k = recv_pkt_process(pkt, n, s->type);
+	k = recv_pkt_process(pkt, n, s->s.type);
 	return compress_pkt_list(pkt, n, k);
-}
-
-static int32_t
-udp_get_dest(struct tle_udp_stream *s, const void *dst_addr,
-	struct tle_udp_dest *dst)
-{
-	int32_t rc;
-	const struct in_addr *d4;
-	const struct in6_addr *d6;
-	struct tle_udp_ctx *ctx;
-	struct tle_udp_dev *dev;
-
-	ctx = s->ctx;
-
-	/* it is here just to keep gcc happy. */
-	d4 = NULL;
-
-	if (s->type == TLE_UDP_V4) {
-		d4 = dst_addr;
-		rc = ctx->prm.lookup4(ctx->prm.lookup4_data, d4, dst);
-	} else if (s->type == TLE_UDP_V6) {
-		d6 = dst_addr;
-		rc = ctx->prm.lookup6(ctx->prm.lookup6_data, d6, dst);
-	} else
-		rc = -ENOENT;
-
-	if (rc < 0 || dst->dev == NULL || dst->dev->ctx != ctx)
-		return -ENOENT;
-
-	dev = dst->dev;
-	if (s->type == TLE_UDP_V4) {
-		struct ipv4_hdr *l3h;
-		l3h = (struct ipv4_hdr *)(dst->hdr + dst->l2_len);
-		l3h->src_addr = dev->prm.local_addr4.s_addr;
-		l3h->dst_addr = d4->s_addr;
-	} else {
-		struct ipv6_hdr *l3h;
-		l3h = (struct ipv6_hdr *)(dst->hdr + dst->l2_len);
-		rte_memcpy(l3h->src_addr, &dev->prm.local_addr6,
-			sizeof(l3h->src_addr));
-		rte_memcpy(l3h->dst_addr, d6, sizeof(l3h->dst_addr));
-	}
-
-	return dev - ctx->dev;
 }
 
 static inline int
 udp_fill_mbuf(struct rte_mbuf *m,
 	uint32_t type, uint64_t ol_flags, uint32_t pid,
-	union udph udph, const struct tle_udp_dest *dst)
+	union udph udph, const struct tle_dest *dst)
 {
 	uint32_t len, plen;
 	char *l2h;
@@ -471,7 +362,7 @@ udp_fill_mbuf(struct rte_mbuf *m,
 
 	/* update proto specific fields. */
 
-	if (type == TLE_UDP_V4) {
+	if (type == TLE_V4) {
 		struct ipv4_hdr *l3h;
 		l3h = (struct ipv4_hdr *)(l2h + dst->l2_len);
 		l3h->packet_id = rte_cpu_to_be_16(pid);
@@ -511,7 +402,7 @@ frag_fixup(const struct rte_mbuf *ms, struct rte_mbuf *mf, uint32_t type)
 	mf->ol_flags = ms->ol_flags;
 	mf->tx_offload = ms->tx_offload;
 
-	if (type == TLE_UDP_V4 && (ms->ol_flags & PKT_TX_IP_CKSUM) == 0) {
+	if (type == TLE_V4 && (ms->ol_flags & PKT_TX_IP_CKSUM) == 0) {
 		l3h = rte_pktmbuf_mtod(mf, struct ipv4_hdr *);
 		l3h->hdr_checksum = _ipv4x_cksum(l3h, mf->l3_len);
 	}
@@ -522,7 +413,7 @@ frag_fixup(const struct rte_mbuf *ms, struct rte_mbuf *mf, uint32_t type)
  */
 static inline int
 fragment(struct rte_mbuf *pkt, struct rte_mbuf *frag[], uint32_t num,
-	uint32_t type, const struct tle_udp_dest *dst)
+	uint32_t type, const struct tle_dest *dst)
 {
 	int32_t frag_num, i;
 	uint16_t mtu;
@@ -533,7 +424,7 @@ fragment(struct rte_mbuf *pkt, struct rte_mbuf *frag[], uint32_t num,
 	mtu = dst->mtu - dst->l2_len;
 
 	/* fragment packet */
-	if (type == TLE_UDP_V4)
+	if (type == TLE_V4)
 		frag_num = rte_ipv4_fragment_packet(pkt, frag, num, mtu,
 			dst->head_mp, dst->head_mp);
 	else
@@ -572,7 +463,7 @@ stream_drb_alloc(struct tle_udp_stream *s, struct tle_drb *drbs[],
 
 /* enqueue up to num packets to the destination device queue. */
 static inline uint16_t
-queue_pkt_out(struct tle_udp_stream *s, struct tle_udp_dev *dev,
+queue_pkt_out(struct tle_udp_stream *s, struct tle_dev *dev,
 		const void *pkt[], uint16_t nb_pkt,
 		struct tle_drb *drbs[], uint32_t *nb_drb)
 {
@@ -613,7 +504,7 @@ queue_pkt_out(struct tle_udp_stream *s, struct tle_udp_dev *dev,
 }
 
 uint16_t
-tle_udp_stream_send(struct tle_udp_stream *s, struct rte_mbuf *pkt[],
+tle_udp_stream_send(struct tle_stream *us, struct rte_mbuf *pkt[],
 	uint16_t num, const struct sockaddr *dst_addr)
 {
 	int32_t di, frg, rc;
@@ -622,16 +513,18 @@ tle_udp_stream_send(struct tle_udp_stream *s, struct rte_mbuf *pkt[],
 	uint32_t mtu, pid, type;
 	const struct sockaddr_in *d4;
 	const struct sockaddr_in6 *d6;
+	struct tle_udp_stream *s;
 	const void *da;
 	union udph udph;
-	struct tle_udp_dest dst;
+	struct tle_dest dst;
 	struct tle_drb *drb[num];
 
-	type = s->type;
+	s = UDP_STREAM(us);
+	type = s->s.type;
 
 	/* start filling UDP header. */
 	udph.raw = 0;
-	udph.ports.src = s->port.dst;
+	udph.ports.src = s->s.port.dst;
 
 	/* figure out what destination addr/port to use. */
 	if (dst_addr != NULL) {
@@ -639,7 +532,7 @@ tle_udp_stream_send(struct tle_udp_stream *s, struct rte_mbuf *pkt[],
 			rte_errno = EINVAL;
 			return 0;
 		}
-		if (type == TLE_UDP_V4) {
+		if (type == TLE_V4) {
 			d4 = (const struct sockaddr_in *)dst_addr;
 			da = &d4->sin_addr;
 			udph.ports.dst = d4->sin_port;
@@ -649,14 +542,14 @@ tle_udp_stream_send(struct tle_udp_stream *s, struct rte_mbuf *pkt[],
 			udph.ports.dst = d6->sin6_port;
 		}
 	} else {
-		udph.ports.dst = s->port.src;
-		if (type == TLE_UDP_V4)
-			da = &s->ipv4.addr.src;
+		udph.ports.dst = s->s.port.src;
+		if (type == TLE_V4)
+			da = &s->s.ipv4.addr.src;
 		else
-			da = &s->ipv6.addr.src;
+			da = &s->s.ipv6.addr.src;
 	}
 
-	di = udp_get_dest(s, da, &dst);
+	di = stream_get_dest(&s->s, da, &dst);
 	if (di < 0) {
 		rte_errno = -di;
 		return 0;
