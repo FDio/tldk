@@ -19,27 +19,11 @@
 #include "dpdk_version.h"
 
 /*
- * Helper functions, verify the queue for corresponding UDP port.
- */
-static uint8_t
-verify_queue_for_port(const struct netbe_dev *prtq, const uint16_t lport)
-{
-	uint32_t align_nb_q, qid;
-
-	align_nb_q = rte_align32pow2(prtq->port.nb_lcore);
-	qid = (lport % align_nb_q) % prtq->port.nb_lcore;
-	if (prtq->rxqid == qid)
-		return 1;
-
-	return 0;
-}
-
-/*
  * UDP IPv4 destination lookup callback.
  */
 static int
 lpm4_dst_lookup(void *data, const struct in_addr *addr,
-	struct tle_udp_dest *res)
+	struct tle_dest *res)
 {
 	int32_t rc;
 #ifdef DPDK_VERSION_GE_1604
@@ -48,7 +32,7 @@ lpm4_dst_lookup(void *data, const struct in_addr *addr,
 	uint8_t idx;
 #endif
 	struct netbe_lcore *lc;
-	struct tle_udp_dest *dst;
+	struct tle_dest *dst;
 
 	lc = data;
 
@@ -56,7 +40,7 @@ lpm4_dst_lookup(void *data, const struct in_addr *addr,
 	if (rc == 0) {
 		dst = &lc->dst4[idx];
 		rte_memcpy(res, dst, dst->l2_len + dst->l3_len +
-			offsetof(struct tle_udp_dest, hdr));
+			offsetof(struct tle_dest, hdr));
 	}
 	return rc;
 }
@@ -105,7 +89,7 @@ lcore_lpm_init(struct netbe_lcore *lc)
  */
 static int
 netbe_find4(const struct in_addr *laddr, const uint16_t lport,
-	const struct in_addr *raddr, const uint32_t be_lc)
+	const struct in_addr *raddr, const uint32_t belc)
 {
 	uint32_t i, j;
 #ifdef DPDK_VERSION_GE_1604
@@ -120,14 +104,14 @@ netbe_find4(const struct in_addr *laddr, const uint16_t lport,
 		return 0;
 
 	/* search by provided be_lcore */
-	if (be_lc != LCORE_ID_ANY) {
+	if (belc != LCORE_ID_ANY) {
 		for (i = 0; i != becfg.cpu_num; i++) {
 			bc = becfg.cpu + i;
-			if (be_lc == bc->id)
+			if (belc == bc->id)
 				return i;
 		}
 		RTE_LOG(NOTICE, USER1, "%s: no stream with be_lcore=%u\n",
-			__func__, be_lc);
+			__func__, belc);
 		return -ENOENT;
 	}
 

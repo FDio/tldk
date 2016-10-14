@@ -15,31 +15,28 @@ ifeq ($(RTE_SDK),)
 $(error "Please define RTE_SDK environment variable")
 endif
 
-# Default target, can be overwritten by command line or environment
-RTE_TARGET ?= x86_64-native-linuxapp-gcc
+ifeq ($(RTE_TARGET),)
+$(error "Please define RTE_TARGET environment variable")
+endif
+
+ifeq ($(TLDK_ROOT),)
+$(error "Please define TLDK_ROOT environment variable")
+endif
 
 include $(RTE_SDK)/mk/rte.vars.mk
 
-# library name
-LIB = libtle_udp.a
+# binary name
+APP = test_timer
 
-CFLAGS += -O3
-CFLAGS += $(WERROR_FLAGS) -I$(SRCDIR)
+# all source are stored in SRCS-y
+SRCS-y += test_timer.c
 
-EXPORT_MAP := tle_udp_version.map
+CFLAGS += $(WERROR_FLAGS)
+CFLAGS += -I$(RTE_OUTPUT)/include
 
-LIBABIVER := 1
+LDLIBS += -L$(RTE_OUTPUT)/lib
+LDLIBS += -ltle_timer
 
-#source files
-SRCS-y += event.c
-SRCS-y += udp_ctl.c
-SRCS-y += udp_rxtx.c
+EXTRA_CFLAGS += -O3
 
-# install this header file
-SYMLINK-y-include += tle_udp_impl.h
-SYMLINK-y-include += tle_event.h
-
-# this lib dependencies
-DEPDIRS-y += lib/libtle_dring
-
-include $(TLDK_ROOT)/mk/tle.lib.mk
+include $(TLDK_ROOT)/mk/tle.app.mk

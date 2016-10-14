@@ -37,7 +37,7 @@ CFLAGS += $(WERROR_FLAGS)
 CFLAGS += -I$(RTE_OUTPUT)/include
 
 LDLIBS += -L$(RTE_OUTPUT)/lib
-LDLIBS += -ltle_udp
+LDLIBS += -ltle_l4p
 
 EXTRA_CFLAGS += -O3
 CFLAGS_parse.o += -D_GNU_SOURCE
