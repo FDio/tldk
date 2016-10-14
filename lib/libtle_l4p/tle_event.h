@@ -17,6 +17,7 @@
 #define _SEV_IMPL_H_
 
 #include <rte_common.h>
+#include <rte_memory.h>
 #include <rte_spinlock.h>
 #include <rte_atomic.h>
 #include <sys/queue.h>
@@ -168,7 +169,7 @@ tle_event_active(struct tle_event *ev, enum tle_ev_state st)
 {
 	struct tle_evq *q;
 
-	if (st == ev->state)
+	if (ev->state != TLE_SEV_IDLE)
 		return;
 
 	q = ev->head;
@@ -208,6 +209,26 @@ tle_event_idle(struct tle_event *ev)
 	}
 	ev->state = TLE_SEV_IDLE;
 	rte_spinlock_unlock(&q->lock);
+}
+
+static inline void
+tle_evq_idle(struct tle_evq *evq, struct tle_event *ev[], uint32_t num)
+{
+	uint32_t i, n;
+
+	rte_spinlock_lock(&evq->lock);
+
+	n = 0;
+	for (i = 0; i != num; i++) {
+		if (ev[i]->state == TLE_SEV_UP) {
+			TAILQ_REMOVE(&evq->armed, ev[i], ql);
+			n++;
+		}
+		ev[i]->state = TLE_SEV_IDLE;
+	}
+
+	evq->nb_armed -= n;
+	rte_spinlock_unlock(&evq->lock);
 }
 
 

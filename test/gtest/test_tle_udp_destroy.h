@@ -18,13 +18,13 @@
 
 #include <gtest/gtest.h>
 #include <rte_errno.h>
-#include <tle_udp_impl.h>
+#include <tle_ctx.h>
 
 class udp_destroy : public ::testing::Test {
 
 protected:
-	struct tle_udp_ctx *ctx;
-	struct tle_udp_ctx_param prm;
+	struct tle_ctx *ctx;
+	struct tle_ctx_param prm;
 
 	virtual void SetUp(void)
 	{
@@ -35,7 +35,7 @@ protected:
 		prm.max_stream_rbufs = 0x100;
 		prm.max_stream_sbufs = 0x100;
 
-		ctx = tle_udp_create(&prm);
+		ctx = tle_ctx_create(&prm);
 		ASSERT_NE(ctx, (void *) NULL);
 	}
 

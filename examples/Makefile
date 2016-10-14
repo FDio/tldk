@@ -21,6 +21,6 @@ endif
 
 include $(RTE_SDK)/mk/rte.vars.mk
 
-DIRS-y += udpfwd
+DIRS-y += l4fwd
 
 include $(TLDK_ROOT)/mk/tle.subdir.mk

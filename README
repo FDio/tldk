@@ -52,7 +52,7 @@ export RTE_TARGET=x86_64-native-linuxapp-gcc
 
 cd tldk
 make all
-./x86_64-native-linuxapp-gcc/app/udpfwd ...
+./x86_64-native-linuxapp-gcc/app/l4fwd ...
 
 CONTENTS
 ========
@@ -63,12 +63,12 @@ $(TLDK_ROOT)
 |      |
 |      +--libtle_dring - dring library
 |      |
-|      +--libtle_udp - implementation of the UDP datagram processing
+|      +--libtle_l4p - implementation of the UDP datagram processing
 |
 +----examples
 |      |
-|      +--udpfwd - sample app to demonstrate and test libtle_udp usage
-|            (refer to examples/udpfwd/README for more information)
+|      +--l4fwd - sample app to demonstrate and test libtle_l4p UDP usage
+|            (refer to examples/l4fwd/README for more information)
 |
 +----test - unit-tests
 |      |

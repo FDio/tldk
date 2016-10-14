@@ -21,6 +21,30 @@ extern "C" {
 #endif
 
 static inline int
+xmm_cmp(const rte_xmm_t *da, const rte_xmm_t *sa)
+{
+	uint64_t ret;
+
+	ret = (sa->u64[0] ^ da->u64[0]) |
+		(sa->u64[1] ^ da->u64[1]);
+
+	return (ret != 0);
+}
+
+static inline int
+ymm_cmp(const _ymm_t *da, const _ymm_t *sa)
+{
+	uint64_t ret;
+
+	ret = (sa->u64[0] ^ da->u64[0]) |
+		(sa->u64[1] ^ da->u64[1]) |
+		(sa->u64[2] ^ da->u64[2]) |
+		(sa->u64[3] ^ da->u64[3]);
+
+	return (ret != 0);
+}
+
+static inline int
 ymm_mask_cmp(const _ymm_t *da, const _ymm_t *sa, const _ymm_t *sm)
 {
 	uint64_t ret;
@@ -261,6 +285,46 @@ _ipv4x_cksum(const void *iph, size_t len)
 	return (cksum == 0xffff) ? cksum : ~cksum;
 }
 
+static inline int
+check_pkt_csum(const struct rte_mbuf *m, uint64_t ol_flags, uint32_t type,
+	uint32_t proto)
+{
+	const struct ipv4_hdr *l3h4;
+	const struct ipv6_hdr *l3h6;
+	const struct udp_hdr *l4h;
+	int32_t ret;
+	uint16_t csum;
+
+	ret = 0;
+	l3h4 = rte_pktmbuf_mtod_offset(m, const struct ipv4_hdr *, m->l2_len);
+	l3h6 = rte_pktmbuf_mtod_offset(m, const struct ipv6_hdr *, m->l2_len);
+
+	if ((ol_flags & PKT_RX_IP_CKSUM_BAD) != 0) {
+		csum = _ipv4x_cksum(l3h4, m->l3_len);
+		ret = (csum != UINT16_MAX);
+	}
+
+	if (ret == 0 && (ol_flags & PKT_RX_L4_CKSUM_BAD) != 0) {
+
+		/*
+		 * for IPv4 it is allowed to have zero UDP cksum,
+		 * for IPv6 valid UDP cksum is mandatory.
+		 */
+		if (type == TLE_V4) {
+			l4h = (const struct udp_hdr *)((uintptr_t)l3h4 +
+				m->l3_len);
+			csum = (proto == IPPROTO_UDP && l4h->dgram_cksum == 0) ?
+				UINT16_MAX : _ipv4_udptcp_mbuf_cksum(m,
+				m->l2_len + m->l3_len, l3h4);
+		} else
+			csum = _ipv6_udptcp_mbuf_cksum(m,
+				m->l2_len + m->l3_len, l3h6);
+
+		ret = (csum != UINT16_MAX);
+	}
+
+	return ret;
+}
 
 /*
  * Analog of read-write locks, very much in favour of read side.
@@ -302,6 +366,33 @@ static inline void
 rwl_up(rte_atomic32_t *p)
 {
 	rte_atomic32_sub(p, INT32_MIN);
+}
+
+/* exclude NULLs from the final list of packets. */
+static inline uint32_t
+compress_pkt_list(struct rte_mbuf *pkt[], uint32_t nb_pkt, uint32_t nb_zero)
+{
+	uint32_t i, j, k, l;
+
+	for (j = nb_pkt; nb_zero != 0 && j-- != 0; ) {
+
+		/* found a hole. */
+		if (pkt[j] == NULL) {
+
+			/* find how big is it. */
+			for (i = j; i-- != 0 && pkt[i] == NULL; )
+				;
+			/* fill the hole. */
+			for (k = j + 1, l = i + 1; k != nb_pkt; k++, l++)
+				pkt[l] = pkt[k];
+
+			nb_pkt -= j - i;
+			nb_zero -= j - i;
+			j = i + 1;
+		}
+	}
+
+	return nb_pkt;
 }
 
 #ifdef __cplusplus
