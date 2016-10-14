@@ -16,57 +16,88 @@
 #ifndef TEST_TLE_UDP_STREAM_H_
 #define TEST_TLE_UDP_STREAM_H_
 #include <iostream>
+#include <algorithm>
+#include <string>
 #include <arpa/inet.h>
+#include <netinet/in.h>
+#include <netinet/ip6.h>
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 #include <rte_errno.h>
 
-#include <tle_udp_impl.h>
+#include <tle_udp.h>
 #include <tle_event.h>
 
-struct tle_udp_ctx_param ctx_prm_tmpl = {
+#include "test_common.h"
+
+#define MAX_STREAMS 0xFFFF
+#define MAX_STREAM_RBUFS 0x100
+#define MAX_STREAM_SBUFS 0x100
+#define RX_OFFLOAD 0x100
+#define TX_OFFLOAD 0x100
+
+using namespace std;
+
+struct tle_ctx_param ctx_prm_tmpl = {
 	.socket_id = SOCKET_ID_ANY,
-	.max_streams = 0x10,
-	.max_stream_rbufs = 0x100,
-	.max_stream_sbufs = 0x100
+	.proto = TLE_PROTO_UDP,
+	.max_streams = MAX_STREAMS,
+	.max_stream_rbufs = MAX_STREAM_RBUFS,
+	.max_stream_sbufs = MAX_STREAM_SBUFS
 };
 
-struct tle_udp_dev_param dev_prm_tmpl = {
-	.rx_offload = 0x100,
-	.tx_offload = 0x100
+struct tle_dev_param dev_prm_tmpl = {
+	.rx_offload = RX_OFFLOAD,
+	.tx_offload = TX_OFFLOAD
 };
 
 class test_tle_udp_stream: public ::testing::Test {
 public:
-	void setup_dev_prm(struct tle_udp_dev_param *,
+	void setup_dev_prm(struct tle_dev_param *,
 			char const *, char const *);
-	struct tle_udp_ctx *setup_ctx(struct tle_udp_ctx_param *prm);
-	struct tle_udp_dev *setup_dev(struct tle_udp_ctx *ctx,
-			struct tle_udp_dev_param *dev_prm);
+	struct tle_ctx *setup_ctx(struct tle_ctx_param *prm);
+	struct tle_dev *setup_dev(struct tle_ctx *ctx,
+			struct tle_dev_param *dev_prm);
 	struct tle_evq *setup_event();
 
 	virtual void SetUp(void)
 	{
-		char const *ipv4_laddr = "192.168.0.1";
-		char const *ipv4_raddr = "192.168.0.2";
+		char const *ipv4_laddr = "192.0.0.1";
+		char const *ipv4_raddr = "10.0.0.1";
 		char const *ipv6 = "fe80::21e:67ff:fec2:2568";
+		struct tle_ctx_param cprm;
+		port = 10000;
 
 		ctx = nullptr;
 		dev = nullptr;
 		stream = nullptr;
 		/* Setup Context */
-		ctx = setup_ctx(&ctx_prm_tmpl);
+		cprm = ctx_prm_tmpl;
+		cprm.max_streams = 0xA;
+		cprm.lookup4 = dummy_lookup4;
+		cprm.lookup6 = dummy_lookup6;
+		ctx = setup_ctx(&cprm);
+		ASSERT_NE(ctx, nullptr);
+
 		/* Setup Dev */
 		memset(&dev_prm, 0, sizeof(dev_prm));
 		setup_dev_prm(&dev_prm, ipv4_laddr, ipv6);
 		dev = setup_dev(ctx, &dev_prm);
+		ASSERT_NE(dev, nullptr);
 
 		/* Stream Param & Event param */
 		memset(&stream_prm, 0, sizeof(struct tle_udp_stream_param));
-		inet_pton(AF_INET, ipv4_laddr, &stream_prm.local_addr);
-		inet_pton(AF_INET, ipv4_raddr, &stream_prm.remote_addr);
-		stream_prm.local_addr.ss_family = AF_INET;
-		stream_prm.remote_addr.ss_family = AF_INET;
+
+		ip4_addr = (struct sockaddr_in *) &stream_prm.local_addr;
+		ip4_addr->sin_family = AF_INET;
+		ip4_addr->sin_port = htons(port);
+		ip4_addr->sin_addr.s_addr = inet_addr(ipv4_laddr);
+
+		ip4_addr = (struct sockaddr_in *) &stream_prm.remote_addr;
+		ip4_addr->sin_family = AF_INET;
+		ip4_addr->sin_port = htons(port);
+		ip4_addr->sin_addr.s_addr = inet_addr(ipv4_raddr);
+
 		stream_prm.recv_ev = tle_event_alloc(setup_event(), nullptr);
 		stream_prm.send_ev = tle_event_alloc(setup_event(), nullptr);
 	}
@@ -74,19 +105,24 @@ public:
 	virtual void TearDown(void)
 	{
 		ret = 0;
-		tle_udp_stream_close(stream);
-		tle_udp_del_dev(dev);
-		tle_udp_destroy(ctx);
+		for(auto s : streams) {
+			tle_udp_stream_close(s);
+		}
+		tle_del_dev(dev);
+		tle_ctx_destroy(ctx);
 	}
 
 	int ret;
-	struct tle_udp_ctx *ctx;
-	struct tle_udp_dev *dev;
-	struct tle_udp_stream *stream;
-
-	struct tle_udp_ctx_param ctx_prm;
-	struct tle_udp_dev_param dev_prm;
+	int port;
+	struct tle_ctx *ctx;
+	struct tle_dev *dev;
+	struct tle_stream *stream;
+	struct tle_ctx_param ctx_prm;
+	struct tle_dev_param dev_prm;
 	struct tle_udp_stream_param stream_prm;
+	struct sockaddr_in *ip4_addr;
+
+	vector<tle_stream*> streams;
 };
 
 struct tle_evq *test_tle_udp_stream::setup_event() {
@@ -105,32 +141,94 @@ struct tle_evq *test_tle_udp_stream::setup_event() {
 	return evq;
 }
 
-struct tle_udp_ctx
-*test_tle_udp_stream::setup_ctx(struct tle_udp_ctx_param *prm) {
-	struct tle_udp_ctx *ctx;
+struct tle_ctx
+*test_tle_udp_stream::setup_ctx(struct tle_ctx_param *prm) {
+	struct tle_ctx *ctx;
 
-	ctx = tle_udp_create(prm);
+	ctx = tle_ctx_create(prm);
 
 	return ctx;
 }
 
-struct tle_udp_dev
-*test_tle_udp_stream::setup_dev(struct tle_udp_ctx *ctx,
-		struct tle_udp_dev_param *dev_prm) {
+struct tle_dev
+*test_tle_udp_stream::setup_dev(struct tle_ctx *ctx,
+		struct tle_dev_param *dev_prm) {
 
-	struct tle_udp_dev *dev;
+	struct tle_dev *dev;
 
-	dev = tle_udp_add_dev(ctx, dev_prm);
+	dev = tle_add_dev(ctx, dev_prm);
 
 	return dev;
 }
 
-void test_tle_udp_stream::setup_dev_prm(struct tle_udp_dev_param *dev_prm,
+void test_tle_udp_stream::setup_dev_prm(struct tle_dev_param *dev_prm,
 		char const *ipv4, char const *ipv6) {
 
 	inet_pton(AF_INET, ipv4, &dev_prm->local_addr4);
 	inet_pton(AF_INET6, ipv6, &dev_prm->local_addr6);
 
 }
+
+/* Fixture for max number of streams on single ctx + multiple devices */
+class test_tle_udp_stream_max: public ::test_tle_udp_stream {
+public:
+
+	virtual void SetUp(void)
+	{
+		/* Create enough devices and streams to exceed MAX_STREAMS on ctx */
+		nb_devs = 10;
+		nb_streams = 6554 	;
+
+		in_addr_t src;
+		string ssrc;
+
+		memset(&ctx_prm, 0, sizeof(ctx_prm));
+		ctx_prm = ctx_prm_tmpl;
+		ctx_prm.lookup4 = dummy_lookup4;
+		ctx_prm.lookup6 = dummy_lookup6;
+		ctx = setup_ctx(&ctx_prm);
+		ASSERT_NE(ctx, (void *)NULL);
+
+		memset(&dev_prm, 0, sizeof(dev_prm));
+		setup_dev_prm(&dev_prm, base_l_ipv4, base_l_ipv6);
+
+		memset(&stream_prm, 0, sizeof(struct tle_udp_stream_param));
+		stream_prm.recv_ev = tle_event_alloc(setup_event(), nullptr);
+		stream_prm.send_ev = tle_event_alloc(setup_event(), nullptr);
+
+		for(i=0; i < nb_devs; i++) {
+			ssrc = inet_ntoa(dev_prm.local_addr4);
+
+			dev = setup_dev(ctx, &dev_prm);
+			ASSERT_NE(dev, (void *)NULL);
+			devs.push_back(dev);
+
+			/* Modify base IP addresses for next loops */
+			src = dev_prm.local_addr4.s_addr;
+			src += 1;
+			dev_prm.local_addr4.s_addr = src;
+		}
+	}
+
+	virtual void TearDown(void)
+	{
+		for(auto s: streams){
+			tle_udp_stream_close(s);
+		}
+		for(auto d: devs) {
+			tle_del_dev(d);
+		}
+		tle_ctx_destroy(ctx);
+	}
+
+	int i;
+	int nb_devs;
+	int nb_streams;
+	char const *base_l_ipv4 = "10.0.0.1";
+	char const *base_r_ipv4 = "190.0.0.1";
+	char const *base_l_ipv6 = "2000::1";
+	vector<tle_dev*> devs;
+	vector<tle_stream*> streams;
+};
 
 #endif /* TEST_TLE_UDP_STREAM_H_ */
