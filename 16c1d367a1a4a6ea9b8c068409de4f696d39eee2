@@ -16,6 +16,24 @@
       "revId": "16c1d367a1a4a6ea9b8c068409de4f696d39eee2",
       "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "fa3479d7_e8616cd4",
+        "filename": "vagrant/build_tldk.sh",
+        "patchSetId": 1
+      },
+      "lineNbr": 23,
+      "author": {
+        "id": 540
+      },
+      "writtenOn": "2016-10-14T09:32:36Z",
+      "side": 1,
+      "message": "Vagrant mounts the tldk source tree in /tldk",
+      "parentUuid": "fa3479d7_0dc16280",
+      "revId": "16c1d367a1a4a6ea9b8c068409de4f696d39eee2",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
     }
   ]
 }
