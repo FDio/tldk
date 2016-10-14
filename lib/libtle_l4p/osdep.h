@@ -36,6 +36,8 @@ extern "C" {
 
 #define UDP_LOG(lvl, fmt, args...)      RTE_LOG(lvl, USER1, fmt, ##args)
 
+#define TCP_LOG(lvl, fmt, args...)      RTE_LOG(lvl, USER1, fmt, ##args)
+
 /*
  * if no AVX support, define _ymm_t here.
  */

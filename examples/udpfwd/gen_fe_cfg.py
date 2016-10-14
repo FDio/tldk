@@ -31,7 +31,7 @@ def print_usage ():
 			"lcores are comma-separated, within double quote"
 	print "   -b, --be_lcore_list: list of lcores used for BE. Multiple " \
 			"lcores are comma-separated, within double quote"
-	print "   -p, --start_port: starting UDP port number"
+	print "   -p, --start_port: starting TCP/UDP port number"
 	print "   -n, --number_of_streams: number of streams to be generated"
 	print "   -m, --mode: mode of the application. [echo, rx, tx, fwd]"
 	print "   -q, --local_address: local address of the stream"
@@ -55,7 +55,8 @@ def print_stream(mode, la, ra, fwd_la, fwd_ra, lcore, belcore, lport,
 		lport_str = str(lport)
 		fwrport_str = str(fwrport)
 
-	stream = "lcore=" + str(lcore) + ",belcore=" + str(belcore) + ",op=" + mode
+	stream = "lcore=" + str(lcore) + ",belcore=" + str(belcore)
+	stream += ",op=" + mode
 	stream += ",laddr=" + la + ",lport=" + lport_str
 	stream += ",raddr=" + ra + ",rport=0"
 

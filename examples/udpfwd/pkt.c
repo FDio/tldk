@@ -37,15 +37,24 @@ is_ipv4_frag(const struct ipv4_hdr *iph)
 	return ((mask & iph->fragment_offset) != 0);
 }
 
+static inline uint32_t
+get_tcp_header_size(struct rte_mbuf *m, uint32_t l3_len)
+{
+	const struct tcp_hdr *tcp;
+	tcp = rte_pktmbuf_mtod_offset(m, struct tcp_hdr *,
+		sizeof(struct ether_hdr) + l3_len);
+	return (tcp->data_off >> 4) * 4;
+}
+
 static inline void
 fill_ipv4_hdr_len(struct rte_mbuf *m, uint32_t l2, uint32_t proto,
-	uint32_t frag)
+	uint32_t frag, uint32_t l4_len)
 {
 	const struct ipv4_hdr *iph;
 	int32_t dlen, len;
 
 	dlen = rte_pktmbuf_data_len(m);
-	dlen -= l2 + sizeof(struct udp_hdr);
+	dlen -= l2 + l4_len;
 
 	iph = rte_pktmbuf_mtod_offset(m, const struct ipv4_hdr *, l2);
 	len = (iph->version_ihl & IPV4_HDR_IHL_MASK) * IPV4_IHL_MULTIPLIER;
@@ -58,7 +67,7 @@ fill_ipv4_hdr_len(struct rte_mbuf *m, uint32_t l2, uint32_t proto,
 	if (len > dlen || (proto <= IPPROTO_MAX && iph->next_proto_id != proto))
 		m->packet_type = RTE_PTYPE_UNKNOWN;
 	else
-		fill_pkt_hdr_len(m, l2, len, sizeof(struct udp_hdr));
+		fill_pkt_hdr_len(m, l2, len, l4_len);
 }
 
 static inline int
@@ -74,7 +83,7 @@ ipv6x_hdr(uint32_t proto)
 
 static inline void
 fill_ipv6x_hdr_len(struct rte_mbuf *m, uint32_t l2, uint32_t nproto,
-	uint32_t fproto)
+	uint32_t fproto, uint32_t l4_len)
 {
 	const struct ip6_ext *ipx;
 	int32_t dlen, len, ofs;
@@ -82,7 +91,7 @@ fill_ipv6x_hdr_len(struct rte_mbuf *m, uint32_t l2, uint32_t nproto,
 	len = sizeof(struct ipv6_hdr);
 
 	dlen = rte_pktmbuf_data_len(m);
-	dlen -= l2 + sizeof(struct udp_hdr);
+	dlen -= l2 + l4_len;
 
 	ofs = l2 + len;
 	ipx = rte_pktmbuf_mtod_offset(m, const struct ip6_ext *, ofs);
@@ -123,11 +132,12 @@ fill_ipv6x_hdr_len(struct rte_mbuf *m, uint32_t l2, uint32_t nproto,
 	if ((ofs == 0 && nproto != fproto) || len > dlen)
 		m->packet_type = RTE_PTYPE_UNKNOWN;
 	else
-		fill_pkt_hdr_len(m, l2, len, sizeof(struct udp_hdr));
+		fill_pkt_hdr_len(m, l2, len, l4_len);
 }
 
 static inline void
-fill_ipv6_hdr_len(struct rte_mbuf *m, uint32_t l2, uint32_t fproto)
+fill_ipv6_hdr_len(struct rte_mbuf *m, uint32_t l2, uint32_t fproto,
+	uint32_t l4_len)
 {
 	const struct ipv6_hdr *iph;
 
@@ -135,18 +145,20 @@ fill_ipv6_hdr_len(struct rte_mbuf *m, uint32_t l2, uint32_t fproto)
 		sizeof(struct ether_hdr));
 
 	if (iph->proto == fproto)
-		fill_pkt_hdr_len(m, l2, sizeof(struct ipv6_hdr),
-			sizeof(struct udp_hdr));
+		fill_pkt_hdr_len(m, l2, sizeof(struct ipv6_hdr), l4_len);
 	else if (ipv6x_hdr(iph->proto) != 0)
-		fill_ipv6x_hdr_len(m, l2, iph->proto, fproto);
+		fill_ipv6x_hdr_len(m, l2, iph->proto, fproto, l4_len);
 }
 
 static inline void
-fill_eth_hdr_len(struct rte_mbuf *m)
+fill_eth_hdr_len(struct rte_mbuf *m, uint32_t *proto)
 {
 	uint32_t dlen, l2;
 	uint16_t etp;
 	const struct ether_hdr *eth;
+	const struct ipv4_hdr *ip4h;
+	const struct ipv6_hdr *ip6h;
+	uint32_t l4_len;
 
 	dlen = rte_pktmbuf_data_len(m);
 
@@ -165,38 +177,65 @@ fill_eth_hdr_len(struct rte_mbuf *m)
 		l2 += sizeof(struct vlan_hdr);
 
 	if (etp == rte_be_to_cpu_16(ETHER_TYPE_IPv4)) {
-		m->packet_type = RTE_PTYPE_L4_UDP |
-			RTE_PTYPE_L3_IPV4_EXT_UNKNOWN |
-			RTE_PTYPE_L2_ETHER;
-		fill_ipv4_hdr_len(m, l2, IPPROTO_UDP, 1);
+		ip4h = rte_pktmbuf_mtod_offset(m, const struct ipv4_hdr *, l2);
+		if (ip4h->next_proto_id == IPPROTO_TCP) {
+			l4_len = get_tcp_header_size(m, sizeof(struct ipv4_hdr));
+			m->packet_type = RTE_PTYPE_L4_TCP |
+				RTE_PTYPE_L3_IPV4_EXT_UNKNOWN |
+				RTE_PTYPE_L2_ETHER;
+			fill_ipv4_hdr_len(m, l2, IPPROTO_TCP, 1, l4_len);
+			*proto = IPPROTO_TCP;
+		} else {
+			m->packet_type = RTE_PTYPE_L4_UDP |
+				RTE_PTYPE_L3_IPV4_EXT_UNKNOWN |
+				RTE_PTYPE_L2_ETHER;
+			fill_ipv4_hdr_len(m, l2, IPPROTO_UDP, 1, sizeof(struct udp_hdr));
+			*proto = IPPROTO_UDP;
+		}
 	} else if (etp == rte_be_to_cpu_16(ETHER_TYPE_IPv6) &&
 			dlen >= l2 + sizeof(struct ipv6_hdr) +
 			sizeof(struct udp_hdr)) {
-		m->packet_type = RTE_PTYPE_L4_UDP |
-			RTE_PTYPE_L3_IPV6_EXT_UNKNOWN |
-			RTE_PTYPE_L2_ETHER;
-			fill_ipv6_hdr_len(m, l2, IPPROTO_UDP);
+		ip6h = rte_pktmbuf_mtod_offset(m, const struct ipv6_hdr *, l2);
+		if (ip6h->proto == IPPROTO_TCP) {
+			l4_len = get_tcp_header_size(m, sizeof(struct ipv6_hdr));
+			m->packet_type = RTE_PTYPE_L4_TCP |
+				RTE_PTYPE_L3_IPV6_EXT_UNKNOWN |
+				RTE_PTYPE_L2_ETHER;
+			fill_ipv6_hdr_len(m, l2, IPPROTO_TCP, l4_len);
+			*proto = IPPROTO_TCP;
+		} else {
+			m->packet_type = RTE_PTYPE_L4_UDP |
+				RTE_PTYPE_L3_IPV6_EXT_UNKNOWN |
+				RTE_PTYPE_L2_ETHER;
+			fill_ipv6_hdr_len(m, l2, IPPROTO_UDP, sizeof(struct udp_hdr));
+			*proto = IPPROTO_UDP;
+		}
 	} else
 		m->packet_type = RTE_PTYPE_UNKNOWN;
+
 }
 
 static inline uint16_t
 ipv4x_cksum(const void *iph, size_t len)
 {
-        uint16_t cksum;
+	uint16_t cksum;
 
-        cksum = rte_raw_cksum(iph, len);
-        return (cksum == 0xffff) ? cksum : ~cksum;
+	cksum = rte_raw_cksum(iph, len);
+	return (cksum == 0xffff) ? cksum : ~cksum;
 }
 
 static inline void
-fix_reassembled(struct rte_mbuf *m, int32_t hwcsum)
+fix_reassembled(struct rte_mbuf *m, int32_t hwcsum, uint32_t proto)
 {
 	struct ipv4_hdr *iph;
 
 	/* update packet type. */
 	m->packet_type &= ~RTE_PTYPE_L4_MASK;
-	m->packet_type |= RTE_PTYPE_L4_UDP;
+
+	if (proto == IPPROTO_TCP)
+		m->packet_type |= RTE_PTYPE_L4_TCP;
+	else
+		m->packet_type |= RTE_PTYPE_L4_UDP;
 
 	/* fix reassemble setting TX flags. */
 	m->ol_flags &= ~PKT_TX_IP_CKSUM;
@@ -214,7 +253,7 @@ fix_reassembled(struct rte_mbuf *m, int32_t hwcsum)
 
 static struct rte_mbuf *
 reassemble(struct rte_mbuf *m, struct netbe_lcore *lc, uint64_t tms,
-	uint8_t port)
+	uint8_t port, uint32_t proto)
 {
 	uint32_t l3cs;
 	struct rte_ip_frag_tbl *tbl;
@@ -258,7 +297,7 @@ reassemble(struct rte_mbuf *m, struct netbe_lcore *lc, uint64_t tms,
 
 	/* got reassembled packet. */
 	if (m != NULL)
-		fix_reassembled(m, l3cs);
+		fix_reassembled(m, l3cs, proto);
 
 	return m;
 }
@@ -291,10 +330,111 @@ compress_pkt_list(struct rte_mbuf *pkt[], uint32_t nb_pkt, uint32_t nb_zero)
 }
 
 /*
+ * if it is a fragment, try to reassemble it,
+ * if by some reason it can't be done, then
+ * set pkt[] entry to NULL.
+ */
+#define DO_REASSEMBLE(proto) \
+do { \
+	if ((pkt[j]->packet_type & RTE_PTYPE_L4_MASK) == \
+			RTE_PTYPE_L4_FRAG) { \
+		cts = (cts == 0) ? rte_rdtsc() : cts; \
+		pkt[j] = reassemble(pkt[j], lc, cts, port, (proto)); \
+		x += (pkt[j] == NULL); \
+	} \
+} while (0)
+
+/*
  * HW can recognise L2/L3 with/without extentions/L4 (ixgbe/igb/fm10k)
  */
 static uint16_t __rte_unused
-type0_rx_callback(uint8_t port, __rte_unused uint16_t queue,
+type0_tcp_rx_callback(uint8_t port, __rte_unused uint16_t queue,
+	struct rte_mbuf *pkt[], uint16_t nb_pkts,
+	__rte_unused uint16_t max_pkts, void *user_param)
+{
+	uint32_t j, tp, x;
+	uint64_t cts;
+	struct netbe_lcore *lc;
+	uint32_t l4_len;
+
+	lc = user_param;
+	cts = 0;
+
+	x = 0;
+	for (j = 0; j != nb_pkts; j++) {
+
+		NETBE_PKT_DUMP(pkt[j]);
+
+		tp = pkt[j]->packet_type & (RTE_PTYPE_L4_MASK |
+			RTE_PTYPE_L3_MASK | RTE_PTYPE_L2_MASK);
+
+		switch (tp) {
+		/* non fragmented tcp packets. */
+		case (RTE_PTYPE_L4_TCP | RTE_PTYPE_L3_IPV4 |
+				RTE_PTYPE_L2_ETHER):
+			l4_len = get_tcp_header_size(pkt[j], sizeof(struct ipv4_hdr));
+			fill_pkt_hdr_len(pkt[j], sizeof(struct ether_hdr),
+				sizeof(struct ipv4_hdr), l4_len);
+			break;
+		case (RTE_PTYPE_L4_TCP | RTE_PTYPE_L3_IPV6 |
+				RTE_PTYPE_L2_ETHER):
+			l4_len = get_tcp_header_size(pkt[j], sizeof(struct ipv6_hdr));
+			fill_pkt_hdr_len(pkt[j], sizeof(struct ether_hdr),
+				sizeof(struct ipv6_hdr), l4_len);
+			break;
+		case (RTE_PTYPE_L4_TCP | RTE_PTYPE_L3_IPV4_EXT |
+				RTE_PTYPE_L2_ETHER):
+			l4_len = get_tcp_header_size(pkt[j], sizeof(struct ipv4_hdr));
+			fill_ipv4_hdr_len(pkt[j], sizeof(struct ether_hdr),
+				UINT32_MAX, 0, l4_len);
+			break;
+		case (RTE_PTYPE_L4_TCP | RTE_PTYPE_L3_IPV6_EXT |
+				RTE_PTYPE_L2_ETHER):
+			l4_len = get_tcp_header_size(pkt[j], sizeof(struct ipv6_hdr));
+			fill_ipv6_hdr_len(pkt[j], sizeof(struct ether_hdr),
+				IPPROTO_TCP, l4_len);
+			break;
+		/* possibly fragmented tcp packets. */
+		case (RTE_PTYPE_L3_IPV4 | RTE_PTYPE_L2_ETHER):
+		case (RTE_PTYPE_L3_IPV4_EXT | RTE_PTYPE_L2_ETHER):
+			l4_len = get_tcp_header_size(pkt[j], sizeof(struct ipv4_hdr));
+			fill_ipv4_hdr_len(pkt[j], sizeof(struct ether_hdr),
+				IPPROTO_TCP, 1, l4_len);
+			break;
+		case (RTE_PTYPE_L3_IPV6 | RTE_PTYPE_L2_ETHER):
+		case (RTE_PTYPE_L3_IPV6_EXT | RTE_PTYPE_L2_ETHER):
+			l4_len = get_tcp_header_size(pkt[j], sizeof(struct ipv6_hdr));
+			fill_ipv6_hdr_len(pkt[j], sizeof(struct ether_hdr),
+				IPPROTO_TCP, l4_len);
+			break;
+		default:
+			/* treat packet types as invalid. */
+			pkt[j]->packet_type = RTE_PTYPE_UNKNOWN;
+			break;
+		}
+
+		DO_REASSEMBLE(IPPROTO_TCP);
+	}
+
+	/* reassemble was invoked, cleanup its death-row. */
+	if (cts != 0)
+		rte_ip_frag_free_death_row(&lc->death_row, 0);
+
+	if (x == 0)
+		return nb_pkts;
+
+	NETBE_TRACE("%s(port=%u, queue=%u, nb_pkts=%u): "
+		"%u non-reassembled fragments;\n",
+		__func__, port, queue, nb_pkts, x);
+
+	return compress_pkt_list(pkt, nb_pkts, x);
+}
+
+/*
+ * HW can recognise L2/L3 with/without extentions/L4 (ixgbe/igb/fm10k)
+ */
+static uint16_t __rte_unused
+type0_udp_rx_callback(uint8_t port, __rte_unused uint16_t queue,
 	struct rte_mbuf *pkt[], uint16_t nb_pkts,
 	__rte_unused uint16_t max_pkts, void *user_param)
 {
@@ -318,35 +458,33 @@ type0_rx_callback(uint8_t port, __rte_unused uint16_t queue,
 		case (RTE_PTYPE_L4_UDP | RTE_PTYPE_L3_IPV4 |
 				RTE_PTYPE_L2_ETHER):
 			fill_pkt_hdr_len(pkt[j], sizeof(struct ether_hdr),
-				sizeof(struct ipv4_hdr),
-				sizeof(struct udp_hdr));
+				sizeof(struct ipv4_hdr), sizeof(struct udp_hdr));
 			break;
 		case (RTE_PTYPE_L4_UDP | RTE_PTYPE_L3_IPV6 |
 				RTE_PTYPE_L2_ETHER):
 			fill_pkt_hdr_len(pkt[j], sizeof(struct ether_hdr),
-				sizeof(struct ipv6_hdr),
-				sizeof(struct udp_hdr));
+				sizeof(struct ipv6_hdr), sizeof(struct udp_hdr));
 			break;
 		case (RTE_PTYPE_L4_UDP | RTE_PTYPE_L3_IPV4_EXT |
 				RTE_PTYPE_L2_ETHER):
 			fill_ipv4_hdr_len(pkt[j], sizeof(struct ether_hdr),
-				UINT32_MAX, 0);
+				UINT32_MAX, 0, sizeof(struct udp_hdr));
 			break;
 		case (RTE_PTYPE_L4_UDP | RTE_PTYPE_L3_IPV6_EXT |
 				RTE_PTYPE_L2_ETHER):
 			fill_ipv6_hdr_len(pkt[j], sizeof(struct ether_hdr),
-				IPPROTO_UDP);
+				IPPROTO_UDP, sizeof(struct udp_hdr));
 			break;
 		/* possibly fragmented udp packets. */
 		case (RTE_PTYPE_L3_IPV4 | RTE_PTYPE_L2_ETHER):
 		case (RTE_PTYPE_L3_IPV4_EXT | RTE_PTYPE_L2_ETHER):
 			fill_ipv4_hdr_len(pkt[j], sizeof(struct ether_hdr),
-				IPPROTO_UDP, 1);
+				IPPROTO_UDP, 1, sizeof(struct udp_hdr));
 			break;
 		case (RTE_PTYPE_L3_IPV6 | RTE_PTYPE_L2_ETHER):
 		case (RTE_PTYPE_L3_IPV6_EXT | RTE_PTYPE_L2_ETHER):
 			fill_ipv6_hdr_len(pkt[j], sizeof(struct ether_hdr),
-				IPPROTO_UDP);
+				IPPROTO_UDP, sizeof(struct udp_hdr));
 			break;
 		default:
 			/* treat packet types as invalid. */
@@ -354,17 +492,7 @@ type0_rx_callback(uint8_t port, __rte_unused uint16_t queue,
 			break;
 		}
 
-		/*
-		 * if it is a fragment, try to reassemble it,
-		 * if by some reason it can't be done, then
-		 * set pkt[] entry to NULL.
-		 */
-		if ((pkt[j]->packet_type & RTE_PTYPE_L4_MASK) ==
-				RTE_PTYPE_L4_FRAG) {
-			cts = (cts == 0) ? rte_rdtsc() : cts;
-			pkt[j] = reassemble(pkt[j], lc, cts, port);
-			x += (pkt[j] == NULL);
-		}
+		DO_REASSEMBLE(IPPROTO_UDP);
 	}
 
 	/* reassemble was invoked, cleanup its death-row. */
@@ -375,8 +503,8 @@ type0_rx_callback(uint8_t port, __rte_unused uint16_t queue,
 		return nb_pkts;
 
 	NETBE_TRACE("%s(port=%u, queue=%u, nb_pkts=%u): "
-	"%u non-reassembled fragments;\n",
-	__func__, port, queue, nb_pkts, x);
+		"%u non-reassembled fragments;\n",
+		__func__, port, queue, nb_pkts, x);
 
 	return compress_pkt_list(pkt, nb_pkts, x);
 }
@@ -385,7 +513,79 @@ type0_rx_callback(uint8_t port, __rte_unused uint16_t queue,
  * HW can recognise L2/L3/L4 and fragments (i40e).
  */
 static uint16_t __rte_unused
-type1_rx_callback(uint8_t port, __rte_unused uint16_t queue,
+type1_tcp_rx_callback(uint8_t port, __rte_unused uint16_t queue,
+	struct rte_mbuf *pkt[], uint16_t nb_pkts,
+	__rte_unused uint16_t max_pkts, void *user_param)
+{
+	uint32_t j, tp, x;
+	uint64_t cts;
+	struct netbe_lcore *lc;
+	uint32_t l4_len;
+
+	lc = user_param;
+	cts = 0;
+
+	x = 0;
+	for (j = 0; j != nb_pkts; j++) {
+
+		NETBE_PKT_DUMP(pkt[j]);
+
+		tp = pkt[j]->packet_type & (RTE_PTYPE_L4_MASK |
+			RTE_PTYPE_L3_MASK | RTE_PTYPE_L2_MASK);
+
+		switch (tp) {
+		case (RTE_PTYPE_L4_TCP | RTE_PTYPE_L3_IPV4_EXT_UNKNOWN |
+				RTE_PTYPE_L2_ETHER):
+			l4_len = get_tcp_header_size(pkt[j], sizeof(struct ipv4_hdr));
+			fill_ipv4_hdr_len(pkt[j], sizeof(struct ether_hdr),
+				UINT32_MAX, 0, l4_len);
+			break;
+		case (RTE_PTYPE_L4_TCP | RTE_PTYPE_L3_IPV6_EXT_UNKNOWN |
+				RTE_PTYPE_L2_ETHER):
+			l4_len = get_tcp_header_size(pkt[j], sizeof(struct ipv6_hdr));
+			fill_ipv6_hdr_len(pkt[j], sizeof(struct ether_hdr),
+				IPPROTO_TCP, l4_len);
+			break;
+		case (RTE_PTYPE_L4_FRAG | RTE_PTYPE_L3_IPV4_EXT_UNKNOWN |
+				RTE_PTYPE_L2_ETHER):
+			l4_len = get_tcp_header_size(pkt[j], sizeof(struct ipv4_hdr));
+			fill_ipv4_hdr_len(pkt[j], sizeof(struct ether_hdr),
+				IPPROTO_TCP, 0, l4_len);
+			break;
+		case (RTE_PTYPE_L4_FRAG | RTE_PTYPE_L3_IPV6_EXT_UNKNOWN |
+				RTE_PTYPE_L2_ETHER):
+			l4_len = get_tcp_header_size(pkt[j], sizeof(struct ipv6_hdr));
+			fill_ipv6_hdr_len(pkt[j], sizeof(struct ether_hdr),
+				IPPROTO_TCP, l4_len);
+			break;
+		default:
+			/* treat packet types as invalid. */
+			pkt[j]->packet_type = RTE_PTYPE_UNKNOWN;
+			break;
+		}
+
+		DO_REASSEMBLE(IPPROTO_TCP);
+	}
+
+	/* reassemble was invoked, cleanup its death-row. */
+	if (cts != 0)
+		rte_ip_frag_free_death_row(&lc->death_row, 0);
+
+	if (x == 0)
+		return nb_pkts;
+
+	NETBE_TRACE("%s(port=%u, queue=%u, nb_pkts=%u): "
+		"%u non-reassembled fragments;\n",
+		__func__, port, queue, nb_pkts, x);
+
+	return compress_pkt_list(pkt, nb_pkts, x);
+}
+
+/*
+ * HW can recognise L2/L3/L4 and fragments (i40e).
+ */
+static uint16_t __rte_unused
+type1_udp_rx_callback(uint8_t port, __rte_unused uint16_t queue,
 	struct rte_mbuf *pkt[], uint16_t nb_pkts,
 	__rte_unused uint16_t max_pkts, void *user_param)
 {
@@ -408,22 +608,22 @@ type1_rx_callback(uint8_t port, __rte_unused uint16_t queue,
 		case (RTE_PTYPE_L4_UDP | RTE_PTYPE_L3_IPV4_EXT_UNKNOWN |
 				RTE_PTYPE_L2_ETHER):
 			fill_ipv4_hdr_len(pkt[j], sizeof(struct ether_hdr),
-				UINT32_MAX, 0);
+				UINT32_MAX, 0, sizeof(struct udp_hdr));
 			break;
 		case (RTE_PTYPE_L4_UDP | RTE_PTYPE_L3_IPV6_EXT_UNKNOWN |
 				RTE_PTYPE_L2_ETHER):
 			fill_ipv6_hdr_len(pkt[j], sizeof(struct ether_hdr),
-				IPPROTO_UDP);
+				IPPROTO_UDP, sizeof(struct udp_hdr));
 			break;
 		case (RTE_PTYPE_L4_FRAG | RTE_PTYPE_L3_IPV4_EXT_UNKNOWN |
 				RTE_PTYPE_L2_ETHER):
 			fill_ipv4_hdr_len(pkt[j], sizeof(struct ether_hdr),
-				IPPROTO_UDP, 0);
+				IPPROTO_UDP, 0, sizeof(struct udp_hdr));
 			break;
 		case (RTE_PTYPE_L4_FRAG | RTE_PTYPE_L3_IPV6_EXT_UNKNOWN |
 				RTE_PTYPE_L2_ETHER):
 			fill_ipv6_hdr_len(pkt[j], sizeof(struct ether_hdr),
-				IPPROTO_UDP);
+				IPPROTO_UDP, sizeof(struct udp_hdr));
 			break;
 		default:
 			/* treat packet types as invalid. */
@@ -431,17 +631,7 @@ type1_rx_callback(uint8_t port, __rte_unused uint16_t queue,
 			break;
 		}
 
-		/*
-		 * if it is a fragment, try to reassemble it,
-		 * if by some reason it can't be done, then
-		 * set pkt[] entry to NULL.
-		 */
-		if ((pkt[j]->packet_type & RTE_PTYPE_L4_MASK) ==
-				RTE_PTYPE_L4_FRAG) {
-			cts = (cts == 0) ? rte_rdtsc() : cts;
-			pkt[j] = reassemble(pkt[j], lc, cts, port);
-			x += (pkt[j] == NULL);
-		}
+		DO_REASSEMBLE(IPPROTO_UDP);
 	}
 
 	/* reassemble was invoked, cleanup its death-row. */
@@ -452,8 +642,8 @@ type1_rx_callback(uint8_t port, __rte_unused uint16_t queue,
 		return nb_pkts;
 
 	NETBE_TRACE("%s(port=%u, queue=%u, nb_pkts=%u): "
-	"%u non-reassembled fragments;\n",
-	__func__, port, queue, nb_pkts, x);
+		"%u non-reassembled fragments;\n",
+		__func__, port, queue, nb_pkts, x);
 
 	return compress_pkt_list(pkt, nb_pkts, x);
 }
@@ -469,27 +659,19 @@ typen_rx_callback(uint8_t port, __rte_unused uint16_t queue,
 	uint32_t j, x;
 	uint64_t cts;
 	struct netbe_lcore *lc;
+	uint32_t proto;
 
 	lc = user_param;
 	cts = 0;
 
 	x = 0;
+	proto = IPPROTO_UDP;
 	for (j = 0; j != nb_pkts; j++) {
 
 		NETBE_PKT_DUMP(pkt[j]);
-		fill_eth_hdr_len(pkt[j]);
+		fill_eth_hdr_len(pkt[j], &proto);
 
-		/*
-		 * if it is a fragment, try to reassemble it,
-		 * if by some reason it can't be done, then
-		 * set pkt[] entry to NULL.
-		 */
-		if ((pkt[j]->packet_type & RTE_PTYPE_L4_MASK) ==
-				RTE_PTYPE_L4_FRAG) {
-			cts = (cts == 0) ? rte_rdtsc() : cts;
-			pkt[j] = reassemble(pkt[j], lc, cts, port);
-			x += (pkt[j] == NULL);
-		}
+		DO_REASSEMBLE(proto);
 	}
 
 	/* reassemble was invoked, cleanup its death-row. */
@@ -500,8 +682,8 @@ typen_rx_callback(uint8_t port, __rte_unused uint16_t queue,
 		return nb_pkts;
 
 	NETBE_TRACE("%s(port=%u, queue=%u, nb_pkts=%u): "
-	"%u non-reassembled fragments;\n",
-	__func__, port, queue, nb_pkts, x);
+		"%u non-reassembled fragments;\n",
+		__func__, port, queue, nb_pkts, x);
 
 	return compress_pkt_list(pkt, nb_pkts, x);
 }
