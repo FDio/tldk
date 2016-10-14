@@ -18,7 +18,7 @@
 
 #include <gtest/gtest.h>
 #include <rte_errno.h>
-#include <tle_udp_impl.h>
+#include <tle_ctx.h>
 #include <tle_event.h>
 
 struct event_state_active {

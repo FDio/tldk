@@ -15,32 +15,37 @@ ifeq ($(RTE_SDK),)
 $(error "Please define RTE_SDK environment variable")
 endif
 
-ifeq ($(RTE_TARGET),)
-$(error "Please define RTE_TARGET environment variable")
-endif
-
-ifeq ($(TLDK_ROOT),)
-$(error "Please define TLDK_ROOT environment variable")
-endif
+# Default target, can be overwritten by command line or environment
+RTE_TARGET ?= x86_64-native-linuxapp-gcc
 
 include $(RTE_SDK)/mk/rte.vars.mk
 
-# binary name
-APP = udpfwd
+# library name
+LIB = libtle_l4p.a
 
-# all source are stored in SRCS-y
-SRCS-y += parse.c
-SRCS-y += pkt.c
-SRCS-y += main.c
+CFLAGS += -O3
+CFLAGS += $(WERROR_FLAGS) -I$(SRCDIR)
 
-CFLAGS += $(WERROR_FLAGS)
-CFLAGS += -I$(RTE_OUTPUT)/include
+EXPORT_MAP := tle_l4p_version.map
 
-LDLIBS += -L$(RTE_OUTPUT)/lib
-LDLIBS += -ltle_l4p
+LIBABIVER := 1
 
-EXTRA_CFLAGS += -O3
-CFLAGS_parse.o += -D_GNU_SOURCE
-CFLAGS_main.o += -D_GNU_SOURCE
+#source files
+SRCS-y += event.c
+SRCS-y += ctx.c
+SRCS-y += stream_table.c
+SRCS-y += tcp_stream.c
+SRCS-y += tcp_rxtx.c
+SRCS-y += udp_stream.c
+SRCS-y += udp_rxtx.c
 
-include $(TLDK_ROOT)/mk/tle.app.mk
+# install this header file
+SYMLINK-y-include += tle_ctx.h
+SYMLINK-y-include += tle_event.h
+SYMLINK-y-include += tle_tcp.h
+SYMLINK-y-include += tle_udp.h
+
+# this lib dependencies
+DEPDIRS-y += lib/libtle_dring
+
+include $(TLDK_ROOT)/mk/tle.lib.mk

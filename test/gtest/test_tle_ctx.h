@@ -13,11 +13,11 @@
  * limitations under the License.
  */
 
-#ifndef TEST_TLE_UDP_CTX_H_
-#define TEST_TLE_UDP_CTX_H_
+#ifndef TEST_TLE_CTX_H_
+#define TEST_TLE_CTX_H_
 
 #include <gtest/gtest.h>
 #include <rte_errno.h>
-#include <tle_udp.h>
+#include <tle_ctx.h>
 
-#endif /* TEST_TLE_UDP_CTX_H_ */
+#endif /* TEST_TLE_CTX_H_ */

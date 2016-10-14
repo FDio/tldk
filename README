@@ -63,11 +63,11 @@ $(TLDK_ROOT)
 |      |
 |      +--libtle_dring - dring library
 |      |
-|      +--libtle_udp - implementation of the UDP datagram processing
+|      +--libtle_l4p - implementation of the UDP datagram processing
 |
 +----examples
 |      |
-|      +--udpfwd - sample app to demonstrate and test libtle_udp usage
+|      +--udpfwd - sample app to demonstrate and test libtle_l4p UDP usage
 |            (refer to examples/udpfwd/README for more information)
 |
 +----test - unit-tests
