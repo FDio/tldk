@@ -21,6 +21,30 @@ extern "C" {
 #endif
 
 static inline int
+xmm_cmp(const rte_xmm_t *da, const rte_xmm_t *sa)
+{
+	uint64_t ret;
+
+	ret = (sa->u64[0] ^ da->u64[0]) |
+		(sa->u64[1] ^ da->u64[1]);
+
+	return (ret != 0);
+}
+
+static inline int
+ymm_cmp(const _ymm_t *da, const _ymm_t *sa)
+{
+	uint64_t ret;
+
+	ret = (sa->u64[0] ^ da->u64[0]) |
+		(sa->u64[1] ^ da->u64[1]) |
+		(sa->u64[2] ^ da->u64[2]) |
+		(sa->u64[3] ^ da->u64[3]);
+
+	return (ret != 0);
+}
+
+static inline int
 ymm_mask_cmp(const _ymm_t *da, const _ymm_t *sa, const _ymm_t *sm)
 {
 	uint64_t ret;
@@ -302,6 +326,33 @@ static inline void
 rwl_up(rte_atomic32_t *p)
 {
 	rte_atomic32_sub(p, INT32_MIN);
+}
+
+/* exclude NULLs from the final list of packets. */
+static inline uint32_t
+compress_pkt_list(struct rte_mbuf *pkt[], uint32_t nb_pkt, uint32_t nb_zero)
+{
+	uint32_t i, j, k, l;
+
+	for (j = nb_pkt; nb_zero != 0 && j-- != 0; ) {
+
+		/* found a hole. */
+		if (pkt[j] == NULL) {
+
+			/* find how big is it. */
+			for (i = j; i-- != 0 && pkt[i] == NULL; )
+				;
+			/* fill the hole. */
+			for (k = j + 1, l = i + 1; k != nb_pkt; k++, l++)
+				pkt[l] = pkt[k];
+
+			nb_pkt -= j - i;
+			nb_zero -= j - i;
+			j = i + 1;
+		}
+	}
+
+	return nb_pkt;
 }
 
 #ifdef __cplusplus

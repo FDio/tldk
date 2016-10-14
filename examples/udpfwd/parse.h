@@ -33,23 +33,6 @@ union parse_val {
 	rte_cpuset_t cpuset;
 };
 
-static int
-parse_uint_val(__rte_unused const char *key, const char *val, void *prm)
-{
-	union parse_val *rv;
-	unsigned long v;
-	char *end;
-
-	rv = prm;
-	errno = 0;
-	v = strtoul(val, &end, 0);
-	if (errno != 0 || end[0] != 0 || v > UINT32_MAX)
-		return -EINVAL;
-
-	rv->u64 = v;
-	return 0;
-}
-
 static const char *
 format_addr(const struct sockaddr_storage *sp, char buf[], size_t len)
 {
@@ -71,11 +54,16 @@ format_addr(const struct sockaddr_storage *sp, char buf[], size_t len)
 }
 
 int parse_netbe_arg(struct netbe_port *prt, const char *arg,
-	rte_cpuset_t *cpuset);
+	rte_cpuset_t *pcpu);
 
 int netbe_parse_dest(const char *fname, struct netbe_dest_prm *prm);
 
 int netfe_parse_cfg(const char *fname, struct netfe_lcore_prm *lp);
+
+int
+parse_app_options(int argc, char **argv, struct netbe_cfg *cfg,
+	struct tle_ctx_param *ctx_prm,
+	char *fecfg_fname, char *becfg_fname);
 
 #endif /* __PARSE_H__ */
 

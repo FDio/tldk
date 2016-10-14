@@ -21,23 +21,29 @@ RTE_TARGET ?= x86_64-native-linuxapp-gcc
 include $(RTE_SDK)/mk/rte.vars.mk
 
 # library name
-LIB = libtle_udp.a
+LIB = libtle_l4p.a
 
 CFLAGS += -O3
 CFLAGS += $(WERROR_FLAGS) -I$(SRCDIR)
 
-EXPORT_MAP := tle_udp_version.map
+EXPORT_MAP := tle_l4p_version.map
 
 LIBABIVER := 1
 
 #source files
 SRCS-y += event.c
-SRCS-y += udp_ctl.c
+SRCS-y += ctx.c
+SRCS-y += stream_table.c
+SRCS-y += tcp_stream.c
+SRCS-y += tcp_rxtx.c
+SRCS-y += udp_stream.c
 SRCS-y += udp_rxtx.c
 
 # install this header file
-SYMLINK-y-include += tle_udp_impl.h
+SYMLINK-y-include += tle_ctx.h
 SYMLINK-y-include += tle_event.h
+SYMLINK-y-include += tle_tcp.h
+SYMLINK-y-include += tle_udp.h
 
 # this lib dependencies
 DEPDIRS-y += lib/libtle_dring

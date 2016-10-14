@@ -18,6 +18,6 @@
 
 #include <gtest/gtest.h>
 #include <rte_errno.h>
-#include <tle_udp_impl.h>
+#include <tle_udp.h>
 
 #endif /* TEST_TLE_UDP_CTX_H_ */

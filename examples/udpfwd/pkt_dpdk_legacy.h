@@ -37,7 +37,8 @@ setup_rx_cb(const struct netbe_port *uprt, struct netbe_lcore *lc,
 		IPV4_EXT_PTYPE = 0x4,
 		IPV6_PTYPE = 0x8,
 		IPV6_EXT_PTYPE = 0x10,
-		UDP_PTYPE = 0x20,
+		TCP_PTYPE = 0x20,
+		UDP_PTYPE = 0x40,
 	};
 
 	static const struct {
@@ -47,15 +48,27 @@ setup_rx_cb(const struct netbe_port *uprt, struct netbe_lcore *lc,
 	} ptype2cb[] = {
 		{
 			.mask = ETHER_PTYPE | IPV4_PTYPE | IPV4_EXT_PTYPE |
+				IPV6_PTYPE | IPV6_EXT_PTYPE | TCP_PTYPE,
+			.name = "HW l2/l3x/l4-tcp ptype",
+			.fn = type0_tcp_rx_callback,
+		},
+		{
+			.mask = ETHER_PTYPE | IPV4_PTYPE | IPV4_EXT_PTYPE |
 				IPV6_PTYPE | IPV6_EXT_PTYPE | UDP_PTYPE,
-			.name = "HW l2/l3x/l4 ptype",
-			.fn = type0_rx_callback,
+			.name = "HW l2/l3x/l4-udp ptype",
+			.fn = type0_udp_rx_callback,
+		},
+		{
+			.mask = ETHER_PTYPE | IPV4_PTYPE | IPV6_PTYPE |
+				TCP_PTYPE,
+			.name = "HW l2/l3/l4-tcp ptype",
+			.fn = type1_tcp_rx_callback,
 		},
 		{
 			.mask = ETHER_PTYPE | IPV4_PTYPE | IPV6_PTYPE |
 				UDP_PTYPE,
-			.name = "HW l2/l3/l4 ptype",
-			.fn = type1_rx_callback,
+			.name = "HW l2/l3/l4-udp ptype",
+			.fn = type1_udp_rx_callback,
 		},
 		{
 			.mask = 0,
@@ -95,6 +108,9 @@ setup_rx_cb(const struct netbe_port *uprt, struct netbe_lcore *lc,
 		case RTE_PTYPE_L3_IPV6_EXT:
 			smask |= IPV6_EXT_PTYPE;
 			break;
+		case RTE_PTYPE_L4_TCP:
+			smask |= TCP_PTYPE;
+			break;
 		case RTE_PTYPE_L4_UDP:
 			smask |= UDP_PTYPE;
 			break;
@@ -103,6 +119,12 @@ setup_rx_cb(const struct netbe_port *uprt, struct netbe_lcore *lc,
 
 	for (i = 0; i != RTE_DIM(ptype2cb); i++) {
 		if ((smask & ptype2cb[i].mask) == ptype2cb[i].mask) {
+			if ((lc->proto == TLE_PROTO_TCP &&
+					(ptype2cb[i].mask & UDP_PTYPE)) ||
+					(lc->proto == TLE_PROTO_UDP &&
+					(ptype2cb[i].mask & TCP_PTYPE)))
+				continue;
+
 			cb = rte_eth_add_rx_callback(uprt->id, qid,
 				ptype2cb[i].fn, lc);
 			rc = -rte_errno;
