@@ -78,7 +78,7 @@ TEST_F(udp_event, udp_event_alloc_free_max_reached)
 
 	last_event = tle_event_alloc(evq, (void *) &fake_data);
 	ASSERT_EQ(last_event, (struct tle_event *) NULL);
-	ASSERT_EQ(rte_errno, -ENOMEM);
+	ASSERT_EQ(rte_errno, ENOMEM);
 
 	for (i = 1; i <= max_events; i++) {
 		tle_event_free(event);
@@ -125,6 +125,7 @@ INSTANTIATE_TEST_CASE_P(Default, udp_event_state_active_twice,
 	event_state_active_twice{TLE_SEV_IDLE, TLE_SEV_DOWN, TLE_SEV_DOWN},
 	event_state_active_twice{TLE_SEV_IDLE, TLE_SEV_UP, TLE_SEV_UP},
 	event_state_active_twice{TLE_SEV_DOWN, TLE_SEV_IDLE, TLE_SEV_DOWN},
+	event_state_active_twice{TLE_SEV_DOWN, TLE_SEV_UP, TLE_SEV_DOWN},
 	event_state_active_twice{TLE_SEV_DOWN, TLE_SEV_DOWN, TLE_SEV_DOWN},
 	event_state_active_twice{TLE_SEV_UP, TLE_SEV_IDLE, TLE_SEV_UP},
 	event_state_active_twice{TLE_SEV_UP, TLE_SEV_DOWN, TLE_SEV_UP},

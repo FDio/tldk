@@ -21,7 +21,7 @@ extern "C" {
 #endif
 
 /*
- * Simple implementation of bitmap for all possible UDP ports [0-UINT16_MAX].
+ * Simple implementation of bitmap for all possible L4 ports [0-UINT16_MAX].
  */
 
 #define MAX_PORT_NUM	(UINT16_MAX + 1)
@@ -31,14 +31,14 @@ extern "C" {
 
 #define	MAX_PORT_BLK	PORT_BLK(MAX_PORT_NUM)
 
-struct udp_pbm {
+struct tle_pbm {
 	uint32_t nb_set; /* number of bits set. */
 	uint32_t blk;    /* last block with free entry. */
 	uint32_t bm[MAX_PORT_BLK];
 };
 
 static inline void
-udp_pbm_init(struct udp_pbm *pbm, uint32_t blk)
+tle_pbm_init(struct tle_pbm *pbm, uint32_t blk)
 {
 	pbm->bm[0] = 1;
 	pbm->nb_set = 1;
@@ -46,7 +46,7 @@ udp_pbm_init(struct udp_pbm *pbm, uint32_t blk)
 }
 
 static inline void
-udp_pbm_set(struct udp_pbm *pbm, uint16_t port)
+tle_pbm_set(struct tle_pbm *pbm, uint16_t port)
 {
 	uint32_t i, b, v;
 
@@ -58,7 +58,7 @@ udp_pbm_set(struct udp_pbm *pbm, uint16_t port)
 }
 
 static inline void
-udp_pbm_clear(struct udp_pbm *pbm, uint16_t port)
+tle_pbm_clear(struct tle_pbm *pbm, uint16_t port)
 {
 	uint32_t i, b, v;
 
@@ -71,7 +71,7 @@ udp_pbm_clear(struct udp_pbm *pbm, uint16_t port)
 
 
 static inline uint32_t
-udp_pbm_check(const struct udp_pbm *pbm, uint16_t port)
+tle_pbm_check(const struct tle_pbm *pbm, uint16_t port)
 {
 	uint32_t i, v;
 
@@ -81,7 +81,7 @@ udp_pbm_check(const struct udp_pbm *pbm, uint16_t port)
 }
 
 static inline uint16_t
-udp_pbm_find_range(struct udp_pbm *pbm, uint32_t start_blk, uint32_t end_blk)
+tle_pbm_find_range(struct tle_pbm *pbm, uint32_t start_blk, uint32_t end_blk)
 {
 	uint32_t i, v;
 	uint16_t p;
