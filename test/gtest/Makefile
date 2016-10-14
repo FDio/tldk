@@ -82,7 +82,7 @@ CXXFLAGS += -I$(RTE_OUTPUT)/include
 
 LDFLAGS += -lstdc++
 LDFLAGS += -L$(GMOCK_DIR) -lgmock
-LDLIBS += -ltle_udp -ltle_dring
+LDLIBS += -ltle_l4p -ltle_dring
 
 include $(TLDK_ROOT)/mk/tle.cpp-obj.mk
 endif
@@ -106,7 +106,7 @@ LDLIBS += gtest-rfc.o
 LDFLAGS += -lstdc++
 LDFLAGS += -L$(GMOCK_DIR) -lgmock
 LDLIBS += -L$(RTE_OUTPUT)/lib
-LDLIBS += -ltle_udp -ltle_dring
+LDLIBS += -ltle_l4p -ltle_dring
 
 include $(TLDK_ROOT)/mk/tle.app.mk
 endif

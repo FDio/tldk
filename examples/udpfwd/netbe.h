@@ -38,8 +38,10 @@
 #include <rte_hash.h>
 #include <rte_ip.h>
 #include <rte_ip_frag.h>
+#include <rte_tcp.h>
 #include <rte_udp.h>
-#include <tle_udp_impl.h>
+#include <tle_tcp.h>
+#include <tle_udp.h>
 #include <tle_event.h>
 
 #define	MAX_PKT_BURST	0x20
@@ -54,7 +56,7 @@
 struct netbe_port {
 	uint32_t id;
 	uint32_t nb_lcore;
-	uint32_t *lcore;
+	uint32_t *lcore_id;
 	uint32_t mtu;
 	uint32_t rx_offload;
 	uint32_t tx_offload;
@@ -92,7 +94,7 @@ struct netbe_dev {
 	uint16_t rxqid;
 	uint16_t txqid;
 	struct netbe_port port;
-	struct tle_udp_dev *dev;
+	struct tle_dev *dev;
 	struct {
 		uint64_t in;
 		uint64_t up;
@@ -111,21 +113,24 @@ struct netbe_dev {
 
 struct netbe_lcore {
 	uint32_t id;
+	uint32_t proto;              /**< L4 proto to handle. */
 	struct rte_lpm *lpm4;
 	struct rte_lpm6 *lpm6;
 	struct rte_ip_frag_tbl *ftbl;
-	struct tle_udp_ctx *ctx;
+	struct tle_ctx *ctx;
 	uint32_t prtq_num;
 	uint32_t dst4_num;
 	uint32_t dst6_num;
 	struct netbe_dev *prtq;
-	struct tle_udp_dest dst4[LCORE_MAX_DST];
-	struct tle_udp_dest dst6[LCORE_MAX_DST];
+	struct tle_dest dst4[LCORE_MAX_DST];
+	struct tle_dest dst6[LCORE_MAX_DST];
 	struct rte_ip_frag_death_row death_row;
 };
 
 struct netbe_cfg {
 	uint32_t promisc;
+	uint32_t proto;
+	uint32_t server;
 	uint32_t prt_num;
 	uint32_t cpu_num;
 	struct netbe_port *prt;
@@ -145,13 +150,14 @@ enum {
 
 struct netfe_sprm {
 	uint32_t bidx;  /* BE index to use. */
-	struct tle_udp_stream_param prm;
+	struct sockaddr_storage local_addr;  /**< stream local address. */
+	struct sockaddr_storage remote_addr; /**< stream remote address. */
 };
 
 struct netfe_stream_prm {
 	uint32_t lcore;
-	uint32_t be_lcore;
-	uint32_t line;
+	uint32_t belcore;
+	uint16_t line;
 	uint16_t op;
 	uint16_t txlen; /* valid/used only for TXONLY op. */
 	struct netfe_sprm sprm;
@@ -165,12 +171,15 @@ struct netfe_lcore_prm {
 };
 
 struct netfe_stream {
-	struct tle_udp_stream *s;
+	struct tle_stream *s;
+	struct tle_event *erev;
 	struct tle_event *rxev;
 	struct tle_event *txev;
 	uint16_t op;
+	uint16_t proto;
 	uint16_t family;
 	uint16_t txlen;
+	uint32_t id;
 	struct {
 		uint64_t rxp;
 		uint64_t txp;
@@ -180,18 +189,28 @@ struct netfe_stream {
 		uint64_t txev[TLE_SEV_NUM];
 	} stat;
 	struct pkt_buf pbuf;
+	struct sockaddr_storage laddr;
 	struct sockaddr_storage raddr;
 	struct netfe_sprm fwdprm;
+	struct netfe_stream *fwds;
 };
 
 struct netfe_lcore {
 	uint32_t snum;  /* max number of streams */
-	uint32_t sidx;  /* last open stream index */
+	struct tle_evq *syneq;
+	struct tle_evq *ereq;
 	struct tle_evq *rxeq;
 	struct tle_evq *txeq;
 	struct rte_hash *fw4h;
 	struct rte_hash *fw6h;
-	struct netfe_stream *fs;
+	struct {
+		uint64_t acc;
+		uint64_t rej;
+	} tcp_stat;
+	uint32_t nb_sidx; /* number of free streams */
+	struct netfe_stream *fs; /* list of fe streams */
+	uint32_t *sidx; /* list of free stream indexes */
+	uint32_t *fs_active; /* list of active stream indexes */
 };
 
 struct lcore_prm {
@@ -262,5 +281,27 @@ struct lcore_prm {
 
 int setup_rx_cb(const struct netbe_port *uprt, struct netbe_lcore *lc,
 	uint16_t qid);
+
+/*
+ * application function pointers
+ */
+
+typedef int (*LCORE_MAIN_FUNCTYPE)(void *arg);
+
+/*
+ * tle_l4p lib function pointers
+ */
+
+typedef uint16_t (*TLE_RX_BULK_FUNCTYPE)
+	(struct tle_dev *dev, struct rte_mbuf *pkt[],
+	struct rte_mbuf *rp[], int32_t rc[], uint16_t num);
+
+typedef uint16_t (*TLE_TX_BULK_FUNCTYPE)
+	(struct tle_dev *dev, struct rte_mbuf *pkt[], uint16_t num);
+
+typedef uint16_t (*TLE_STREAM_RECV_FUNCTYPE)
+	(struct tle_stream *ts, struct rte_mbuf *pkt[], uint16_t num);
+
+typedef int (*TLE_STREAM_CLOSE_FUNCTYPE)(struct tle_stream *s);
 
 #endif /* __NETBE_H__ */
