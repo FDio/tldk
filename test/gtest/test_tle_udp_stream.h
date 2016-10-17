@@ -24,6 +24,26 @@
 #include <tle_udp_impl.h>
 #include <tle_event.h>
 
+int
+dummy_lookup4(void *opaque, const struct in_addr *addr,
+	struct tle_udp_dest *res)
+{
+	RTE_SET_USED(opaque);
+	RTE_SET_USED(addr);
+	RTE_SET_USED(res);
+	return -ENOENT;
+}
+
+int
+dummy_lookup6(void *opaque, const struct in6_addr *addr,
+	struct tle_udp_dest *res)
+{
+	RTE_SET_USED(opaque);
+	RTE_SET_USED(addr);
+	RTE_SET_USED(res);
+	return -ENOENT;
+}
+
 struct tle_udp_ctx_param ctx_prm_tmpl = {
 	.socket_id = SOCKET_ID_ANY,
 	.max_streams = 0x10,
@@ -50,12 +70,16 @@ public:
 		char const *ipv4_laddr = "192.168.0.1";
 		char const *ipv4_raddr = "192.168.0.2";
 		char const *ipv6 = "fe80::21e:67ff:fec2:2568";
+		struct tle_udp_ctx_param cprm;
 
 		ctx = nullptr;
 		dev = nullptr;
 		stream = nullptr;
 		/* Setup Context */
-		ctx = setup_ctx(&ctx_prm_tmpl);
+		cprm = ctx_prm_tmpl;
+		cprm.lookup4 = dummy_lookup4;
+		cprm.lookup6 = dummy_lookup6;
+		ctx = setup_ctx(&cprm);
 		/* Setup Dev */
 		memset(&dev_prm, 0, sizeof(dev_prm));
 		setup_dev_prm(&dev_prm, ipv4_laddr, ipv6);
