@@ -730,7 +730,7 @@ tle_udp_stream_close(struct tle_udp_stream *s)
 	static const struct tle_udp_stream_cb zcb;
 
 	if (s == NULL || s->type >= TLE_UDP_VNUM)
-		return EINVAL;
+		return -EINVAL;
 
 	ctx = s->ctx;
 
@@ -779,7 +779,7 @@ tle_udp_stream_get_param(const struct tle_udp_stream *s,
 	struct sockaddr_in6 *lin6;
 
 	if (prm == NULL || s == NULL || s->type >= TLE_UDP_VNUM)
-		return EINVAL;
+		return -EINVAL;
 
 	prm[0] = s->prm;
 	if (prm->local_addr.ss_family == AF_INET) {

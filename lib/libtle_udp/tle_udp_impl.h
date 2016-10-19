@@ -270,7 +270,7 @@ int tle_udp_stream_close(struct tle_udp_stream *s);
  *   Pointer to the stream.
  * @return
  *   zero on successful completion.
- *   - EINVAL - invalid parameter passed to function
+ *   - -EINVAL - invalid parameter passed to function
  */
 int
 tle_udp_stream_get_param(const struct tle_udp_stream *s,

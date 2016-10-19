@@ -33,7 +33,7 @@ TEST_F(test_tle_udp_stream, stream_test_open_nullctx)
 	EXPECT_EQ(rte_errno, EINVAL);
 
 	ret = tle_udp_stream_close(stream);
-	EXPECT_EQ(ret, EINVAL);
+	EXPECT_EQ(ret, -EINVAL);
 }
 
 TEST_F(test_tle_udp_stream, stream_test_open_null_stream_prm)
@@ -43,7 +43,7 @@ TEST_F(test_tle_udp_stream, stream_test_open_null_stream_prm)
 	EXPECT_EQ(rte_errno, EINVAL);
 
 	ret = tle_udp_stream_close(stream);
-	EXPECT_EQ(ret, EINVAL);
+	EXPECT_EQ(ret, -EINVAL);
 }
 
 
@@ -77,7 +77,7 @@ TEST_F(test_tle_udp_stream, stream_test_close)
 TEST_F(test_tle_udp_stream, stream_test_close_null)
 {
 	ret = tle_udp_stream_close(nullptr);
-	EXPECT_EQ(ret, EINVAL);
+	EXPECT_EQ(ret, -EINVAL);
 }
 
 
@@ -115,7 +115,7 @@ TEST_F(test_tle_udp_stream, stream_get_param_streamnull)
 	EXPECT_NE(stream, nullptr);
 
 	ret = tle_udp_stream_get_param(nullptr, &prm);
-	EXPECT_EQ(ret, EINVAL);
+	EXPECT_EQ(ret, -EINVAL);
 }
 
 TEST_F(test_tle_udp_stream, stream_get_param_prmnull)
@@ -127,7 +127,7 @@ TEST_F(test_tle_udp_stream, stream_get_param_prmnull)
 	EXPECT_NE(stream, nullptr);
 
 	ret = tle_udp_stream_get_param(stream, nullptr);
-	EXPECT_EQ(ret, EINVAL);
+	EXPECT_EQ(ret, -EINVAL);
 }
 
 
