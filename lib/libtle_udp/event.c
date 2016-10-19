@@ -79,7 +79,7 @@ tle_event_alloc(struct tle_evq *evq, const void *data)
 		evq->nb_free--;
 		h->data = data;
 	} else
-		rte_errno = -ENOMEM;
+		rte_errno = ENOMEM;
 	rte_spinlock_unlock(&evq->lock);
 	return h;
 }
