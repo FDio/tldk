@@ -480,42 +480,6 @@ find_initilized_lcore(struct netbe_cfg *cfg, uint32_t lc_num)
 	return NULL;
 }
 
-static int
-calculate_nb_prtq(struct netbe_cfg *cfg)
-{
-	uint32_t i, j, rc;
-	struct netbe_port *prt;
-	struct netbe_lcore *lc;
-
-	for (i = 0; i != cfg->prt_num; i++) {
-		prt = &cfg->prt[i];
-		for (j = 0; j != prt->nb_lcore; j++) {
-			rc = check_lcore(prt->lcore[j]);
-			if (rc != 0) {
-				RTE_LOG(ERR, USER1,
-					"%s: processing failed with err: %d\n",
-					__func__, rc);
-				return rc;
-			}
-
-			lc = find_initilized_lcore(cfg, prt->lcore[j]);
-			if (lc == NULL) {
-				lc = &cfg->cpu[cfg->cpu_num];
-				lc->id = prt->lcore[j];
-				cfg->cpu_num++;
-			}
-
-			NETBE_REALLOC(lc->prtq, lc->prtq_num + 1);
-			lc->prtq[lc->prtq_num].rxqid = j;
-			lc->prtq[lc->prtq_num].txqid = j;
-			lc->prtq[lc->prtq_num].port = *prt;
-			lc->prtq_num++;
-		}
-	}
-
-	return 0;
-}
-
 /*
  * Setup all enabled ports.
  */
@@ -527,6 +491,7 @@ netbe_port_init(struct netbe_cfg *cfg, int argc, char *argv[])
 	struct netbe_port *prt;
 	rte_cpuset_t cpuset;
 	uint32_t nc;
+	struct netbe_lcore *lc;
 
 	n = (uint32_t)argc;
 	cfg->prt = rte_zmalloc(NULL, sizeof(struct netbe_port) * n,
@@ -549,14 +514,6 @@ netbe_port_init(struct netbe_cfg *cfg, int argc, char *argv[])
 	cfg->cpu = rte_zmalloc(NULL, sizeof(struct netbe_lcore) * nc,
 		RTE_CACHE_LINE_SIZE);
 
-	/* calculate number of queues per lcore. */
-	rc = calculate_nb_prtq(cfg);
-	if (rc != 0) {
-		RTE_LOG(ERR, USER1, "%s: processing of arguments failed"
-			" with error code: %d\n", __func__, rc);
-		return rc;
-	}
-
 	for (i = 0; i != cfg->prt_num; i++) {
 		prt = cfg->prt + i;
 		rc = port_init(prt);
@@ -571,6 +528,10 @@ netbe_port_init(struct netbe_cfg *cfg, int argc, char *argv[])
 			rte_eth_promiscuous_enable(prt->id);
 
 		for (j = 0; j < prt->nb_lcore; j++) {
+			rc = check_lcore(prt->lcore[j]);
+			if (rc != 0)
+				return rc;
+
 			sid = rte_lcore_to_socket_id(prt->lcore[j]) + 1;
 			assert(sid < RTE_DIM(mpool));
 
@@ -593,6 +554,20 @@ netbe_port_init(struct netbe_cfg *cfg, int argc, char *argv[])
 					__func__, prt->lcore[j], rc);
 				return rc;
 			}
+
+			/* calculate number of queues and assign queue id per lcore. */
+			lc = find_initilized_lcore(cfg, prt->lcore[j]);
+			if (lc == NULL) {
+				lc = &cfg->cpu[cfg->cpu_num];
+				lc->id = prt->lcore[j];
+				cfg->cpu_num++;
+			}
+
+			NETBE_REALLOC(lc->prtq, lc->prtq_num + 1);
+			lc->prtq[lc->prtq_num].rxqid = j;
+			lc->prtq[lc->prtq_num].txqid = j;
+			lc->prtq[lc->prtq_num].port = *prt;
+			lc->prtq_num++;
 		}
 	}
 	log_netbe_cfg(cfg);
