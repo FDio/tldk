@@ -168,20 +168,20 @@ tle_event_active(struct tle_event *ev, enum tle_ev_state st)
 {
 	struct tle_evq *q;
 
-	if (st == ev->state)
+	if (ev->state != TLE_SEV_IDLE)
 		return;
 
 	q = ev->head;
 	rte_compiler_barrier();
 
 	rte_spinlock_lock(&q->lock);
-	if (st > ev->state) {
-		if (st == TLE_SEV_UP) {
-			TAILQ_INSERT_TAIL(&q->armed, ev, ql);
-			q->nb_armed++;
-		}
-		ev->state = st;
+
+	if (st == TLE_SEV_UP) {
+		TAILQ_INSERT_TAIL(&q->armed, ev, ql);
+		q->nb_armed++;
 	}
+	ev->state = st;
+
 	rte_spinlock_unlock(&q->lock);
 }
 
