@@ -1,0 +1,411 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "ba3e81b7_bf8f2375",
+        "filename": "lib/libtle_l4p/tcp_rxtx.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 181,
+      "author": {
+        "id": 651
+      },
+      "writtenOn": "2016-10-25T10:16:09Z",
+      "side": 1,
+      "message": "whitespace",
+      "revId": "84cdbc415c8811b384c329003ebd054303e97b8b",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "ba3e81b7_7fe9bb19",
+        "filename": "lib/libtle_l4p/tcp_rxtx.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 222,
+      "author": {
+        "id": 651
+      },
+      "writtenOn": "2016-10-25T10:16:09Z",
+      "side": 1,
+      "message": "whitespace",
+      "range": {
+        "startLine": 222,
+        "startChar": 15,
+        "endLine": 222,
+        "endChar": 16
+      },
+      "revId": "84cdbc415c8811b384c329003ebd054303e97b8b",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "ba3e81b7_9f8c5f81",
+        "filename": "lib/libtle_l4p/tcp_rxtx.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 276,
+      "author": {
+        "id": 651
+      },
+      "writtenOn": "2016-10-25T10:16:09Z",
+      "side": 1,
+      "message": "whitespace",
+      "range": {
+        "startLine": 276,
+        "startChar": 69,
+        "endLine": 276,
+        "endChar": 71
+      },
+      "revId": "84cdbc415c8811b384c329003ebd054303e97b8b",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "ba3e81b7_ffdc8b76",
+        "filename": "lib/libtle_l4p/tcp_rxtx.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 553,
+      "author": {
+        "id": 651
+      },
+      "writtenOn": "2016-10-25T10:16:09Z",
+      "side": 1,
+      "message": "whitespace",
+      "range": {
+        "startLine": 553,
+        "startChar": 2,
+        "endLine": 553,
+        "endChar": 3
+      },
+      "revId": "84cdbc415c8811b384c329003ebd054303e97b8b",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "ba3e81b7_7fd09b53",
+        "filename": "lib/libtle_l4p/tcp_rxtx.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 604,
+      "author": {
+        "id": 651
+      },
+      "writtenOn": "2016-10-25T10:16:09Z",
+      "side": 1,
+      "message": "Same as in case of tle_udp_rx_bulk - in my opinion this function could use some comments on what is happening in each step",
+      "range": {
+        "startLine": 577,
+        "startChar": 1,
+        "endLine": 604,
+        "endChar": 1
+      },
+      "revId": "84cdbc415c8811b384c329003ebd054303e97b8b",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "ba3e81b7_9fba1f09",
+        "filename": "lib/libtle_l4p/tcp_rxtx.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 803,
+      "author": {
+        "id": 651
+      },
+      "writtenOn": "2016-10-25T10:16:09Z",
+      "side": 1,
+      "message": "typo: available",
+      "range": {
+        "startLine": 803,
+        "startChar": 20,
+        "endLine": 803,
+        "endChar": 29
+      },
+      "revId": "84cdbc415c8811b384c329003ebd054303e97b8b",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "ba3e81b7_ff95ab88",
+        "filename": "lib/libtle_l4p/tcp_stream.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 200,
+      "author": {
+        "id": 651
+      },
+      "writtenOn": "2016-10-25T10:16:09Z",
+      "side": 1,
+      "message": "whitespaces",
+      "range": {
+        "startLine": 200,
+        "startChar": 43,
+        "endLine": 200,
+        "endChar": 44
+      },
+      "revId": "84cdbc415c8811b384c329003ebd054303e97b8b",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "ba3e81b7_9368de88",
+        "filename": "lib/libtle_l4p/tcp_stream.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 360,
+      "author": {
+        "id": 651
+      },
+      "writtenOn": "2016-10-25T10:16:09Z",
+      "side": 1,
+      "message": "Should be negative value",
+      "range": {
+        "startLine": 360,
+        "startChar": 9,
+        "endLine": 360,
+        "endChar": 15
+      },
+      "revId": "84cdbc415c8811b384c329003ebd054303e97b8b",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "ba3e81b7_df92e79e",
+        "filename": "lib/libtle_l4p/tcp_stream.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 72,
+      "author": {
+        "id": 651
+      },
+      "writtenOn": "2016-10-25T10:16:09Z",
+      "side": 1,
+      "message": "whitespace",
+      "revId": "84cdbc415c8811b384c329003ebd054303e97b8b",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "ba3e81b7_b302c2b2",
+        "filename": "lib/libtle_l4p/tle_ctx.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 128,
+      "author": {
+        "id": 651
+      },
+      "writtenOn": "2016-10-25T10:16:09Z",
+      "side": 1,
+      "message": "whitespace",
+      "range": {
+        "startLine": 128,
+        "startChar": 2,
+        "endLine": 128,
+        "endChar": 5
+      },
+      "revId": "84cdbc415c8811b384c329003ebd054303e97b8b",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "ba3e81b7_530a76d3",
+        "filename": "lib/libtle_l4p/tle_tcp.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 85,
+      "author": {
+        "id": 651
+      },
+      "writtenOn": "2016-10-25T10:16:09Z",
+      "side": 1,
+      "message": "Should be negative",
+      "range": {
+        "startLine": 85,
+        "startChar": 7,
+        "endLine": 85,
+        "endChar": 13
+      },
+      "revId": "84cdbc415c8811b384c329003ebd054303e97b8b",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "ba3e81b7_1f818f4a",
+        "filename": "lib/libtle_l4p/tle_tcp.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 127,
+      "author": {
+        "id": 651
+      },
+      "writtenOn": "2016-10-25T10:16:09Z",
+      "side": 1,
+      "message": "second \"*\" missing?",
+      "revId": "84cdbc415c8811b384c329003ebd054303e97b8b",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "ba3e81b7_330ff2e3",
+        "filename": "lib/libtle_l4p/tle_tcp.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 214,
+      "author": {
+        "id": 651
+      },
+      "writtenOn": "2016-10-25T10:16:09Z",
+      "side": 1,
+      "message": "Trailing whitespace",
+      "range": {
+        "startLine": 214,
+        "startChar": 44,
+        "endLine": 214,
+        "endChar": 45
+      },
+      "revId": "84cdbc415c8811b384c329003ebd054303e97b8b",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "ba3e81b7_1314eef3",
+        "filename": "lib/libtle_l4p/tle_tcp.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 327,
+      "author": {
+        "id": 651
+      },
+      "writtenOn": "2016-10-25T10:16:09Z",
+      "side": 1,
+      "message": "Should be negative",
+      "range": {
+        "startLine": 327,
+        "startChar": 7,
+        "endLine": 327,
+        "endChar": 13
+      },
+      "revId": "84cdbc415c8811b384c329003ebd054303e97b8b",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "ba3e81b7_f3f84ac6",
+        "filename": "lib/libtle_l4p/tle_tcp.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 347,
+      "author": {
+        "id": 651
+      },
+      "writtenOn": "2016-10-25T10:16:09Z",
+      "side": 1,
+      "message": "Trailing whitespace",
+      "range": {
+        "startLine": 347,
+        "startChar": 52,
+        "endLine": 347,
+        "endChar": 53
+      },
+      "revId": "84cdbc415c8811b384c329003ebd054303e97b8b",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "ba3e81b7_3f7c5372",
+        "filename": "lib/libtle_l4p/udp_rxtx.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 180,
+      "author": {
+        "id": 651
+      },
+      "writtenOn": "2016-10-25T10:16:09Z",
+      "side": 1,
+      "message": "This function could use more comments in my opinion. When I first read it and tried to debug it I had problems because of lot of helper/counter variables. It\u0027s easy to lose track of what is going on and I think each loop should be described.",
+      "revId": "84cdbc415c8811b384c329003ebd054303e97b8b",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "ba3e81b7_9fb57f33",
+        "filename": "lib/libtle_l4p/udp_stream.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 179,
+      "author": {
+        "id": 651
+      },
+      "writtenOn": "2016-10-25T10:16:09Z",
+      "side": 1,
+      "message": "trailing whitespaces",
+      "range": {
+        "startLine": 179,
+        "startChar": 43,
+        "endLine": 179,
+        "endChar": 44
+      },
+      "revId": "84cdbc415c8811b384c329003ebd054303e97b8b",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "ba3e81b7_7f82db53",
+        "filename": "lib/libtle_l4p/udp_stream.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 42,
+      "author": {
+        "id": 651
+      },
+      "writtenOn": "2016-10-25T10:16:09Z",
+      "side": 1,
+      "message": "whitespace",
+      "revId": "84cdbc415c8811b384c329003ebd054303e97b8b",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "ba3e81b7_5f871762",
+        "filename": "lib/libtle_l4p/udp_stream.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 55,
+      "author": {
+        "id": 651
+      },
+      "writtenOn": "2016-10-25T10:16:09Z",
+      "side": 1,
+      "message": "typo: objects?",
+      "range": {
+        "startLine": 55,
+        "startChar": 36,
+        "endLine": 55,
+        "endChar": 37
+      },
+      "revId": "84cdbc415c8811b384c329003ebd054303e97b8b",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    }
+  ]
+}
