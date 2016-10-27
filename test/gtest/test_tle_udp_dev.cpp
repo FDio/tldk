@@ -53,6 +53,7 @@ TEST_F(udp_dev, udp_dev_add_only_ipv4)
 	dev = tle_udp_add_dev(ctx, &dev_prm);
 	ASSERT_NE(dev, (void *) NULL);
 	EXPECT_EQ(rte_errno, 0);
+	devs.push_back(dev);
 }
 
 TEST_F(udp_dev, udp_dev_add_only_ipv6)
@@ -70,6 +71,7 @@ TEST_F(udp_dev, udp_dev_add_nonexist_ipv4)
 	dev = tle_udp_add_dev(ctx, &dev_prm);
 	ASSERT_NE(dev, (void *) NULL);
 	EXPECT_EQ(rte_errno, 0);
+	devs.push_back(dev);
 }
 
 TEST_F(udp_dev, udp_dev_add_positive)
@@ -77,9 +79,21 @@ TEST_F(udp_dev, udp_dev_add_positive)
 	dev = tle_udp_add_dev(ctx, &dev_prm);
 	ASSERT_NE(dev, (void *) NULL);
 	EXPECT_EQ(rte_errno, 0);
+	devs.push_back(dev);
+}
+
+TEST_F(udp_dev, udp_dev_add_max)
+{
+	int i;
+	for(i = 0; i < RTE_MAX_ETHPORTS; i++) {
+		dev = tle_udp_add_dev(ctx, &dev_prm);
+		ASSERT_NE(dev, (void *) NULL);
+		EXPECT_EQ(rte_errno, 0);
+		devs.push_back(dev);
+	}
 	dev = tle_udp_add_dev(ctx, &dev_prm);
-	ASSERT_NE(dev, (void *) NULL);
-	EXPECT_EQ(rte_errno, 0);
+	ASSERT_EQ(dev, (void *) NULL);
+	EXPECT_EQ(rte_errno, ENODEV);
 }
 
 TEST_F(udp_dev, udp_dev_del_positive)
@@ -87,6 +101,12 @@ TEST_F(udp_dev, udp_dev_del_positive)
 	dev = tle_udp_add_dev(ctx, &dev_prm);
 	ASSERT_NE(dev, (void *) NULL);
 	EXPECT_EQ(rte_errno, 0);
+	devs.push_back(dev);
 	ASSERT_EQ(tle_udp_del_dev(dev), 0);
 	EXPECT_EQ(rte_errno, 0);
+}
+
+TEST_F(udp_dev, udp_dev_del_null_dev)
+{
+	ASSERT_EQ(tle_udp_del_dev(dev), -EINVAL);
 }
