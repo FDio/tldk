@@ -16,13 +16,18 @@
 #ifndef TEST_TLE_UDP_DEV_H_
 #define TEST_TLE_UDP_DEV_H_
 
+#include <algorithm>
 #include <arpa/inet.h>
 #include <gtest/gtest.h>
+
 #include <rte_errno.h>
+
 #include <tle_udp_impl.h>
 
 #define RX_NO_OFFLOAD 0
 #define TX_NO_OFFLOAD 0
+
+using namespace std;
 
 class udp_dev : public ::testing::Test {
 
@@ -31,6 +36,7 @@ public:
 	struct tle_udp_dev *dev;
 	struct tle_udp_ctx_param prm;
 	struct tle_udp_dev_param dev_prm;
+	vector<tle_udp_dev*> devs;
 
 	virtual void SetUp(void)
 	{
@@ -56,6 +62,9 @@ public:
 
 	virtual void TearDown(void)
 	{
+		for(auto d : devs) {
+			tle_udp_del_dev(d);
+		}
 		tle_udp_destroy(ctx);
 	}
 };
