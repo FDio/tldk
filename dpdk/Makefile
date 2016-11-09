@@ -14,7 +14,7 @@
 # Scripts require non-POSIX parts of bash
 SHELL := /bin/bash
 
-DPDK_VERSION ?= 16.04
+DPDK_VERSION ?= 16.07
 DPDK_BUILD_DIR        ?= $(CURDIR)/_build
 DPDK_INSTALL_DIR      ?= $(DPDK_BUILD_DIR)/dpdk/$(RTE_TARGET)
 DPDK_PKTMBUF_HEADROOM ?= 128
@@ -105,6 +105,7 @@ $(B)/custom-config: $(B)/.patch.ok Makefile
 	$(call set,RTE_BUILD_COMBINE_LIBS,y)
 	$(call set,RTE_LIBRTE_I40E_16BYTE_RX_DESC,y)
 	$(call set,RTE_LIBRTE_I40E_ITR_INTERVAL,16)
+	$(call set,RTE_LIBRTE_PMD_PCAP,y)
 	@# enable debug init for device drivers
 	$(call set,RTE_LIBRTE_I40E_DEBUG_INIT,$(DPDK_DEBUG))
 	$(call set,RTE_LIBRTE_IXGBE_DEBUG_INIT,$(DPDK_DEBUG))
