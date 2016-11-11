@@ -1,0 +1,140 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "9a437d4f_dbd789ec",
+        "filename": "README",
+        "patchSetId": 3
+      },
+      "lineNbr": 70,
+      "author": {
+        "id": 29
+      },
+      "writtenOn": "2016-11-11T17:19:27Z",
+      "side": 1,
+      "message": "Can not call this application udpfwd anymore as it does TCP as well. Maybe a name change to echo or l4fwd would be better name",
+      "revId": "21255c16f514a3c4dc7a8f339eff74a026461e88",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "9a437d4f_bb04c57e",
+        "filename": "examples/udpfwd/README",
+        "patchSetId": 3
+      },
+      "lineNbr": 4,
+      "author": {
+        "id": 29
+      },
+      "writtenOn": "2016-11-11T17:19:27Z",
+      "side": 1,
+      "message": "Name change would be good as previously stated.",
+      "revId": "21255c16f514a3c4dc7a8f339eff74a026461e88",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "9a437d4f_9b090198",
+        "filename": "examples/udpfwd/common.h",
+        "patchSetId": 3
+      },
+      "lineNbr": 26,
+      "author": {
+        "id": 29
+      },
+      "writtenOn": "2016-11-11T17:19:27Z",
+      "side": 1,
+      "message": "please start commenting the function and structures as it will be very hard to do later.",
+      "revId": "21255c16f514a3c4dc7a8f339eff74a026461e88",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "9a437d4f_3bb0d58a",
+        "filename": "examples/udpfwd/tcp.h",
+        "patchSetId": 3
+      },
+      "lineNbr": 381,
+      "author": {
+        "id": 29
+      },
+      "writtenOn": "2016-11-11T17:19:27Z",
+      "side": 1,
+      "message": "remove spaces",
+      "revId": "21255c16f514a3c4dc7a8f339eff74a026461e88",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "9a437d4f_fba92d25",
+        "filename": "lib/libtle_l4p/osdep.h",
+        "patchSetId": 3
+      },
+      "lineNbr": 36,
+      "author": {
+        "id": 29
+      },
+      "writtenOn": "2016-11-11T17:19:27Z",
+      "side": 1,
+      "message": "Maybe we need to add a new type instead of USER1 we add a TLE define to the standard.",
+      "revId": "21255c16f514a3c4dc7a8f339eff74a026461e88",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "9a437d4f_dba66953",
+        "filename": "lib/libtle_l4p/tcp_stream.h",
+        "patchSetId": 3
+      },
+      "lineNbr": 73,
+      "author": {
+        "id": 29
+      },
+      "writtenOn": "2016-11-11T17:19:27Z",
+      "side": 1,
+      "message": "white space delete",
+      "revId": "21255c16f514a3c4dc7a8f339eff74a026461e88",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "9a437d4f_bb63a519",
+        "filename": "lib/libtle_l4p/tle_ctx.h",
+        "patchSetId": 3
+      },
+      "lineNbr": 61,
+      "author": {
+        "id": 29
+      },
+      "writtenOn": "2016-11-11T17:19:27Z",
+      "side": 1,
+      "message": "can you have more the uin16_t blocked ports as ports is defined as unit16_t?",
+      "revId": "21255c16f514a3c4dc7a8f339eff74a026461e88",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "9a437d4f_9b68e1f6",
+        "filename": "lib/libtle_l4p/tle_ctx.h",
+        "patchSetId": 3
+      },
+      "lineNbr": 87,
+      "author": {
+        "id": 29
+      },
+      "writtenOn": "2016-11-11T17:19:27Z",
+      "side": 1,
+      "message": "Is this the L2 and L3 headers builtin this structure as an array of bytes?",
+      "revId": "21255c16f514a3c4dc7a8f339eff74a026461e88",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    }
+  ]
+}
