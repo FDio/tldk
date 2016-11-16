@@ -1,0 +1,38 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "7a288981_83952ce6",
+        "filename": "test/gtest/main.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 56,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2016-11-16T23:13:45Z",
+      "side": 1,
+      "message": "I think you can create just one mpool with twice number of entries and use it for all purposes.",
+      "revId": "b6478bc18fc4fed8e02ce7d6968626b94e911c71",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "7a288981_639a4016",
+        "filename": "test/gtest/test_common.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 318,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2016-11-16T23:13:45Z",
+      "side": 1,
+      "message": "x \u003d\u003d 0, so not sure why do you need it here at all.\nSame for compress_pkt_list().",
+      "revId": "b6478bc18fc4fed8e02ce7d6968626b94e911c71",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    }
+  ]
+}
