@@ -16,6 +16,24 @@
       "revId": "700bf515506d69f8da075ff2b231a941604bbf02",
       "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "7a288981_15417339",
+        "filename": "lib/libtle_udp/tle_event.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 178,
+      "author": {
+        "id": 651
+      },
+      "writtenOn": "2016-11-17T11:44:40Z",
+      "side": 1,
+      "message": "If we enter the function with ev-\u003estate\u003d\u003dUP or \u003d\u003dDOWN then we won\u0027t reach spinlock or won\u0027t insert event into list again, because we will return from function on line 172.\n\nIF on line 171 makes sure that nothing happens if current state is other than IDLE (and I think this is correct according to description on line 160 - move from IDLE to DOWN/UP state). \nit\u0027s the same as in tle_event_down() - conditional on line 144 is similar.\n\nBut I think I could add \"\u0026\u0026 st \u003d\u003d TLE_SEV_IDLE\" on line 171 - entering with state IDLE and trying to change it to IDLE results in unnecessary lock which does nothing.",
+      "parentUuid": "7a288981_55201b9b",
+      "revId": "700bf515506d69f8da075ff2b231a941604bbf02",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
     }
   ]
 }
