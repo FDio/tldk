@@ -19,6 +19,40 @@
     },
     {
       "key": {
+        "uuid": "7a288981_153a93cd",
+        "filename": "test/gtest/test_common.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 86,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2016-11-17T11:09:50Z",
+      "side": 1,
+      "message": "this was done to improve performance.\nfor UT you can do m-\u003el2_len \u003d l2; m-\u003el3_len \u003d l3; ...",
+      "revId": "b6478bc18fc4fed8e02ce7d6968626b94e911c71",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "7a288981_f536e7e6",
+        "filename": "test/gtest/test_common.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 212,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2016-11-17T11:09:50Z",
+      "side": 1,
+      "message": "not sure, why do you need these 2 funcions:compress_pkt_list() and fill_reassembled() at all?",
+      "revId": "b6478bc18fc4fed8e02ce7d6968626b94e911c71",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "7a288981_639a4016",
         "filename": "test/gtest/test_common.cpp",
         "patchSetId": 1
@@ -30,6 +64,40 @@
       "writtenOn": "2016-11-16T23:13:45Z",
       "side": 1,
       "message": "x \u003d\u003d 0, so not sure why do you need it here at all.\nSame for compress_pkt_list().",
+      "revId": "b6478bc18fc4fed8e02ce7d6968626b94e911c71",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "7a288981_d533ebf4",
+        "filename": "test/gtest/test_tle_udp_stream_gen.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 49,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2016-11-17T11:09:50Z",
+      "side": 1,
+      "message": "use RTE_VERSION instead, otherwise you\u0027ll have a trouble for 17.02, etc.",
+      "revId": "b6478bc18fc4fed8e02ce7d6968626b94e911c71",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "7a288981_b5305fe9",
+        "filename": "test/gtest/test_tle_udp_stream_gen.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 196,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2016-11-17T11:09:50Z",
+      "side": 1,
+      "message": "again, not sure why do you need a reassemble table here?",
       "revId": "b6478bc18fc4fed8e02ce7d6968626b94e911c71",
       "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
       "unresolved": false
