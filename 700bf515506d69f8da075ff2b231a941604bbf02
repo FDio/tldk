@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "7a288981_55201b9b",
+        "filename": "lib/libtle_udp/tle_event.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 178,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2016-11-17T10:58:47Z",
+      "side": 1,
+      "message": "thinking about it once again:\nwhy we need to remove if (st \u003e ev-\u003estate)?\nSuppose at that moment ev-\u003estate \u003d\u003d UP, and st \u003d\u003d UP you don\u0027t want to insert it into the list once again.\nIf ev-\u003estate \u003d\u003d UP and st\u003d\u003dDOWN, you probably shouldn\u0027t do anything. So I think that comparision still should be there.",
+      "revId": "700bf515506d69f8da075ff2b231a941604bbf02",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    }
+  ]
+}
