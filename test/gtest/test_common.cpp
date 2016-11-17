@@ -73,17 +73,15 @@ int port_init(uint8_t port, struct rte_mempool *mbuf_pool)
  * Would like to move these funcions to separate lib so all
  * future created apps could re-use that code. */
 
-uint64_t
-_mbuf_tx_offload(uint64_t il2, uint64_t il3, uint64_t il4, uint64_t tso,
-	uint64_t ol3, uint64_t ol2)
-{
-	return il2 | il3 << 7 | il4 << 16 | tso << 24 | ol3 << 40 | ol2 << 49;
-}
-
 void
 fill_pkt_hdr_len(struct rte_mbuf *m, uint32_t l2, uint32_t l3, uint32_t l4)
 {
-	m->tx_offload = _mbuf_tx_offload(l2, l3, l4, 0, 0, 0);
+	m->l2_len = l2;
+	m->l3_len = l3;
+	m->l4_len = l4;
+	m->tso_segsz = 0;
+	m->outer_l2_len = 0;
+	m->outer_l3_len = 0;
 }
 
 int
@@ -207,56 +205,6 @@ fill_ipv6_hdr_len(struct rte_mbuf *m, uint32_t l2, uint32_t fproto)
 		fill_ipv6x_hdr_len(m, l2, iph->proto, fproto);
 }
 
-/* exclude NULLs from the final list of packets. */
-uint32_t
-compress_pkt_list(struct rte_mbuf *pkt[], uint32_t nb_pkt, uint32_t nb_zero)
-{
-	uint32_t i, j, k, l;
-
-	for (j = nb_pkt; nb_zero != 0 && j-- != 0; ) {
-
-		/* found a hole. */
-		if (pkt[j] == NULL) {
-
-			/* find how big is it. */
-			for (i = j; i-- != 0 && pkt[i] == NULL; )
-				;
-			/* fill the hole. */
-			for (k = j + 1, l = i + 1; k != nb_pkt; k++, l++)
-				pkt[l] = pkt[k];
-
-			nb_pkt -= j - i;
-			nb_zero -= j - i;
-			j = i + 1;
-		}
-	}
-
-	return nb_pkt;
-}
-
-void
-fix_reassembled(struct rte_mbuf *m, int32_t hwcsum)
-{
-	struct ipv4_hdr *iph;
-
-	/* update packet type. */
-	m->packet_type &= ~RTE_PTYPE_L4_MASK;
-	m->packet_type |= RTE_PTYPE_L4_UDP;
-
-	/* fix reassemble setting TX flags. */
-	m->ol_flags &= ~PKT_TX_IP_CKSUM;
-
-	/* fix l3_len after reassemble. */
-	if (RTE_ETH_IS_IPV6_HDR(m->packet_type))
-		m->l3_len = m->l3_len - sizeof(struct ipv6_extension_fragment);
-
-	/* recalculate ipv4 cksum after reassemble. */
-	else if (hwcsum == 0 && RTE_ETH_IS_IPV4_HDR(m->packet_type)) {
-		iph = rte_pktmbuf_mtod_offset(m, struct ipv4_hdr *, m->l2_len);
-		iph->hdr_checksum = ipv4x_cksum(iph, m->l3_len);
-	}
-}
-
 void
 fill_eth_hdr_len(struct rte_mbuf *m)
 {
@@ -304,19 +252,12 @@ typen_rx_callback(uint8_t port, __rte_unused uint16_t queue,
 	struct rte_mbuf *pkt[], uint16_t nb_pkts,
 	__rte_unused uint16_t max_pkts, void *user_param)
 {
-	uint32_t j, x;
-	uint64_t cts;
+	uint32_t j;
 
-	cts = 0;
-
-	x = 0;
 	for (j = 0; j != nb_pkts; j++) {
 		fill_eth_hdr_len(pkt[j]);
 
 	}
 
-	if (x == 0)
-		return nb_pkts;
-
-	return compress_pkt_list(pkt, nb_pkts, x);
+	return nb_pkts;
 }

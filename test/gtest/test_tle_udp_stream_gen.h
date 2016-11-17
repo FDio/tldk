@@ -55,7 +55,6 @@
 using namespace std;
 
 extern struct rte_mempool *mbuf_pool;
-extern struct rte_mempool *frag_mp;
 
 /* Dummy lookup functions, TX operations are not performed in these tests */
 
@@ -174,30 +173,6 @@ public:
 
 	virtual void SetUp(void)
 	{
-		struct ether_hdr *eth1, *eth2;
-		uint64_t frag_cycles;
-		struct ipv4_hdr *ip4h;
-		struct ipv6_hdr *ip6h;
-
-		static struct ipv4_hdr ipv4_tmpl;
-		ipv4_tmpl.version_ihl =  4 << 4 | sizeof(*ip4h) / IPV4_IHL_MULTIPLIER;
-		ipv4_tmpl.time_to_live = 64;
-		ipv4_tmpl.next_proto_id = IPPROTO_UDP;
-
-
-		static struct ipv6_hdr ipv6_tmpl;
-		ipv6_tmpl.vtc_flow = 6 << 4;
-		ipv6_tmpl.proto = IPPROTO_UDP;
-		ipv6_tmpl.hop_limits = 64;
-
-		frag_cycles = (rte_get_tsc_hz() + MS_PER_S - 1) /
-				MS_PER_S * 100;
-
-		ftbl = rte_ip_frag_table_create(2,
-				1024, 2048,
-				frag_cycles, 0);
-
-
 		uint32_t i, j;	/* Counters for loops*/
 		nb_ports = 1;
 		tp = GetParam();
@@ -247,26 +222,6 @@ public:
 						  s.nb_pkts, s.bad_chksum_l3, s.bad_chksum_l4, RX_PCAP);
 		}
 
-		dst4.dev = dev;
-		dst4.mtu = 1500;
-		dst4.l2_len = sizeof(*eth1);
-		dst4.l3_len = sizeof(*ip4h);
-		dst4.head_mp = frag_mp;
-		eth1 = (struct ether_hdr *)dst4.hdr;
-		eth1->ether_type = rte_cpu_to_be_16(ETHER_TYPE_IPv4);
-		ip4h = (struct ipv4_hdr *)(eth1 + 1);
-		ip4h[0] = ipv4_tmpl;
-		dst6.dev = dev;
-		dst6.mtu = 1500;
-		dst6.l2_len = sizeof(*eth2);
-		dst6.l3_len = sizeof(*ip6h);
-		dst6.head_mp = frag_mp;
-		eth2 = (struct ether_hdr *)dst6.hdr;
-		eth2->ether_type = rte_cpu_to_be_16(ETHER_TYPE_IPv6);
-		ip6h = (struct ipv6_hdr *)(eth2 + 1);
-		ip6h[0] = ipv6_tmpl;
-
-
 		/* setup pcap/eth devices */
 		setup_devices(&portid);
 	}
@@ -293,9 +248,6 @@ public:
 	struct tle_udp_dev *dev;
 	struct tle_evq *evq;
 	struct tle_udp_stream *stream;
-	struct rte_ip_frag_tbl *ftbl;
-	struct tle_udp_dest dst4;
-	struct tle_udp_dest dst6;
 	vector<test_r> results;
 	test_str tp;
 	void *cb;
@@ -366,8 +318,6 @@ test_tle_udp_stream_gen::setup_ctx(void) {
 	ctx_prm.max_stream_sbufs = CTX_MAX_SBUFS;
 	ctx_prm.lookup4 = dummy_lookup4;
 	ctx_prm.lookup6 = dummy_lookup6;
-	ctx_prm.lookup4_data = (void*)&dst4;
-	ctx_prm.lookup6_data = (void*)&dst6;
 
 	ctx = tle_udp_create(&ctx_prm);
 

@@ -28,7 +28,6 @@
 #include "test_common.h"
 
 struct rte_mempool *mbuf_pool;
-struct rte_mempool *frag_mp;
 
 int main(int argc, char *argv[])
 {
@@ -44,22 +43,18 @@ int main(int argc, char *argv[])
 	argc -= ret;
 	argv += ret;
 
-	/* Creates a new mempool in memory to hold the mbufs. */
-	mbuf_pool = rte_pktmbuf_pool_create("MBUF_POOL", NUM_MBUFS * nb_ports,
+	/*
+	 * Creates a new mempool in memory to hold the mbufs.
+	 * Multiplied by 2 because of mempeool to be used for packet
+	 * fragmentation purposes.
+	 */
+	mbuf_pool = rte_pktmbuf_pool_create("MBUF_POOL", 2 * NUM_MBUFS * nb_ports,
 	MBUF_CACHE_SIZE, 0, RTE_MBUF_DEFAULT_BUF_SIZE, rte_socket_id());
 	if (mbuf_pool == NULL) {
 		rc = -rte_errno;
 		printf("Mempool was not created, rc=%d\n", rc);
 		return rc;
 	}
-
-	frag_mp = rte_pktmbuf_pool_create("FRAG_POOL", NUM_MBUFS * nb_ports,
-			MBUF_CACHE_SIZE, 0, RTE_MBUF_DEFAULT_BUF_SIZE, rte_socket_id());
-	if (frag_mp == NULL) {
-			rc = -rte_errno;
-			printf("Frag-Mempool was not created, rc=%d\n", rc);
-			return rc;
-		}
 
 	return RUN_ALL_TESTS();
 }
