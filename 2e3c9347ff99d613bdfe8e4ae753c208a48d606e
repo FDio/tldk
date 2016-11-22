@@ -1,0 +1,257 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "7a288981_041dbf0f",
+        "filename": "/COMMIT_MSG",
+        "patchSetId": 4
+      },
+      "lineNbr": 8,
+      "author": {
+        "id": 29
+      },
+      "writtenOn": "2016-11-22T17:03:12Z",
+      "side": 1,
+      "message": "from",
+      "range": {
+        "startLine": 8,
+        "startChar": 33,
+        "endLine": 8,
+        "endChar": 39
+      },
+      "revId": "2e3c9347ff99d613bdfe8e4ae753c208a48d606e",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "7a288981_e4199323",
+        "filename": "README",
+        "patchSetId": 4
+      },
+      "lineNbr": 70,
+      "author": {
+        "id": 29
+      },
+      "writtenOn": "2016-11-22T17:03:12Z",
+      "side": 1,
+      "message": "change the name to l4fwd maybe is a better name.",
+      "range": {
+        "startLine": 70,
+        "startChar": 10,
+        "endLine": 70,
+        "endChar": 16
+      },
+      "revId": "2e3c9347ff99d613bdfe8e4ae753c208a48d606e",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "7a288981_c41697f1",
+        "filename": "examples/udpfwd/README",
+        "patchSetId": 4
+      },
+      "lineNbr": 4,
+      "author": {
+        "id": 29
+      },
+      "writtenOn": "2016-11-22T17:03:12Z",
+      "side": 1,
+      "message": "l4fwd and the rest of the application can be updated.",
+      "range": {
+        "startLine": 4,
+        "startChar": 0,
+        "endLine": 4,
+        "endChar": 6
+      },
+      "revId": "2e3c9347ff99d613bdfe8e4ae753c208a48d606e",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "7a288981_24e79b14",
+        "filename": "examples/udpfwd/common.h",
+        "patchSetId": 4
+      },
+      "lineNbr": 234,
+      "author": {
+        "id": 29
+      },
+      "writtenOn": "2016-11-22T17:03:12Z",
+      "side": 1,
+      "message": "Should this be \u0027is_queue_for_port\u0027 a better name as it is a boolean functions.",
+      "range": {
+        "startLine": 234,
+        "startChar": 0,
+        "endLine": 234,
+        "endChar": 21
+      },
+      "revId": "2e3c9347ff99d613bdfe8e4ae753c208a48d606e",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "7a288981_64dda342",
+        "filename": "examples/udpfwd/common.h",
+        "patchSetId": 4
+      },
+      "lineNbr": 275,
+      "author": {
+        "id": 29
+      },
+      "writtenOn": "2016-11-22T17:03:12Z",
+      "side": 1,
+      "message": "This and the next functions are not static inline functions, should they not be?",
+      "range": {
+        "startLine": 275,
+        "startChar": 0,
+        "endLine": 275,
+        "endChar": 10
+      },
+      "revId": "2e3c9347ff99d613bdfe8e4ae753c208a48d606e",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "7a288981_04e49f0b",
+        "filename": "examples/udpfwd/lcore.h",
+        "patchSetId": 4
+      },
+      "lineNbr": 24,
+      "author": {
+        "id": 29
+      },
+      "writtenOn": "2016-11-22T17:03:12Z",
+      "side": 1,
+      "message": "static inline again?\n\nIf the code is included in more then one function is just turns into code blot.",
+      "range": {
+        "startLine": 24,
+        "startChar": 0,
+        "endLine": 24,
+        "endChar": 6
+      },
+      "revId": "2e3c9347ff99d613bdfe8e4ae753c208a48d606e",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "7a288981_e4f073cb",
+        "filename": "examples/udpfwd/main.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 77,
+      "author": {
+        "id": 29
+      },
+      "writtenOn": "2016-11-22T17:03:12Z",
+      "side": 1,
+      "message": "Why is this a two dimension array and not \u0027static char *proto_name[] \u003d { \"udp\", \"tcp\", NULL};\u0027",
+      "range": {
+        "startLine": 77,
+        "startChar": 7,
+        "endLine": 77,
+        "endChar": 11
+      },
+      "revId": "2e3c9347ff99d613bdfe8e4ae753c208a48d606e",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "7a288981_c4ed77f1",
+        "filename": "examples/udpfwd/main.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 100,
+      "author": {
+        "id": 29
+      },
+      "writtenOn": "2016-11-22T17:03:12Z",
+      "side": 1,
+      "message": "I do not like hiding code in header files except for inline functions, this is very odd code construct.",
+      "range": {
+        "startLine": 95,
+        "startChar": 0,
+        "endLine": 100,
+        "endChar": 16
+      },
+      "revId": "2e3c9347ff99d613bdfe8e4ae753c208a48d606e",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "7a288981_a4ba6bdf",
+        "filename": "examples/udpfwd/pkt.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 46,
+      "author": {
+        "id": 29
+      },
+      "writtenOn": "2016-11-22T17:03:12Z",
+      "side": 1,
+      "message": "This routine needs to take into account the TCP options in the header size.",
+      "range": {
+        "startLine": 41,
+        "startChar": 0,
+        "endLine": 46,
+        "endChar": 1
+      },
+      "revId": "2e3c9347ff99d613bdfe8e4ae753c208a48d606e",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "7a288981_84bf6fd0",
+        "filename": "examples/udpfwd/pkt.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 218,
+      "author": {
+        "id": 29
+      },
+      "writtenOn": "2016-11-22T17:03:12Z",
+      "side": 1,
+      "message": "Does DPDK not have a cksum routine for IPv4 headers or is this function doing something new?",
+      "range": {
+        "startLine": 218,
+        "startChar": 0,
+        "endLine": 218,
+        "endChar": 11
+      },
+      "revId": "2e3c9347ff99d613bdfe8e4ae753c208a48d606e",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "7a288981_64b483f2",
+        "filename": "examples/udpfwd/port.h",
+        "patchSetId": 4
+      },
+      "lineNbr": 19,
+      "author": {
+        "id": 29
+      },
+      "writtenOn": "2016-11-22T17:03:12Z",
+      "side": 1,
+      "message": "I am not liking the idea of these header files, they should be compiled files and not included.",
+      "range": {
+        "startLine": 19,
+        "startChar": 0,
+        "endLine": 19,
+        "endChar": 11
+      },
+      "revId": "2e3c9347ff99d613bdfe8e4ae753c208a48d606e",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    }
+  ]
+}
