@@ -34,7 +34,8 @@ udpv6_hdr_len = eth_hdr_len + ipv6_hdr_len + udp_hdr_len
 def write_pkts(pkts, pcap_path):
     try:
         pktdump = PcapWriter(pcap_path, append=False, sync=True)
-        pktdump.write(pkts)
+        if len(pkts) > 0:
+            pktdump.write(pkts)
     except IOError:
         pass
 

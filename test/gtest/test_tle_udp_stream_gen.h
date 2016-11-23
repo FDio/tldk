@@ -19,6 +19,7 @@
 #include <sys/types.h>
 
 #include <stdio.h>
+#include <map>
 #include <string>
 #include <algorithm>
 #include <arpa/inet.h>
@@ -41,12 +42,14 @@
 
 #define RX_PCAP "rx_pcap.cap"
 #define TX_PCAP "tx_pcap.cap"
+
 /*
  * Check DPDK version:
  * Previous "eth_pcap" was changed to "net_pcap" after DPDK 16.07.
  * Use correct vdev name depending on version.
  */
-#if (RTE_VER_YEAR >= 16 && RTE_VER_MONTH > 7)
+#if ( RTE_VERSION_NUM(16,7,0,0) < \
+		RTE_VERSION_NUM(RTE_VER_YEAR, RTE_VER_MONTH, 0 ,0) )
 	#define VDEV_NAME "net_pcap0"
 #else
 	#define VDEV_NAME "eth_pcap0"
@@ -59,62 +62,94 @@ extern struct rte_mempool *mbuf_pool;
 /* Dummy lookup functions, TX operations are not performed in these tests */
 
 static int
-dummy_lookup4(void *opaque, const struct in_addr *addr,
+lookup4_function(void *opaque, const struct in_addr *addr,
 	struct tle_udp_dest *res)
 {
-	struct tle_udp_dest *dst;
-	dst = (tle_udp_dest*)opaque;
+	struct in_addr route;
+	struct ether_hdr *eth;
+	struct ipv4_hdr *ip4h;
+	auto routes = static_cast<map<string, tle_udp_dev* >*>(opaque);
 
-	rte_memcpy(res, dst, dst->l2_len + dst->l3_len +
-			offsetof(struct tle_udp_dest, hdr));
+	/* Check all routes added in map for a match with dest *addr */
+	for (auto it=routes->begin(); it!=routes->end(); ++it) {
+		inet_pton(AF_INET, it->first.c_str(), &route);
 
-	return 0;
+		/* If it matches then fill *res and return with 0 code */
+		if(memcmp(&route, addr, sizeof(struct in_addr)) == 0 ) {
+			memset(res, 0, sizeof(*res));
+			res->dev = it->second;
+			res->mtu = 1500;
+			res->l2_len = sizeof(*eth);
+			res->l3_len = sizeof(*ip4h);
+			res->head_mp = mbuf_pool;
+			eth = (struct ether_hdr *)res->hdr;
+			eth->ether_type = rte_cpu_to_be_16(ETHER_TYPE_IPv4);
+			ip4h = (struct ipv4_hdr *)(eth + 1);
+			ip4h->version_ihl = 4 << 4 | sizeof(*ip4h) / IPV4_IHL_MULTIPLIER;
+			ip4h->time_to_live = 64;
+			ip4h->next_proto_id = IPPROTO_UDP;
+			ip4h->fragment_offset = 0;
+
+			return 0;
+		}
+	}
+	return -ENOENT;
 }
 
 static int
-dummy_lookup6(void *opaque, const struct in6_addr *addr,
-	struct tle_udp_dest *res)
+lookup6_function(void *opaque, const struct in6_addr *addr,
+		struct tle_udp_dest *res)
 {
-	struct tle_udp_dest *dst;
-	dst = (tle_udp_dest*)opaque;
+	struct ether_hdr *eth;
+	struct ipv6_hdr *ip6h;
+	struct in6_addr route;
+	auto routes = static_cast<map<string, tle_udp_dev* >*>(opaque);
 
-	rte_memcpy(res, dst, dst->l2_len + dst->l3_len +
-			offsetof(struct tle_udp_dest, hdr));
+	/* Check all routes added in map for a match with dest *addr */
+	for (auto it=routes->begin(); it!=routes->end(); ++it) {
+		inet_pton(AF_INET6, it->first.c_str(), &route);
 
-	return 0;
+		/* If it matches then fill *res and return with 0 code */
+		if(memcmp(&route, addr, sizeof(struct in6_addr)) == 0 ) {
+			memset(res, 0, sizeof(*res));
+			res->dev = it->second;
+			res->mtu = 1500;
+			res->l2_len = sizeof(*eth);
+			res->l3_len = sizeof(*ip6h);
+			res->head_mp = mbuf_pool;
+			eth = (struct ether_hdr *)res->hdr;
+			eth->ether_type = rte_cpu_to_be_16(ETHER_TYPE_IPv6);
+			ip6h = (struct ipv6_hdr *)(eth + 1);
+			ip6h->vtc_flow = 6 << 4;
+			ip6h->proto = IPPROTO_UDP;
+			ip6h->hop_limits = 64;
+
+			return 0;
+		}
+	}
+	return -ENOENT;
 }
 
 /*
  * Structures used to describe test instances:
  * test_str - main structure for describing test case instance; contains
  *            instance description, and vectors with information about
- *            devices & scapy generated streams.
+ *            devices, streams & streams to be generated for RX/TX path.
  * dev_s    - structure describing single device; contains device addresses,
- *            checksum offload information and expected number of received
- *            packets for that device in scenario. Streams vector contains
- *            information about each stream associated with device.
- * stream_s - structure describing single stream in device; contains
+ *            checksum offload information and expected number of received /
+ *            transmitted packets.
+ *            packets for that device in scenario.
+ * stream_s - structure describing single stream to be created; contains
  *            information on local & remote IP's and port numbers, expected
- *            number of received packets.
+ *            number of received and transmitted packets.
  * stream_g - structure describing a stream which to generate via scapy script;
  *            Contains information on IP addresses and port numbers and if
  *            L3/L4 checksums should be incorrectly calculated.
  *            In future: if packet should be fragmented.
- * test_r   - structure contains pointer to all created devices and streams;
- *            Also keeps information how many packets were successfully
- *            received on each device and stream for verification at the end
- *            of each test instance.
  */
 
-struct stream_s {
-	int l_port;
-	int r_port;
-	string l_ip;
-	string r_ip;
-	int exp_pkts_rx;
-};
-
 struct stream_g {
+	int family;
 	string src_ip;
 	string dst_ip;
 	int src_port;
@@ -125,34 +160,43 @@ struct stream_g {
 	bool fragment;
 };
 
+struct stream_s {
+	int family;
+	int l_port;
+	int r_port;
+	string l_ip;
+	string r_ip;
+	int exp_pkts_rx;
+	int exp_pkts_tx;
+	int act_pkts_rx;
+	int act_pkts_tx;
+	tle_udp_stream *ptr;
+};
+
 struct dev_s {
 	string l_ipv4;
 	string l_ipv6;
 	int rx_offload;
 	int tx_offload;
 	int exp_pkts_bulk_rx;
-	int exp_enoent;
-	vector<stream_s> streams;
+	int exp_pkts_bulk_tx;
+	int exp_pkts_enoent;
+	int act_pkts_bulk_rx;
+	int act_pkts_bulk_tx;
+	int act_pkts_enoent;
+	tle_udp_dev *ptr;
 };
 
 struct test_str {
 	string test_desc;
 	vector<dev_s> devs;
-	vector<stream_g> streams;
-};
-
-struct test_r {
-	int rx_dev;
-	int tx_dev;
-	struct tle_udp_dev *dev_ptr;
-	vector<int> rx_str;
-	vector<int> tx_str;
-	vector <tle_udp_stream*> str_ptr;
+	vector<stream_s> streams;
+	vector<stream_g> gen_streams;
 };
 
 const char *vdevargs[] = {VDEV_NAME",rx_pcap=" RX_PCAP",tx_pcap=" TX_PCAP};
 
-class test_tle_udp_stream_gen: public testing::TestWithParam<test_str> {
+class test_tle_udp_gen_base: public testing::TestWithParam<test_str> {
 public:
 
 	tle_udp_ctx *setup_ctx(void);
@@ -160,7 +204,7 @@ public:
 		uint32_t tx_offload, const char *local_ipv4, const char *local_ipv6);
 	tle_evq *setup_evq(void);
 	tle_event *setup_event(void);
-	tle_udp_stream *setup_stream(struct tle_udp_ctx *ctx,
+	tle_udp_stream *setup_stream(struct tle_udp_ctx *ctx, int family,
 		const char *l_ip, const char *r_ip, int l_port, int r_port);
 	int setup_devices(uint8_t *portid);
 	int cleanup_devices(uint8_t portid);
@@ -169,11 +213,11 @@ public:
 			int l3_chksum, int l4_chksum, string rx_pcap_dest);
 
 	int cleanup_pcaps(const char *file);
-	int close_streams_devs(vector<struct test_r> ptrs);
+	int close_streams(vector<struct stream_s> streams);
+	int del_devs(vector<struct dev_s> devs);
 
 	virtual void SetUp(void)
 	{
-		uint32_t i, j;	/* Counters for loops*/
 		nb_ports = 1;
 		tp = GetParam();
 
@@ -184,42 +228,49 @@ public:
 		evq = setup_evq();
 		ASSERT_NE(evq, nullptr);
 
-		for(auto d : tp.devs) {
-			/* Temporary helper vectors below */
-			vector<int> str_rx_temp;
-			vector<int> str_tx_temp;
-			vector<struct tle_udp_stream*> str_ptr_temp;
-
+		for(auto &d : tp.devs) {
 			dev = setup_dev(ctx, d.rx_offload, d.tx_offload,
 						d.l_ipv4.c_str(), d.l_ipv6.c_str());
 			ASSERT_NE(dev, nullptr);
 
-			for(auto s : d.streams) {
-				stream = setup_stream(ctx, s.l_ip.c_str(), s.r_ip.c_str(),
-					s.l_port, s.r_port);
+			/* Initialize counters for verifying results */
+			d.act_pkts_bulk_rx = 0;
+			d.act_pkts_bulk_tx = 0;
+			d.act_pkts_enoent = 0;
 
-				ASSERT_NE(stream, nullptr);
-
-				/*
-				 * Initialize stream expected results with zeroes
-				 * and save stream pointers for later use
-				 */
-				str_rx_temp.push_back(0);
-				str_tx_temp.push_back(0);
-				str_ptr_temp.push_back(stream);
-			}
-
-			/*
-			 * Initialize dev expected results with 0
-			 * and save pointer for later use
-			 */
-			results.push_back({0, 0, dev, str_rx_temp, str_tx_temp,str_ptr_temp});
+			/* Save pointer to device */
+			d.ptr = dev;
 		}
 
-		for(auto s : tp.streams) {
-			prepare_pcaps(s.src_ip.c_str(), s.dst_ip.c_str(),
-						  s.src_port, s.dst_port,
-						  s.nb_pkts, s.bad_chksum_l3, s.bad_chksum_l4, RX_PCAP);
+		for(auto &s : tp.streams) {
+			stream = setup_stream(ctx, s.family,
+					s.l_ip.c_str(), s.r_ip.c_str(),
+					s.l_port, s.r_port);
+			ASSERT_NE(stream, nullptr);
+
+			/* Initialize counters for verifying results */
+			s.act_pkts_rx = 0;
+			s.act_pkts_tx = 0;
+
+			/* Save pointer to stream */
+			s.ptr = stream;
+
+			/* Find which dev has the same address as streams local address
+			 * and save destination for later use in lookup functions */
+
+			if (s.family == AF_INET) {
+				for(auto &d: tp.devs) {
+					if (s.l_ip.compare(d.l_ipv4) == 0)
+						routes4.insert(
+								pair<string, tle_udp_dev*>(s.r_ip, d.ptr));
+				}
+			} else if (s.family == AF_INET6) {
+				for(auto &d: tp.devs) {
+					if (s.l_ip.compare(d.l_ipv6) == 0)
+						routes6.insert(
+								pair<string, tle_udp_dev*>(s.r_ip, d.ptr));
+				}
+			}
 		}
 
 		/* setup pcap/eth devices */
@@ -233,7 +284,8 @@ public:
 		 * and clean / delete .pcap files so not to
 		 * interfere with next test
 		 */
-		close_streams_devs(results);
+		close_streams(tp.streams);
+		del_devs(tp.devs);
 		tle_udp_destroy(ctx);
 		cleanup_devices(portid);
 		cleanup_pcaps(RX_PCAP);
@@ -248,12 +300,13 @@ public:
 	struct tle_udp_dev *dev;
 	struct tle_evq *evq;
 	struct tle_udp_stream *stream;
-	vector<test_r> results;
+	map<string, tle_udp_dev*> routes4;
+	map<string, tle_udp_dev*> routes6;
 	test_str tp;
 	void *cb;
 };
 
-int test_tle_udp_stream_gen::setup_devices(uint8_t *portid) {
+int test_tle_udp_gen_base::setup_devices(uint8_t *portid) {
 
 	/* attach + configure + start pmd device */
 
@@ -267,7 +320,7 @@ int test_tle_udp_stream_gen::setup_devices(uint8_t *portid) {
 	return 0;
 }
 
-int test_tle_udp_stream_gen::cleanup_devices(uint8_t portid) {
+int test_tle_udp_gen_base::cleanup_devices(uint8_t portid) {
 
 	/* release mbufs + detach device */
 	char name[RTE_ETH_NAME_MAX_LEN];
@@ -279,7 +332,7 @@ int test_tle_udp_stream_gen::cleanup_devices(uint8_t portid) {
 	return 0;
 }
 
-int test_tle_udp_stream_gen::prepare_pcaps(string l_ip, string r_ip,
+int test_tle_udp_gen_base::prepare_pcaps(string l_ip, string r_ip,
 		int l_port, int r_port, int nb_pkts, int l3_chksum, int l4_chksum,
 		string rx_pcap_dest) {
 	/* generate pcap rx & tx files * for tests using scapy */
@@ -299,14 +352,13 @@ int test_tle_udp_stream_gen::prepare_pcaps(string l_ip, string r_ip,
 	return 0;
 }
 
-int test_tle_udp_stream_gen::cleanup_pcaps(const char *file) {
+int test_tle_udp_gen_base::cleanup_pcaps(const char *file) {
 	if(remove(file) != 0)
 	    perror( "Error deleting pcap file" );
 	return 0;
 }
 
-struct tle_udp_ctx*
-test_tle_udp_stream_gen::setup_ctx(void) {
+tle_udp_ctx *test_tle_udp_gen_base::setup_ctx(void) {
 
 	struct tle_udp_ctx *ctx;
 	struct tle_udp_ctx_param ctx_prm;
@@ -316,15 +368,17 @@ test_tle_udp_stream_gen::setup_ctx(void) {
 	ctx_prm.max_streams = 0x10;
 	ctx_prm.max_stream_rbufs = CTX_MAX_RBUFS;
 	ctx_prm.max_stream_sbufs = CTX_MAX_SBUFS;
-	ctx_prm.lookup4 = dummy_lookup4;
-	ctx_prm.lookup6 = dummy_lookup6;
+	ctx_prm.lookup4 = lookup4_function;
+	ctx_prm.lookup6 = lookup6_function;
+	ctx_prm.lookup4_data = &routes4;
+	ctx_prm.lookup6_data = &routes6;
 
 	ctx = tle_udp_create(&ctx_prm);
 
 	return ctx;
 }
 
-struct tle_udp_dev *test_tle_udp_stream_gen::setup_dev(struct tle_udp_ctx *ctx,
+struct tle_udp_dev *test_tle_udp_gen_base::setup_dev(struct tle_udp_ctx *ctx,
 		uint32_t rx_offload, uint32_t tx_offload,
 		const char *l_ipv4, const char *l_ipv6) {
 
@@ -344,7 +398,7 @@ struct tle_udp_dev *test_tle_udp_stream_gen::setup_dev(struct tle_udp_ctx *ctx,
 	return dev;
 }
 
-struct tle_evq *test_tle_udp_stream_gen::setup_evq() {
+struct tle_evq *test_tle_udp_gen_base::setup_evq() {
 
 	uint32_t socket_id;
 	uint32_t max_events;
@@ -361,63 +415,43 @@ struct tle_evq *test_tle_udp_stream_gen::setup_evq() {
 	return evq;
 }
 
-struct tle_udp_stream *test_tle_udp_stream_gen::setup_stream(
-		struct tle_udp_ctx *ctx, const char *l_ip, const char *r_ip,
+struct tle_udp_stream *test_tle_udp_gen_base::setup_stream(
+		struct tle_udp_ctx *ctx, int family,
+		const char *l_ip, const char *r_ip,
 		int l_port, int r_port) {
 
 	struct tle_udp_stream *stream;
 	struct tle_udp_stream_param stream_prm;
 	struct sockaddr_in *ip4_addr;
 	struct sockaddr_in6 *ip6_addr;
-	struct addrinfo hint, *res = NULL;
 	int32_t ret;
 
-	memset(&hint, '\0', sizeof(hint));
 	memset(&stream_prm, 0, sizeof(stream_prm));
 
-	ret = getaddrinfo(l_ip, NULL, &hint, &res);
-	if (ret) {
-		printf("Invalid address; %s, %d\n", gai_strerror(ret), ret);
-		return NULL;
-	}
-	if (res->ai_family == AF_INET) {
+	if (family == AF_INET) {
 		ip4_addr = (struct sockaddr_in *) &stream_prm.local_addr;
 		ip4_addr->sin_family = AF_INET;
 		ip4_addr->sin_port = htons(l_port);
 		ip4_addr->sin_addr.s_addr = inet_addr(l_ip);
-	} else if (res->ai_family == AF_INET6) {
-		ip6_addr = (struct sockaddr_in6 *) &stream_prm.local_addr;
-		ip6_addr->sin6_family = AF_INET6;
-		inet_pton(AF_INET6, l_ip, &ip6_addr->sin6_addr);
-		ip6_addr->sin6_port = htons(l_port);
-	} else {
-		printf("%s is an is unknown address format %d\n", l_ip,
-			res->ai_family);
-		return NULL;
-	}
-	freeaddrinfo(res);
 
-	ret = getaddrinfo(r_ip, NULL, &hint, &res);
-	if (ret) {
-		printf("Invalid address; %s, %d\n", gai_strerror(ret), ret);
-		return NULL;
-	}
-	if (res->ai_family == AF_INET) {
 		ip4_addr = (struct sockaddr_in *) &stream_prm.remote_addr;
 		ip4_addr->sin_family = AF_INET;
 		ip4_addr->sin_port = htons(r_port);
 		ip4_addr->sin_addr.s_addr = inet_addr(r_ip);
-	} else if (res->ai_family == AF_INET6) {
+	} else if (family == AF_INET6) {
+		ip6_addr = (struct sockaddr_in6 *) &stream_prm.local_addr;
+		ip6_addr->sin6_family = AF_INET6;
+		inet_pton(AF_INET6, l_ip, &ip6_addr->sin6_addr);
+		ip6_addr->sin6_port = htons(l_port);
+
 		ip6_addr = (struct sockaddr_in6 *) &stream_prm.remote_addr;
 		ip6_addr->sin6_family = AF_INET6;
 		inet_pton(AF_INET6, r_ip, &ip6_addr->sin6_addr);
 		ip6_addr->sin6_port = htons(r_port);
 	} else {
-		printf("%s is an is unknown address format %d\n", r_ip,
-				res->ai_family);
+		printf("Invalid address family, stream not created\n");
 		return NULL;
 	}
-	freeaddrinfo(res);
 
 	/* Not supporting callbacks and events at the moment */
 	/* TODO:
@@ -432,23 +466,57 @@ struct tle_udp_stream *test_tle_udp_stream_gen::setup_stream(
 	return stream;
 }
 
-int test_tle_udp_stream_gen::close_streams_devs(vector<struct test_r> ptrs) {
+int test_tle_udp_gen_base::close_streams(vector<struct stream_s> streams) {
 
-	int i, j, rc;
-
-	for(i = 0; i < ptrs.size(); i++) {
-		for(j = 0; j < ptrs[i].str_ptr.size(); j++) {
-			rc = tle_udp_stream_close(ptrs[i].str_ptr[j]);
-			if(rc != 0)
-				return -1;
-		}
-		rc = tle_udp_del_dev(ptrs[i].dev_ptr);
+	int rc;
+	for(auto &s: streams) {
+		rc = tle_udp_stream_close(s.ptr);
 		if(rc != 0)
 			return -1;
 	}
 	return 0;
 }
 
-class tle_rx_enobufs: public test_tle_udp_stream_gen { };
+int test_tle_udp_gen_base::del_devs(vector<struct dev_s> devs) {
+
+	int rc;
+	for(auto &d: devs) {
+		rc = tle_udp_del_dev(d.ptr);
+		if(rc != 0)
+			return -1;
+	}
+	return 0;
+}
+
+class tle_rx_test: public test_tle_udp_gen_base {
+public:
+	virtual void SetUp(void) {
+		/* Generate RX pcap file, for RX tests, then
+		 * follow setup steps as in base class */
+		tp = GetParam();
+
+		for(auto &s : tp.gen_streams) {
+			prepare_pcaps(s.src_ip.c_str(), s.dst_ip.c_str(),
+						  s.src_port, s.dst_port,
+						  s.nb_pkts, s.bad_chksum_l3, s.bad_chksum_l4, RX_PCAP);
+		}
+		test_tle_udp_gen_base::SetUp();
+	}
+};
+
+class tle_rx_enobufs: public tle_rx_test { };
+
+class tle_tx_test: public test_tle_udp_gen_base {
+public:
+	virtual void SetUp(void) {
+		/* Generate 1-packet PCAP RX file so that virtual device can be
+		 * initialized (needs a pcap file present during init), then
+		 * follow setup steps as in base class */
+		prepare_pcaps("10.0.0.1", "10.0.0.1",
+					  100, 100,
+					  1, 0, 0, RX_PCAP);
+		test_tle_udp_gen_base::SetUp();
+	}
+};
 
 #endif /* TEST_TLE_UDP_STREAM_GEN_H_ */
