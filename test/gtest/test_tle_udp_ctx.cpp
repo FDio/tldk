@@ -40,3 +40,22 @@ TEST(udp_ctx, udp_create)
 
 	tle_udp_destroy(ctx);
 }
+
+TEST(udp_ctx, udp_create_invalidate)
+{
+	struct tle_udp_ctx *ctx;
+	struct tle_udp_ctx_param prm;
+
+	memset(&prm, 0, sizeof(prm));
+	prm.socket_id = SOCKET_ID_ANY;
+	prm.max_streams = 0x10;
+	prm.max_stream_rbufs = 0x100;
+	prm.max_stream_sbufs = 0x100;
+
+	ctx = tle_udp_create(&prm);
+	ASSERT_NE(ctx, (void *)NULL);
+
+	tle_udp_ctx_invalidate(ctx);
+
+	tle_udp_destroy(ctx);
+}
