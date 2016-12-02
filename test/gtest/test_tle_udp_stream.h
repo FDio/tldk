@@ -91,13 +91,17 @@ public:
 		stream = nullptr;
 		/* Setup Context */
 		cprm = ctx_prm_tmpl;
+		cprm.max_streams = 0xA;
 		cprm.lookup4 = dummy_lookup4;
 		cprm.lookup6 = dummy_lookup6;
 		ctx = setup_ctx(&cprm);
+		ASSERT_NE(ctx, nullptr);
+
 		/* Setup Dev */
 		memset(&dev_prm, 0, sizeof(dev_prm));
 		setup_dev_prm(&dev_prm, ipv4_laddr, ipv6);
 		dev = setup_dev(ctx, &dev_prm);
+		ASSERT_NE(dev, nullptr);
 
 		/* Stream Param & Event param */
 		memset(&stream_prm, 0, sizeof(struct tle_udp_stream_param));
