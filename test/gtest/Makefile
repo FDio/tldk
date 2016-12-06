@@ -76,6 +76,11 @@ SRCS-y += test_tle_udp_event.cpp
 SRCS-y += test_tle_udp_stream.cpp
 
 CXXFLAGS += -std=c++11
+
+ifeq ($(shell test $(GCC_VERSION) -lt 50 && echo 1), 1)
+CXXFLAGS += -D __STDC_FORMAT_MACROS
+endif
+
 CXXFLAGS += -I$(GTEST_DIR)/include
 CXXFLAGS += -I$(GMOCK_DIR)/include
 CXXFLAGS += -I$(RTE_OUTPUT)/include
@@ -99,6 +104,11 @@ APP = gtest-rfc
 # all source are stored in SRCS-y
 
 CFLAGS += -O3
+
+ifeq ($(shell test $(GCC_VERSION) -lt 50 && echo 1), 1)
+CFLAGS += -D __STDC_FORMAT_MACROS
+endif
+
 CFLAGS += $(WERROR_FLAGS)
 
 LDLIBS += gtest-rfc.o
