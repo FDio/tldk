@@ -103,8 +103,8 @@ CFLAGS += $(WERROR_FLAGS)
 
 LDLIBS += gtest-rfc.o
 
-LDFLAGS += -lstdc++
-LDFLAGS += -L$(GMOCK_DIR) -lgmock
+LDLIBS += -lstdc++
+LDLIBS += -L$(GMOCK_DIR) -lgmock
 LDLIBS += -L$(RTE_OUTPUT)/lib
 LDLIBS += -ltle_udp -ltle_dring
 
