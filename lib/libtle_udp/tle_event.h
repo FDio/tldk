@@ -168,7 +168,7 @@ tle_event_active(struct tle_event *ev, enum tle_ev_state st)
 {
 	struct tle_evq *q;
 
-	if (st == ev->state)
+	if (ev->state != TLE_SEV_IDLE)
 		return;
 
 	q = ev->head;
