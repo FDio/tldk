@@ -2,6 +2,29 @@
   "comments": [
     {
       "key": {
+        "uuid": "3a3291f1_449cd269",
+        "filename": "examples/l4fwd/tcp.h",
+        "patchSetId": 11
+      },
+      "lineNbr": 176,
+      "author": {
+        "id": 414
+      },
+      "writtenOn": "2017-02-15T10:05:27Z",
+      "side": 1,
+      "message": "why thers is not .synev here ? it will be not easily understanding when raising an syn events after three-way handshaking in rx_postsyn.",
+      "range": {
+        "startLine": 174,
+        "startChar": 0,
+        "endLine": 176,
+        "endChar": 51
+      },
+      "revId": "734a6a4a00c12de21142d922c99710ceaf60f248",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "3a3291f1_b673acb0",
         "filename": "lib/libtle_l4p/tcp_rxtx.c",
         "patchSetId": 11
@@ -37,6 +60,30 @@
       "side": 1,
       "message": "Not sure I get you. rx_syn() supposed to be invoked for new conenction requests. Why do you think the stream is in ESTABLISHED state already?",
       "parentUuid": "3a3291f1_b673acb0",
+      "range": {
+        "startLine": 1608,
+        "startChar": 0,
+        "endLine": 1612,
+        "endChar": 14
+      },
+      "revId": "734a6a4a00c12de21142d922c99710ceaf60f248",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "3a3291f1_04a7eabe",
+        "filename": "lib/libtle_l4p/tcp_rxtx.c",
+        "patchSetId": 11
+      },
+      "lineNbr": 1612,
+      "author": {
+        "id": 414
+      },
+      "writtenOn": "2017-02-15T10:05:27Z",
+      "side": 1,
+      "message": "Just starting up.what i mean is that :if the stream is in ESTABLISHED  state already in server, and then the client raise a reconnection, how to deal with it ? I can\u0027t find the proccess in the code,maybe unimplemented?",
+      "parentUuid": "3a3291f1_b6172c51",
       "range": {
         "startLine": 1608,
         "startChar": 0,
