@@ -22,6 +22,30 @@
       "revId": "734a6a4a00c12de21142d922c99710ceaf60f248",
       "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "3a3291f1_b6172c51",
+        "filename": "lib/libtle_l4p/tcp_rxtx.c",
+        "patchSetId": 11
+      },
+      "lineNbr": 1612,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2017-02-15T02:20:08Z",
+      "side": 1,
+      "message": "Not sure I get you. rx_syn() supposed to be invoked for new conenction requests. Why do you think the stream is in ESTABLISHED state already?",
+      "parentUuid": "3a3291f1_b673acb0",
+      "range": {
+        "startLine": 1608,
+        "startChar": 0,
+        "endLine": 1612,
+        "endChar": 14
+      },
+      "revId": "734a6a4a00c12de21142d922c99710ceaf60f248",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
     }
   ]
 }
