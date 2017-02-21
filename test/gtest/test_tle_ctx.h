@@ -13,17 +13,11 @@
  * limitations under the License.
  */
 
-#include "test_tle_udp_destroy.h"
+#ifndef TEST_TLE_CTX_H_
+#define TEST_TLE_CTX_H_
 
-TEST(udp_destroy_null, udp_destroy_null)
-{
-	tle_ctx_destroy(NULL);
-	EXPECT_EQ(rte_errno, EINVAL);
-}
+#include <gtest/gtest.h>
+#include <rte_errno.h>
+#include <tle_ctx.h>
 
-TEST_F(udp_destroy, udp_destroy_positive)
-{
-	int rc;
-	tle_ctx_destroy(ctx);
-	ASSERT_EQ(rte_errno, 0);
-}
+#endif /* TEST_TLE_CTX_H_ */

@@ -15,14 +15,28 @@ ifeq ($(RTE_SDK),)
 $(error "Please define RTE_SDK environment variable")
 endif
 
+ifeq ($(RTE_TARGET),)
+$(error "Please define RTE_TARGET environment variable")
+endif
+
 ifeq ($(TLDK_ROOT),)
-$(error "Please define TLDK_SDK environment variable")
+$(error "Please define TLDK_ROOT environment variable")
 endif
 
 include $(RTE_SDK)/mk/rte.vars.mk
 
-DIRS-y += libtle_dring
-DIRS-y += libtle_timer
-DIRS-y += libtle_l4p
+# binary name
+APP = test_timer
 
-include $(TLDK_ROOT)/mk/tle.subdir.mk
+# all source are stored in SRCS-y
+SRCS-y += test_timer.c
+
+CFLAGS += $(WERROR_FLAGS)
+CFLAGS += -I$(RTE_OUTPUT)/include
+
+LDLIBS += -L$(RTE_OUTPUT)/lib
+LDLIBS += -ltle_timer
+
+EXTRA_CFLAGS += -O3
+
+include $(TLDK_ROOT)/mk/tle.app.mk

@@ -81,6 +81,12 @@ struct tle_dring {
 	struct tle_drb dummy;  /**< dummy block */
 };
 
+static inline uint32_t
+tle_dring_count(const struct tle_dring *dr)
+{
+	return dr->prod.tail - dr->cons.tail;
+}
+
 /*
  * helper routine, to copy objects to/from the ring.
  */

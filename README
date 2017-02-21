@@ -1,77 +1,80 @@
-OVERVIEW
-========
+1. OVERVIEW
 
-TLDK project scope is:
-1) Implement a set of libraries for L4 protocol processing (UDP, TCP etc.)
+   TLDK project scope is as follows:
+
+   1) To implement a set of libraries for L4 protocol processing (UDP, TCP etc.)
    for both IPv4 and IPv6.
 
    The goal is to provide lightweight, high performance and highly adaptable
    implementation for L4(UDP, TCP etc.) protocol processing. The provided API
    are not planned to be compatible with BSD socket API. These libraries are
-   suppose to be built on top of DPDK.
+   supposed to be built on top of DPDK.
 
-      Note: these libraries are not supposed to be a 'complete' network stack.
+   Note: these libraries are not supposed to be a 'complete' network stack.
 
-   Implementation of ARP, IP, ETHER, etc layers and related routing tables,
+   Implementation of ARP, IP, ETHER, etc. layers and related routing tables,
    code for setup, manage and perform actual IO over underlying devices are
    all out of scope of these libraries.
 
-  Implementation of ARP, IP etc. layers and their related routing tables
-  are out of scope of these libraries. Similarly, the setup, management and
-  actual IO on underlying NIC devices are out of scope too.
+   The only information these libraries need to know about the 
+   underlying devices:
+   - supported HW offloads
+   - MTU and L3/L2 addresses
+   That allows the libraries to fill L2/L3 headers and mbuf metadata
+   for the outgoing packets.
 
-   The libraries only need to know about underlying devices plus what
-   HW offloads are supported, underlying device MTU and L3/L2 addresses to
-   fill into L3/L2 headers for the outgoing packets.
-
-   These libraries should be developed in such manner, they could be used
+   These libraries should be developed in such manner, that they could be used
    independently from implementations of 2) and 3).
 
-2) Create VPP graph nodes, plugins etc using those libraries to implement
+   2) To create VPP graph nodes, plugins etc using those libraries to implement
    a host stack.
 
-3) Create such mechanisms (netlink agents, packaging, etc) necessary to make
-   the resulting host stack easily usable by existing non-vpp aware software.
+   3) To create such mechanisms (netlink agents, packaging, etc) necessary
+   to make the resulting host stack easily usable by existing non-vpp aware
+   software.
 
-INSTALLATION GUIDE
-==================
+2. INSTALLATION GUIDE
 
-1. Obtain latest DPDK and build it.
+   1) Obtain latest DPDK and build it.
    (refer to http://dpdk.org for information how to download and build it).
-2. Make sure that RTE_SDK and RTE_TARGET DPDK related environment variables
+   2) Make sure that RTE_SDK and RTE_TARGET DPDK related environment variables
    are setup correctly.
-3. Go to the TLDK root directory and type: 'make all'.
-4. Run sample applications.
+   3) Go to the TLDK root directory and type: 'make all'.
+   4) Run sample applications.
 
-For enabling unit tests application using GoogleTest please see:
-./test/gtest/README
+   For enabling unit tests application using GoogleTest please see:
+   ./test/gtest/README
 
-As an example:
-export RTE_SDK=/opt/DPDK
-export RTE_TARGET=x86_64-native-linuxapp-gcc
+   As an example:
+   export RTE_SDK=/opt/DPDK
+   export RTE_TARGET=x86_64-native-linuxapp-gcc
 
-cd tldk
-make all
-./x86_64-native-linuxapp-gcc/app/udpfwd ...
+   cd tldk
+   make all
+   ./x86_64-native-linuxapp-gcc/app/l4fwd ...
 
-CONTENTS
-========
+3. CONTENTS
 
-$(TLDK_ROOT)
-|
-+----lib
-|      |
-|      +--libtle_dring - dring library
-|      |
-|      +--libtle_udp - implementation of the UDP datagram processing
-|
-+----examples
-|      |
-|      +--udpfwd - sample app to demonstrate and test libtle_udp usage
-|            (refer to examples/udpfwd/README for more information)
-|
-+----test - unit-tests
-|      |
-|      +--dring - UT for libtle_dring (standalone app)
-|      |
-|      +--gtest - UT for libtle_dring and libtle_udp (googletest)
+   $(TLDK_ROOT)
+   |
+   +----lib
+   |      |
+   |      +--libtle_dring - dring library
+   |      |
+   |      +--libtle_l4p - implementation of the TCP/UDP packet processing
+   |      |
+   |      +--libtle_timer - implementation of the timer library
+   |
+   +----examples
+   |      |
+   |      +--l4fwd - sample app to demonstrate and test libtle_l4p TCP/UDP
+   |            usage (refer to examples/l4fwd/README for more information)
+   |
+   +----test - unit-tests
+   |      |
+   |      +--dring - UT for libtle_dring (standalone app)
+   |      |
+   |      +--gtest - UT for libtle_dring, libtle_l4p and libtle_timer
+   |      |     (googletest)
+   |      |
+   |      +--timer - UT for libtle_timer (standalone app)
