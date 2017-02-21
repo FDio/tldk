@@ -13,17 +13,21 @@
  * limitations under the License.
  */
 
-#include "test_tle_udp_destroy.h"
+#ifndef DPDK_VERSION_H_
+#define DPDK_VERSION_H_
 
-TEST(udp_destroy_null, udp_destroy_null)
-{
-	tle_ctx_destroy(NULL);
-	EXPECT_EQ(rte_errno, EINVAL);
-}
+#include <rte_version.h>
 
-TEST_F(udp_destroy, udp_destroy_positive)
-{
-	int rc;
-	tle_ctx_destroy(ctx);
-	ASSERT_EQ(rte_errno, 0);
-}
+#ifdef RTE_VER_MAJOR
+#if RTE_VER_MAJOR >= 16 && RTE_VER_MINOR >= 4
+#define DPDK_VERSION_GE_1604
+#endif
+#elif defined(RTE_VER_YEAR)
+#if RTE_VERSION_NUM(16, 4, 0, 0) <= RTE_VERSION
+#define DPDK_VERSION_GE_1604
+#endif
+#else
+#error "RTE_VER_MAJOR and RTE_VER_YEAR are undefined!"
+#endif
+
+#endif /* DPDK_VERSION_H_ */

@@ -17,14 +17,14 @@
 
 TEST_F(udp_dev, udp_dev_add_null_ctx)
 {
-	dev = tle_udp_add_dev(NULL, &dev_prm);
+	dev = tle_add_dev(NULL, &dev_prm);
 	EXPECT_EQ(dev, (void *) NULL);
 	EXPECT_EQ(rte_errno, EINVAL);
 }
 
 TEST_F(udp_dev, udp_dev_add_null_dev_prm)
 {
-	dev = tle_udp_add_dev(ctx, NULL);
+	dev = tle_add_dev(ctx, NULL);
 	EXPECT_EQ(dev, (void *) NULL);
 	EXPECT_EQ(rte_errno, EINVAL);
 }
@@ -33,7 +33,7 @@ TEST_F(udp_dev, udp_dev_add_no_addr)
 {
 	memset(&(dev_prm).local_addr4, 0, sizeof(struct in_addr));
 	memset(&(dev_prm).local_addr6, 0, sizeof(struct in6_addr));
-	dev = tle_udp_add_dev(ctx, &dev_prm);
+	dev = tle_add_dev(ctx, &dev_prm);
 	EXPECT_EQ(dev, (void *) NULL);
 	EXPECT_EQ(rte_errno, EINVAL);
 }
@@ -42,7 +42,7 @@ TEST_F(udp_dev, udp_dev_add_anyaddr)
 {
 	inet_pton(AF_INET, "0.0.0.0", &(dev_prm).local_addr4);
 	inet_pton(AF_INET6, "::0", &(dev_prm).local_addr6);
-	dev = tle_udp_add_dev(ctx, &dev_prm);
+	dev = tle_add_dev(ctx, &dev_prm);
 	EXPECT_EQ(dev, (void *) NULL);
 	EXPECT_EQ(rte_errno, EINVAL);
 }
@@ -50,7 +50,7 @@ TEST_F(udp_dev, udp_dev_add_anyaddr)
 TEST_F(udp_dev, udp_dev_add_only_ipv4)
 {
 	memset(&(dev_prm).local_addr6, 0, sizeof(struct in6_addr));
-	dev = tle_udp_add_dev(ctx, &dev_prm);
+	dev = tle_add_dev(ctx, &dev_prm);
 	ASSERT_NE(dev, (void *) NULL);
 	EXPECT_EQ(rte_errno, 0);
 	devs.push_back(dev);
@@ -59,16 +59,17 @@ TEST_F(udp_dev, udp_dev_add_only_ipv4)
 TEST_F(udp_dev, udp_dev_add_only_ipv6)
 {
 	memset(&(dev_prm).local_addr4, 0, sizeof(struct in_addr));
-	dev = tle_udp_add_dev(ctx, &dev_prm);
+	dev = tle_add_dev(ctx, &dev_prm);
 	ASSERT_NE(dev, (void *) NULL);
 	EXPECT_EQ(rte_errno, 0);
+	devs.push_back(dev);
 }
 
 TEST_F(udp_dev, udp_dev_add_nonexist_ipv4)
 {
 	memset(&(dev_prm).local_addr4, 0, sizeof(struct in_addr));
 	inet_pton(AF_INET, "10.0.0.1", &(dev_prm).local_addr4);
-	dev = tle_udp_add_dev(ctx, &dev_prm);
+	dev = tle_add_dev(ctx, &dev_prm);
 	ASSERT_NE(dev, (void *) NULL);
 	EXPECT_EQ(rte_errno, 0);
 	devs.push_back(dev);
@@ -76,7 +77,7 @@ TEST_F(udp_dev, udp_dev_add_nonexist_ipv4)
 
 TEST_F(udp_dev, udp_dev_add_positive)
 {
-	dev = tle_udp_add_dev(ctx, &dev_prm);
+	dev = tle_add_dev(ctx, &dev_prm);
 	ASSERT_NE(dev, (void *) NULL);
 	EXPECT_EQ(rte_errno, 0);
 	devs.push_back(dev);
@@ -86,27 +87,27 @@ TEST_F(udp_dev, udp_dev_add_max)
 {
 	int i;
 	for(i = 0; i < RTE_MAX_ETHPORTS; i++) {
-		dev = tle_udp_add_dev(ctx, &dev_prm);
+		dev = tle_add_dev(ctx, &dev_prm);
 		ASSERT_NE(dev, (void *) NULL);
 		EXPECT_EQ(rte_errno, 0);
 		devs.push_back(dev);
 	}
-	dev = tle_udp_add_dev(ctx, &dev_prm);
+	dev = tle_add_dev(ctx, &dev_prm);
 	ASSERT_EQ(dev, (void *) NULL);
 	EXPECT_EQ(rte_errno, ENODEV);
 }
 
 TEST_F(udp_dev, udp_dev_del_positive)
 {
-	dev = tle_udp_add_dev(ctx, &dev_prm);
+	dev = tle_add_dev(ctx, &dev_prm);
 	ASSERT_NE(dev, (void *) NULL);
 	EXPECT_EQ(rte_errno, 0);
 	devs.push_back(dev);
-	ASSERT_EQ(tle_udp_del_dev(dev), 0);
+	ASSERT_EQ(tle_del_dev(dev), 0);
 	EXPECT_EQ(rte_errno, 0);
 }
 
 TEST_F(udp_dev, udp_dev_del_null_dev)
 {
-	ASSERT_EQ(tle_udp_del_dev(dev), -EINVAL);
+	ASSERT_EQ(tle_del_dev(dev), -EINVAL);
 }

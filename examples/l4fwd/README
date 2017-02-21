@@ -1,0 +1,346 @@
+1. INTRODUCTION
+
+   l4fwd is a sample application to demonstrate and test TLDK TCP/UDP
+   functionalities. Depending on configuration it can do simple send, recv or
+   both over opened TCP/UDP streams. Also it implements ability to do TCP/UDP
+   packet forwarding between different streams, so it is possible to use the
+   l4fwd application as a TCP/UDP proxy.
+
+   The l4fwd application logically is divided into two parts, Back End (BE) and
+   Front End (FE).
+
+1.1 Back End (BE)
+
+   BE is responsible for:
+   - RX over DPDK ports and feed them into TCP/UDP TLDK context(s)
+     (via tle_*_rx_bulk).
+
+   - retrieve packets ready to be send out from TCP/UDP TLDK context(s) and TX
+     them over destined DPDK port.
+
+   - Multiple RX/TX queues per port are supported by RSS. Right now the number
+     of TX is same as the number of RX queue.
+
+- Each BE lcore can serve multiple DPDK ports, TLDK TCP/UDP contexts.
+
+   BE configuration record format:
+
+   port=<uint>,addr=<ipv4/ipv6>,masklen=<uint>,mac=<ether><mtu>
+
+   port -    DPDK port id to be used to send packets to the destination.
+             It is an mandatory option.
+   addr -    destination network address. It is an mandatory option.
+   masklen - destination network prefix length. It is an mandatory option.
+   mac -     destination Ethernet address. It is an mandatory option.
+   mtu -     MTU to be used on that port (= application data size + L2/L3/L4
+             headers sizes, default=1514). It is an optional option.
+
+   Below are some example of BE entries
+
+   port=0,masklen=16,addr=192.168.0.0,mac=01:de:ad:be:ef:01
+   port=0,addr=2001:4860:b002::,masklen=64,mac=01:de:ad:be:ef:01
+
+   These examples are also available in be.cfg file.
+
+1.2 Front End (FE)
+
+   FE is responsible for:
+   - to open configured TCP/UDP streams and perform send/recv over them.
+     These streams can belong to different TCP/UDP contexts.
+
+   Each lcore can act as BE and/or FE.
+
+   In UDP mode the application can reassemble input fragmented IP packets, and
+   fragment outgoing IP packets (if destination MTU is less then packet size).
+
+   FE configuration record format:
+
+   lcore=<uint>,op=<"rx|tx|echo|fwd">,\
+   laddr=<ip>,lport=<uint16>,raddr=<ip>,rport=<uint16>,\
+   [txlen=<uint>,fwladdr=<ip>,fwlport=<uint16>,fwraddr=<ip>,fwrport=<uint16>,\
+   belcore=<uint>]
+
+   lcore -   EAL lcore to manage that stream(s) in the FE. It is an mandatory
+             option.
+   belcore - EAL lcore to manage that stream(s) in the BE. It is an optional
+             option. lcore and belcore can specify the same cpu core.
+   op -      operation to perform on that stream:
+             "rx" - do receive only on that stream.
+             "tx" - do send only on that stream.
+             "echo" - mimic recvfrom(..., &addr);sendto(..., &addr);
+             on that stream.
+             "fwd" - forward packets between streams.
+             It is an mandatory option.
+   laddr -   local address for the stream to open. It is an mandatory option.
+   lport -   local port for the stream to open. It is an mandatory option.
+   raddr -   remote address for the stream to open. It is an mandatory option.
+   rport -   remote port for the stream to open. It is an mandatory option.
+   txlen -   data length sending in each packet (mandatory for "tx" mode only).
+   fwladdr - local address for the forwarding stream(s) to open
+             (mandatory for "fwd" mode only).
+   fwlport - local port for the forwarding stream(s) to open
+             (mandatory for "fwd" mode only).
+   fwraddr - remote address for the forwarding stream(s) to open
+             (mandatory for "fwd" mode only).
+   fwrport - remote port for the forwarding stream(s) to open
+             (mandatory for "fwd" mode only).
+
+   Below are some example of FE entries
+
+   lcore=3,op=echo,laddr=192.168.1.233,lport=0x8000,raddr=0.0.0.0,rport=0
+
+   lcore=3,op=tx,laddr=192.168.1.233,lport=0x8001,raddr=192.168.1.56,\
+   rport=0x200,txlen=72
+
+   lcore=3,op=rx,laddr=::,lport=0x200,raddr=::,rport=0,txlen=72
+
+   lcore=3,op=fwd,laddr=0.0.0.0,lport=11211,raddr=0.0.0.0,rport=0,\
+   fwladdr=::,fwlport=0,fwraddr=2001:4860:b002::56,fwrport=11211
+
+   These examples are also available in fe.cfg file with some more explanation.
+
+1.3 Configuration files format
+
+   - each record on a separate line.
+   - lines started with '#' are treated as comments.
+   - empty lines (containing whitespace chars only) are ignored.
+   - kvargs style format for each record.
+   - each FE record correspond to at least one stream to be opened
+     (could be multiple streams in case of op="fwd").
+   - each BE record define a ipv4/ipv6 destination.
+
+2. REQUIREMENTS
+
+   DPDK libraries (16.11 or higher)
+   TLDK libraries (1.0)
+   Back-End (BE) configuration file
+   Front-End(FE) configuration file
+
+3. USAGE
+
+   l4fwd <DPDK EAL parameters> -- \
+      -P | --promisc          /* promiscuous mode enabled. */    \
+      -R | --rbufs <num>      /* max recv buffers per stream. */ \
+      -S | --sbufs <num>      /* max send buffers per stream. */ \
+      -s | --streams <num>    /* streams to open per context. */ \
+      -b | --becfg <filename> /* backend configuration file. */  \
+      -f | --fecfg <filename> /* frontend configuration file. */ \
+      -U | --udp /* run the app to handle UDP streams only. */ \
+      -T | --tcp /* run the app to handle TCP streams only. */ \
+      -L | --listen /* open TCP streams in server mode (listen). */ \
+      -a | --enable-arp /* enable arp responses (request not supported) */ \
+      -v | --verbose /* different level of verbose mode */ \
+      <port0_params> <port1_params> ... <portN_params>
+
+   Note that: options -U and -T cannot be used together.
+   Option -L can be used only with option -T.
+
+   portX_params: port=<uint>,lcore=<uint>[-<uint>],[lcore=<uint>[-<uint>],]\
+   [rx_offload=<uint>,tx_offload=<uint>,mtu=<uint>,ipv4=<ipv4>,ipv6=<ipv6>]
+
+   portX_params are used to configure the particular DPDK device
+   (rte_ethdev port), and specify BE lcore that will handle RX/TX from/to the
+   device and manage BE part of corresponding TCP/UDP context.
+   Multiple BE lcore can be specified.
+
+   port -       DPDK port id (RSS are supported when multiple lcores are
+                specified for a port). It is an mandatory option.
+   lcore -      EAL lcore id to handle IO over that port (rx_burst/tx_burst).
+                several ports can be managed by the same lcore, and same port
+                can be managed by more than one lcore.
+                It is an mandatory option. At least one lcore option has to be
+                specified. lcore range can be specified in one lcore option.
+                e.g. lcore=2-3,lcore=6 will enable lcores 2, 3, and 6 to
+                handle BE.
+   rx_offload - RX HW offload capabilities to enable/use on this port.
+                (bitmask of DEV_RX_OFFLOAD_* values). It is an optional option.
+   tx_offload - TX HW offload capabilities to enable/use on this port.
+                (bitmask of DEV_TX_OFFLOAD_* values).
+   mtu -        MTU to be used on that port (= application data size + L2/L3/L4
+                headers sizes, default=1514).
+   ipv4 -       ipv4 address to assign to that port.
+   ipv6 -       ipv6 address to assign to that port.
+
+   At least one of ipv4/ipv6 values have to be specified for each port.
+
+3.1 RSS
+
+   If multiple lcore is specified per DPDK port, the following RSS hash will
+   be enabled on that port:
+      ETH_RSS_UDP, or ETH_RSS_TCP
+
+   The RSS queue qid will handle the stream according to the TCP/UDP source
+   ports of the stream. The qid can be calculated as below
+   
+   qid = (src_port % power_of_2(n)) % n
+   
+   where n is number of lcore used to mane the DPDK port.
+
+4. EXAMPLES
+
+4.1 Sample testbed
+
++----------------------------+                +-------------------------------+
+|                   TLDK Box |                | Linux Box                     |
+|                            |                |                               |
+|                     port 0 +----------------+ port 0                        |
+|                192.168.1.1 |                | 192.168.1.2                   |
+|          2001:4860:b002::1 |                | 2001:4860:b002::2             |
+|          AA:BB:CC:DD:EE:F1 |                | AA:BB:CC:DD:EE:F2             |
++----------------------------+                +-------------------------------+
+
+4.2 UDP, "rx" mode, IPv4-only, Single core
+
+   This example shows receiving data from a IPv4 stream. The TLDK UDP server
+   runs on single core where both BE and FE run on cpu core 3.
+
+   be.cfg file contains:
+
+   port=0,masklen=24,addr=192.168.1.0,mac=AA:BB:CC:DD:EE:F2
+
+   fe.cfg file contains (udp server listening to port 6000):
+
+   lcore=3,op=rx,laddr=192.168.1.1,lport=6000,raddr=0.0.0.0,rport=0
+
+   run the l4fwd application as below (DPDK port 0 (pci 01:00.0)):
+
+   l4fwd --lcores='3' -w 01:00.0 -- \
+   --promisc --rbufs 0x100 --sbufs 0x100 --streams 0x100 --fecfg fe.cfg \
+   --becfg be.cfg -U port=0,lcore=3,ipv4=192.168.1.1
+
+   This will create TLDK UDP context on lcore=3 (BE lcore) to manage
+   DPDK port 0. The port 0 will have IPv4 address 192.168.1.1.
+   All the streams will be in server mode and also managed by lcore 3.
+
+4.3 UDP, "echo" mode, IPv6-only, Multicore
+
+   This example shows receiving data from a IPv6 stream and sending the data
+   back through the same IPv6 stream. The TLDK UDP server runs on multicore
+   where BE runs on cpu core 2 and FE runs on cpu core 3.
+
+   be.cfg file contains:
+
+   port=0,masklen=64,addr=2001:4860:b002::,mac=AA:BB:CC:DD:EE:F2
+
+   fe.cfg file contains (udp server listening to port 6000):
+
+   lcore=3,op=rx,laddr=2001:4860:b002::1,lport=6000,raddr=::,rport=0
+
+   run the l4fwd application as below (DPDK port 0 (pci 01:00.0)):
+
+   l4fwd --lcores='2,3' -w 01:00.0 -- \
+   --promisc --rbufs 0x100 --sbufs 0x100 --streams 0x100 --fecfg fe.cfg \
+   --becfg be.cfg -U port=0,lcore=2,ipv6=2001:4860:b002::1
+
+   This will create TLDK UDP context on lcore=2 (BE lcore) to manage
+   DPDK port 0. The port 0 will have IPv4 address 2001:4860:b002::1.
+   All the streams will be in server mode and managed by lcore 3 (FE lcore).
+   In this case, the UDP server will send the incoming data back to the sender.
+
+4.4 TCP, "echo" mode, IPv4-only, Multicore, RX-Offload
+
+   This example shows receiving data from a IPv4 stream and sending the data
+   back through the same IPv4 stream. The TLDK TCP server runs on multicore
+   where BE runs on cpu core 2 and FE runs on cpu core 3. The BE also uses
+   receive offload features of the NIC.
+
+   be.cfg file contains:
+
+   port=0,masklen=24,addr=192.168.1.0,mac=AA:BB:CC:DD:EE:F2
+
+   fe.cfg file contains (tcp server listening to port 6000):
+
+   lcore=3,op=echo,laddr=192.168.1.1,lport=6000,raddr=0.0.0.0,rport=0
+
+   run the l4fwd application as below (DPDK port 0 (pci 01:00.0)):
+
+   l4fwd --lcores='2,3' -w 01:00.0 -- \
+   --promisc --rbufs 0x100 --sbufs 0x100 --streams 0x100 --fecfg fe.cfg \
+   --becfg be.cfg -T -L port=0,lcore=2,rx_offload=0xf,tx_offload=0,\
+   ipv4=192.168.1.1
+
+   This will create TLDK TCP context on lcore=2 (BE lcore) to manage
+   DPDK port 0. The port 0 will have IPv4 address 192.168.1.1. The following
+   DPDK RX HW offloads will be enabled on that port.
+      DEV_RX_OFFLOAD_VLAN_STRIP,
+      DEV_RX_OFFLOAD_IPV4_CKSUM,
+      DEV_RX_OFFLOAD_UDP_CKSUM,
+      DEV_RX_OFFLOAD_TCP_CKSUM
+   No HW TX offloads will be enabled.
+   All the streams will be in server mode and managed by lcore 3 (FE core).
+   In this case, the TCP server will send the incoming data back to the sender.
+
+4.5 TCP, "fwd" (proxy) mode, IPv4-to-IPv6, Multi-core, RX-Offload
+
+   This example shows receiving data from a IPv4 stream and forwarding the
+   data to a IPv6 stream. The TLDK TCP server runs on multicore
+   where BE runs on cpu core 2 and FE runs on cpu core 3. The BE also uses
+   receive offload features of the NIC.
+
+   be.cfg file contains:
+
+   port=0,masklen=24,addr=192.168.1.0,mac=AA:BB:CC:DD:EE:F2
+
+   fe.cfg file contains (tcp server listening to port 6000):
+
+   lcore=3,op=fwd,laddr=192.168.1.1,lport=6000,raddr=0.0.0.0,rport=0,\
+      rladdr=::,lport=0,raddr=2001:4860:b002::2,rport=7000
+
+   run the l4fwd application as below (DPDK port 0 (pci 01:00.0)):
+
+   l4fwd --lcores='2,3' -w 01:00.0 -- \
+   --promisc --rbufs 0x100 --sbufs 0x100 --streams 0x100 --fecfg fe.cfg \
+   --becfg be.cfg -T -L port=0,lcore=2,rx_offload=0xf,tx_offload=0,\
+   ipv4=192.168.1.1,ipv6=2001:4860:b002::1
+
+   This will create TLDK TCP context on lcore=2 (BE lcore) to manage
+   DPDK port 0. The port 0 will have IPv4 address 192.168.1.1. The following
+   DPDK RX HW offloads will be enabled on that port.
+      DEV_RX_OFFLOAD_VLAN_STRIP,
+      DEV_RX_OFFLOAD_IPV4_CKSUM,
+      DEV_RX_OFFLOAD_UDP_CKSUM,
+      DEV_RX_OFFLOAD_TCP_CKSUM
+   No HW TX offloads will be enabled.
+   All the streams will be in server mode and managed by lcore 3 (FE core).
+   In this case, the IPv4 TCP server will forward the incoming data to the IPv6
+   TCP server 2001:4860:b002::2 listening to port 7000.
+
+4.6 TCP, "echo" mode, RSS, IPv4-only, Multicore, RX-Offload
+
+   This example shows receiving data from a IPv4 stream and sending the data
+   back through the same IPv4 stream. The TLDK TCP server runs on multicore
+   where BE runs on cpu cores 1-2 and FE runs on cpu core 3. As BE runs on
+   multicore, Receive Side Scaling (RSS) feature will be automatically enabled.
+   The BE also uses receive offload features of the NIC.
+
+   be.cfg file contains:
+
+   port=0,masklen=24,addr=192.168.1.0,mac=AA:BB:CC:DD:EE:F2
+
+   fe.cfg file contains (tcp server listening to port 6000):
+
+   lcore=3,op=echo,laddr=192.168.1.1,lport=6000,raddr=0.0.0.0,rport=0
+   lcore=3,op=echo,laddr=192.168.1.1,lport=6001,raddr=0.0.0.0,rport=0
+
+   run the l4fwd application as below (DPDK port 0 (pci 01:00.0)):
+
+   l4fwd --lcores='1,2,3' -w 01:00.0 -- \
+   --promisc --rbufs 0x100 --sbufs 0x100 --streams 0x100 --fecfg fe.cfg \
+   --becfg be.cfg -T -L port=0,lcore="1-2",rx_offload=0xf,tx_offload=0,\
+   ipv4=192.168.1.1
+
+   This will create TLDK TCP context on lcore=1-2 (BE lcore) to manage
+   DPDK port 0. The port 0 will have IPv4 address 192.168.1.1. The following
+   DPDK RX HW offloads will be enabled on that port.
+      DEV_RX_OFFLOAD_VLAN_STRIP,
+      DEV_RX_OFFLOAD_IPV4_CKSUM,
+      DEV_RX_OFFLOAD_UDP_CKSUM,
+      DEV_RX_OFFLOAD_TCP_CKSUM
+   No HW TX offloads will be enabled.
+   All the streams will be in server mode and managed by lcore 3 (FE core).
+   In this case, the TCP server will send the incoming data back to the sender.
+
+   As RSS is enabled, all the packets with destination port 6000 and 6001 will
+   be managed by HW queue 0 and queue 1 respectively. Please note that RSS
+   is not supported on the interface when both IPv4 and IPv6 are enabled.
+   Only one of IPv4 or IPv6 has to be enabled in the port.

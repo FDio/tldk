@@ -68,12 +68,16 @@ OBJ = gtest-rfc.o
 
 # all source are stored in SRCS-y
 SRCS-y += main.cpp
+SRCS-y += test_common.cpp
 SRCS-y += test_tle_dring.cpp
-SRCS-y += test_tle_udp_ctx.cpp
+SRCS-y += test_tle_ctx.cpp
 #SRCS-y += test_tle_udp_dev.cpp
 SRCS-y += test_tle_udp_destroy.cpp
 SRCS-y += test_tle_udp_event.cpp
-SRCS-y += test_tle_udp_stream.cpp
+#SRCS-y += test_tle_udp_stream.cpp
+#SRCS-y += test_tle_udp_stream_gen.cpp
+#SRCS-y += test_tle_tcp_stream.cpp
+#SRCS-y += test_tle_tcp_stream_gen.cpp
 
 CXXFLAGS += -std=c++11
 
@@ -87,7 +91,7 @@ CXXFLAGS += -I$(RTE_OUTPUT)/include
 
 LDFLAGS += -lstdc++
 LDFLAGS += -L$(GMOCK_DIR) -lgmock
-LDLIBS += -ltle_udp -ltle_dring
+LDLIBS += -whole-archive -ltle_l4p -ltle_dring
 
 include $(TLDK_ROOT)/mk/tle.cpp-obj.mk
 endif
@@ -116,7 +120,7 @@ LDLIBS += gtest-rfc.o
 LDLIBS += -lstdc++
 LDLIBS += -L$(GMOCK_DIR) -lgmock
 LDLIBS += -L$(RTE_OUTPUT)/lib
-LDLIBS += -ltle_udp -ltle_dring
+LDLIBS += -whole-archive -ltle_l4p -ltle_dring -ltle_timer
 
 include $(TLDK_ROOT)/mk/tle.app.mk
 endif
