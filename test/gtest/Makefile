@@ -75,7 +75,7 @@ SRCS-y += test_tle_ctx.cpp
 SRCS-y += test_tle_udp_destroy.cpp
 SRCS-y += test_tle_udp_event.cpp
 #SRCS-y += test_tle_udp_stream.cpp
-#SRCS-y += test_tle_udp_stream_gen.cpp
+SRCS-y += test_tle_udp_stream_gen.cpp
 #SRCS-y += test_tle_tcp_stream.cpp
 #SRCS-y += test_tle_tcp_stream_gen.cpp
 
