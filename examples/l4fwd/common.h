@@ -619,7 +619,7 @@ netbe_lcore(void)
 	}
 }
 
-static inline void
+static inline int
 netfe_rx_process(__rte_unused uint32_t lcore, struct netfe_stream *fes)
 {
 	uint32_t k, n;
@@ -631,12 +631,12 @@ netfe_rx_process(__rte_unused uint32_t lcore, struct netfe_stream *fes)
 	if (k == 0) {
 		tle_event_idle(fes->rxev);
 		fes->stat.rxev[TLE_SEV_IDLE]++;
-		return;
+		return 0;
 	}
 
 	n = tle_stream_recv(fes->s, fes->pbuf.pkt + n, k);
 	if (n == 0)
-		return;
+		return 0;
 
 	NETFE_TRACE("%s(%u): tle_%s_stream_recv(%p, %u) returns %u\n",
 		__func__, lcore, proto_name[fes->proto], fes->s, k, n);
@@ -648,7 +648,7 @@ netfe_rx_process(__rte_unused uint32_t lcore, struct netfe_stream *fes)
 	if (fes->op == RXONLY)
 		fes->stat.rxb += pkt_buf_empty(&fes->pbuf);
 	/* mark stream as writable */
-	else if (k ==  RTE_DIM(fes->pbuf.pkt)) {
+	else if (k == RTE_DIM(fes->pbuf.pkt)) {
 		if (fes->op == RXTX) {
 			tle_event_active(fes->txev, TLE_SEV_UP);
 			fes->stat.txev[TLE_SEV_UP]++;
@@ -657,6 +657,8 @@ netfe_rx_process(__rte_unused uint32_t lcore, struct netfe_stream *fes)
 			fes->stat.txev[TLE_SEV_UP]++;
 		}
 	}
+
+	return n;
 }
 
 #endif /* COMMON_H_ */

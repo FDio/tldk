@@ -41,6 +41,13 @@ tcp_stream_up(struct tle_tcp_stream *s)
 	rwl_up(&s->tx.use);
 }
 
+/* calculate RCV.WND value based on size of stream receive buffer */
+static inline uint32_t
+calc_rx_wnd(const struct tle_tcp_stream *s, uint32_t scale)
+{
+	return  s->rx.q->prod.mask << scale;
+}
+
 /* empty stream's receive queue */
 static void
 empty_rq(struct tle_tcp_stream *s)

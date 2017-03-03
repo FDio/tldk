@@ -110,13 +110,13 @@ stbl_add_entry(struct stbl *st, const union pkt_info *pi)
 }
 
 static inline struct stbl_entry *
-stbl_add_pkt(struct stbl *st, const union pkt_info *pi, const void *pkt)
+stbl_add_stream(struct stbl *st, const union pkt_info *pi, const void *s)
 {
 	struct stbl_entry *se;
 
 	se = stbl_add_entry(st, pi);
 	if (se != NULL)
-		se->data = (void *)((uintptr_t)pkt | STE_PKT);
+		se->data = (void *)(uintptr_t)s;
 	return se;
 }
 

@@ -195,6 +195,7 @@ struct netfe_stream {
 	uint16_t proto;
 	uint16_t family;
 	uint16_t txlen;
+	uint16_t errev; /* # of time error event handling was postponed */
 	struct {
 		uint64_t rxp;
 		uint64_t rxb;
