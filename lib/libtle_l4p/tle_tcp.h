@@ -148,39 +148,18 @@ int tle_tcp_stream_connect(struct tle_stream *s, const struct sockaddr *addr);
  * <stream open happens here>
  * tle_tcp_stream_listen(stream_to_listen);
  * <wait for read event/callback on that stream>
- * n = tle_tcp_synreqs(stream_to_listen, syn_reqs, sizeof(syn_reqs));
- * for (i = 0, k = 0; i != n; i++) {
- *	rc = <decide should connection from that endpoint be allowed>;
- *	if (rc == 0) {
- *		//proceed with connection establishment
- *		k++;
- *		accept_param[k].syn = syn_reqs[i];
- *		<fill rest of accept_param fields for k-th connection>
- *	} else {
- *		//reject connection requests from that endpoint
- *		rej_reqs[i - k] = syn_reqs[i];
- *	}
+ * n = tle_tcp_accept(stream_to_listen, accepted_streams,
+ * 	sizeof(accepted_streams));
+ * for (i = 0, i != n; i++) {
+ * 	//prepare tle_tcp_stream_cfg for newly accepted streams
+ * 	...
  * }
- *
- *	//reject n - k connection requests
- *	tle_tcp_reject(stream_to_listen, rej_reqs, n - k);
- *
- *	//accept k new connections
- *	rc = tle_tcp_accept(stream_to_listen, accept_param, new_con_streams, k);
- *	<handle errors>
+ * k = tle_tcp_stream_update_cfg(rs, prm, n);
+ * if (n != k) {
+ * 	//handle error
+ *	...
+ * }
  */
-
-struct tle_syn_req {
-	struct rte_mbuf *pkt;
-	/*< mbuf with incoming connection request. */
-	void *opaque;    /*< tldk related opaque pointer. */
-};
-
-struct tle_tcp_accept_param {
-	struct tle_syn_req syn;        /*< mbuf with incoming SYN request. */
-	struct tle_tcp_stream_cfg cfg; /*< stream configure options. */
-};
-
 
 /**
  * Set stream into the listen state (passive opener), i.e. make stream ready
@@ -198,27 +177,40 @@ struct tle_tcp_accept_param {
 int tle_tcp_stream_listen(struct tle_stream *s);
 
 /**
- * return up to *num* mbufs with SYN requests that were received
+ * return up to *num* streams from the queue of pending connections
  * for given TCP endpoint.
- * Note that the stream has to be in listen state.
- * For each returned mbuf:
- * data_off set to the start of the packet
- * l2_len, l3_len, l4_len are setup properly
- * (so user can still extract L2/L3/L4 header info if needed)
- * packet_type RTE_PTYPE_L2/L3/L4 bits are setup properly.
- * L3/L4 checksum is verified.
  * @param s
- *   TCP stream to receive packets from.
- * @param rq
- *   An array of tle_syn_req structures that contains
- *   at least *num* elements in it.
+ *   TCP stream in listen state.
+ * @param rs
+ *   An array of pointers to the newily accepted streams.
+ *   Each such new stream represents a new connection to the given TCP endpoint.
+ *   Newly accepted stream should be in connected state and ready to use
+ *   by other FE API routines (send/recv/close/etc.).
  * @param num
- *   Number of elements in the *pkt* array.
+ *   Number of elements in the *rs* array.
  * @return
- *   number of of entries filled inside *pkt* array.
+ *   number of entries filled inside *rs* array.
  */
-uint16_t tle_tcp_stream_synreqs(struct tle_stream *s, struct tle_syn_req rq[],
+uint16_t tle_tcp_stream_accept(struct tle_stream *s, struct tle_stream *rs[],
 	uint32_t num);
+
+/**
+ * updates configuration (associated events, callbacks, stream parameters)
+ * for the given streams.
+ * @param ts
+ *   An array of pointers to the streams to update.
+ * @param prm
+ *   An array of parameters to update for the given streams.
+ * @param num
+ *   Number of elements in the *ts* and *prm* arrays.
+ * @return
+ *   number of streams successfully updated.
+ *   In case of error, error code set in rte_errno.
+ *   Possible rte_errno errors include:
+ *   - EINVAL - invalid parameter passed to function
+ */
+uint32_t tle_tcp_stream_update_cfg(struct tle_stream *ts[],
+	struct tle_tcp_stream_cfg prm[], uint32_t num);
 
 /**
  * Accept connection requests for the given stream.
@@ -241,27 +233,9 @@ uint16_t tle_tcp_stream_synreqs(struct tle_stream *s, struct tle_syn_req rq[],
  *   - EINVAL - invalid parameter passed to function
  *   - ENFILE - no more streams are avaialble to open.
  */
-int tle_tcp_stream_accept(struct tle_stream *s,
-	const struct tle_tcp_accept_param prm[], struct tle_stream *rs[],
-	uint32_t num);
 
 /**
- * Reject connection requests for the given stream.
- * Note that the stream has to be in listen state.
- * For each new connection a new stream will be open.
- * @param s
- *   TCP listen stream.
- * @param rq
- *   An array of tle_syn_req structures that contains
- *   at least *num* elements in it.
- * @param num
- *   Number of elements in the *pkt* array.
- */
-void tle_tcp_reject(struct tle_stream *s, const struct tle_syn_req rq[],
-	uint32_t num);
-
-/**
- * return up to *num* mbufs that was received for given TCP stream.
+ * Return up to *num* mbufs that was received for given TCP stream.
  * Note that the stream has to be in connected state.
  * Data ordering is preserved.
  * For each returned mbuf:

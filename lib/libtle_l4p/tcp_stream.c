@@ -511,6 +511,7 @@ tle_tcp_stream_listen(struct tle_stream *ts)
 				TCP_ST_LISTEN);
 		if (rc != 0) {
 			s->tcb.uop |= TCP_OP_LISTEN;
+			s->tcb.rcv.wnd = calc_rx_wnd(s, TCP_WSCALE_DEFAULT);
 			rc = 0;
 		} else
 			rc = -EDEADLK;
@@ -519,4 +520,88 @@ tle_tcp_stream_listen(struct tle_stream *ts)
 
 	rwl_release(&s->rx.use);
 	return rc;
+}
+
+/*
+ * helper function, updates stream config
+ */
+static inline int
+stream_update_cfg(struct tle_stream *ts,struct tle_tcp_stream_cfg *prm)
+{
+	int32_t rc1, rc2;
+	struct tle_tcp_stream *s;
+
+	s = TCP_STREAM(ts);
+
+	rc1 = rwl_try_acquire(&s->rx.use);
+	rc2 = rwl_try_acquire(&s->tx.use);
+
+	if (rc1 < 0 || rc2 < 0 || (s->tcb.uop & TCP_OP_CLOSE) != 0) {
+		rwl_release(&s->tx.use);
+		rwl_release(&s->rx.use);
+		return -EINVAL;
+	}
+
+	/* setup stream notification menchanism */
+	s->rx.ev = prm->recv_ev;
+	s->tx.ev = prm->send_ev;
+	s->err.ev = prm->err_ev;
+
+	s->rx.cb.data = prm->recv_cb.data;
+	s->tx.cb.data = prm->send_cb.data;
+	s->err.cb.data = prm->err_cb.data;
+
+	rte_smp_wmb();
+
+	s->rx.cb.func = prm->recv_cb.func;
+	s->tx.cb.func = prm->send_cb.func;
+	s->err.cb.func = prm->err_cb.func;
+
+	/* store other params */
+	s->tcb.snd.nb_retm = (prm->nb_retries != 0) ? prm->nb_retries :
+		TLE_TCP_DEFAULT_RETRIES;
+
+	/* invoke async notifications, if any */
+	if (rte_ring_count(s->rx.q) != 0) {
+		if (s->rx.ev != NULL)
+			tle_event_raise(s->rx.ev);
+		else if (s->rx.cb.func != NULL)
+			s->rx.cb.func(s->rx.cb.data, &s->s);
+	}
+	if (rte_ring_free_count(s->tx.q) != 0) {
+		if (s->tx.ev != NULL)
+			tle_event_raise(s->tx.ev);
+		else if (s->tx.cb.func != NULL)
+			s->tx.cb.func(s->tx.cb.data, &s->s);
+	}
+	if (s->tcb.state == TCP_ST_CLOSE_WAIT ||
+			s->tcb.state ==  TCP_ST_CLOSED) {
+		if (s->err.ev != NULL)
+			tle_event_raise(s->err.ev);
+		else if (s->err.cb.func != NULL)
+			s->err.cb.func(s->err.cb.data, &s->s);
+	}
+
+	rwl_release(&s->tx.use);
+	rwl_release(&s->rx.use);
+
+	return 0;
+}
+
+uint32_t
+tle_tcp_stream_update_cfg(struct tle_stream *ts[],
+	struct tle_tcp_stream_cfg prm[], uint32_t num)
+{
+	int32_t rc;
+	uint32_t i;
+
+	for (i = 0; i != num; i++) {
+		rc = stream_update_cfg(ts[i], &prm[i]);
+		if (rc != 0) {
+			rte_errno = -rc;
+			break;
+		}
+	}
+
+	return i;
 }

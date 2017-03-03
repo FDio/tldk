@@ -156,13 +156,8 @@ sync_get_opts(struct syn_opts *so, uintptr_t p, uint32_t len)
 
 static inline void
 sync_fill_tcb(struct tcb *tcb, const union seg_info *si,
-	const struct rte_mbuf *mb)
+	const struct syn_opts *so)
 {
-	const struct tcp_hdr *th;
-
-	th = rte_pktmbuf_mtod_offset(mb, const struct tcp_hdr *,
-		mb->l2_len + mb->l3_len);
-
 	tcb->rcv.nxt = si->seq;
 	tcb->rcv.irs = si->seq - 1;
 
@@ -174,7 +169,7 @@ sync_fill_tcb(struct tcb *tcb, const union seg_info *si,
 	tcb->snd.wu.wl1 = si->seq;
 	tcb->snd.wu.wl2 = si->ack;
 
-	get_syn_opts(&tcb->so, (uintptr_t)(th + 1), mb->l4_len - sizeof(*th));
+	tcb->so = *so;
 
 	tcb->snd.wscale = tcb->so.wscale;
 	tcb->snd.mss = tcb->so.mss;
