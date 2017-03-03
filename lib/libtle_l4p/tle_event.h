@@ -106,6 +106,11 @@ struct tle_event *tle_event_alloc(struct tle_evq *evq, const void *data);
  */
 void tle_event_free(struct tle_event *ev);
 
+static inline enum tle_ev_state
+tle_event_state(const struct tle_event *ev)
+{
+	return ev->state;
+}
 
 /**
  * move event from DOWN to UP state.
