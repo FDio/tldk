@@ -279,9 +279,9 @@ netfe_fwd_tcp(uint32_t lcore, struct netfe_stream *fes)
 				__func__, lcore, proto_name[fes->proto],
 				fed->s, n, k);
 
-			fed->stat.txp += k;
-			fed->stat.drops += n - k;
-			fes->stat.fwp += k;
+		fed->stat.txp += k;
+		fed->stat.drops += n - k;
+		fes->stat.fwp += k;
 
 	} else {
 		NETFE_TRACE("%s(%u, %p): no fwd stream for %u pkts;\n",

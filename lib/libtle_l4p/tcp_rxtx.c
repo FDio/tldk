@@ -27,6 +27,7 @@
 #include "tcp_ctl.h"
 #include "tcp_rxq.h"
 #include "tcp_txq.h"
+#include "tcp_tx_seg.h"
 
 #define	TCP_MAX_PKT_SEG	0x20
 
@@ -2142,13 +2143,42 @@ tle_tcp_stream_recv(struct tle_stream *ts, struct rte_mbuf *pkt[], uint16_t num)
 	return n;
 }
 
+static inline int32_t
+tx_segments(struct tle_tcp_stream *s, uint64_t ol_flags,
+	struct rte_mbuf *segs[], uint32_t num)
+{
+	uint32_t i;
+	int32_t rc;
+
+	for (i = 0; i != num; i++) {
+		/* Build L2/L3/L4 header */
+		rc = tcp_fill_mbuf(segs[i], s, &s->tx.dst, ol_flags, s->s.port,
+			0, TCP_FLAG_ACK, 0, 0);
+		if (rc != 0) {
+			free_segments(segs, num);
+			break;
+		}
+	}
+
+	if (i == num) {
+		/* queue packets for further transmission. */
+		rc = rte_ring_mp_enqueue_bulk(s->tx.q, (void **)segs, num);
+		if (rc != 0)
+			free_segments(segs, num);
+	}
+
+	return rc;
+}
+
 uint16_t
 tle_tcp_stream_send(struct tle_stream *ts, struct rte_mbuf *pkt[], uint16_t num)
 {
-	uint32_t i, j, mss, n, state, type;
+	uint32_t i, j, k, mss, n, state, type;
+	int32_t rc;
 	uint64_t ol_flags;
 	struct tle_tcp_stream *s;
 	struct tle_dev *dev;
+	struct rte_mbuf *segs[TCP_MAX_PKT_SEG];
 
 	s = TCP_STREAM(ts);
 
@@ -2161,53 +2191,87 @@ tle_tcp_stream_send(struct tle_stream *ts, struct rte_mbuf *pkt[], uint16_t num)
 	state = s->tcb.state;
 	if (state != TCP_ST_ESTABLISHED && state != TCP_ST_CLOSE_WAIT) {
 		rte_errno = ENOTCONN;
-		n = 0;
-	} else {
-		mss = s->tcb.snd.mss;
-		dev = s->tx.dst.dev;
-		type = s->s.type;
-		ol_flags = dev->tx.ol_flags[type];
+		rwl_release(&s->tx.use);
+		return 0;
+	}
 
+	mss = s->tcb.snd.mss;
+	dev = s->tx.dst.dev;
+	type = s->s.type;
+	ol_flags = dev->tx.ol_flags[type];
+
+	k = 0;
+	rc = 0;
+	while (k != num) {
 		/* prepare and check for TX */
-		for (i = 0; i != num; i++) {
-
-			/* !!! need to be modified !!! */
+		for (i = k; i != num; i++) {
 			if (pkt[i]->pkt_len > mss ||
-					pkt[i]->nb_segs > TCP_MAX_PKT_SEG) {
-				rte_errno = EBADMSG;
+					pkt[i]->nb_segs > TCP_MAX_PKT_SEG)
 				break;
-			} else if (tcp_fill_mbuf(pkt[i], s, &s->tx.dst,
-					ol_flags, s->s.port, 0, TCP_FLAG_ACK,
-					0, 0) != 0)
+			rc = tcp_fill_mbuf(pkt[i], s, &s->tx.dst, ol_flags,
+				s->s.port, 0, TCP_FLAG_ACK, 0, 0);
+			if (rc != 0)
 				break;
 		}
 
-		/* queue packets for further transmision. */
-		n = rte_ring_mp_enqueue_burst(s->tx.q, (void **)pkt, i);
+		if (i != k) {
+			/* queue packets for further transmission. */
+			n = rte_ring_mp_enqueue_burst(s->tx.q, (void **)pkt + k,
+				(i - k));
+			k += n;
 
-		/* notify BE about more data to send */
-		if (n != 0)
-			txs_enqueue(s->s.ctx, s);
-
-		/*
-		 * for unsent, but already modified packets:
-		 * remove pkt l2/l3 headers, restore ol_flags
-		 */
-		if (n != i) {
-			ol_flags = ~dev->tx.ol_flags[type];
-			for (j = n; j != i; j++) {
-				rte_pktmbuf_adj(pkt[j], pkt[j]->l2_len +
-					pkt[j]->l3_len + pkt[j]->l4_len);
-				pkt[j]->ol_flags &= ol_flags;
+			/*
+			 * for unsent, but already modified packets:
+			 * remove pkt l2/l3 headers, restore ol_flags
+			 */
+			if (i != k) {
+				ol_flags = ~dev->tx.ol_flags[type];
+				for (j = k; j != i; j++) {
+					rte_pktmbuf_adj(pkt[j], pkt[j]->l2_len +
+						pkt[j]->l3_len +
+						pkt[j]->l4_len);
+					pkt[j]->ol_flags &= ol_flags;
+				}
+				break;
 			}
-		/* if possible, rearm stream write event. */
-		} else if (rte_ring_free_count(s->tx.q) != 0 &&
-				s->tx.ev != NULL)
-			tle_event_raise(s->tx.ev);
+		}
+
+		if (rc != 0) {
+			rte_errno = -rc;
+			break;
+
+		/* segment large packet and enqueue for sending */
+		} else if (i != num) {
+			/* segment the packet. */
+			rc = tcp_segmentation(pkt[i], segs, RTE_DIM(segs),
+				&s->tx.dst, mss);
+			if (rc < 0) {
+				rte_errno = -rc;
+				break;
+			}
+
+			rc = tx_segments(s, dev->tx.ol_flags[type], segs, rc);
+			if (rc == 0) {
+				/* free the large mbuf */
+				rte_pktmbuf_free(pkt[i]);
+				/* set the mbuf as consumed */
+				k++;
+			} else
+				/* no space left in tx queue */
+				break;
+		}
 	}
 
+	/* notify BE about more data to send */
+	if (k != 0)
+		txs_enqueue(s->s.ctx, s);
+	/* if possible, re-arm stream write event. */
+	if (rte_ring_free_count(s->tx.q) != 0 && s->tx.ev != NULL)
+		tle_event_raise(s->tx.ev);
+
 	rwl_release(&s->tx.use);
-	return n;
+
+	return k;
 }
 
 /* send data and FIN (if needed) */
