@@ -45,6 +45,8 @@
 extern struct rte_mempool *mbuf_pool;
 extern struct rte_mempool *frag_mp;
 
+extern char binpath[PATH_MAX];
+
 int port_init(uint8_t port, struct rte_mempool *mbuf_pool);
 
 uint64_t

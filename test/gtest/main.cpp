@@ -28,12 +28,14 @@
 #include "test_common.h"
 
 struct rte_mempool *mbuf_pool;
+char binpath[PATH_MAX];
 
 int
 main(int argc, char *argv[])
 {
 	uint8_t nb_ports = 1;
 	int rc = 0;
+	char *slash;
 
 	/* Initialize GoogleTest&Mock and parse any args */
 	testing::InitGoogleMock(&argc, argv);
@@ -43,6 +45,13 @@ main(int argc, char *argv[])
 		rte_exit(EXIT_FAILURE, "Invalid EAL arguments\n");
 	argc -= ret;
 	argv += ret;
+
+	/* get the path of binary and save in a global variable to be used later*/
+	realpath(argv[0], binpath);
+	slash = NULL;
+	slash = strrchr(binpath, '/');
+	if (strcmp(binpath, "") != 0 && slash != NULL)
+		binpath[slash - binpath] = 0;
 
 	/*
 	 * Creates a new mempool in memory to hold the mbufs.
