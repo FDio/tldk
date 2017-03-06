@@ -343,9 +343,18 @@ test_tle_udp_gen_base::prepare_pcaps(string l_ip, string r_ip, int l_port,
 	string rx_pcap_dest)
 {
 	string py_cmd;
+	char binpath[1024], *slash;
+	int32_t sz;
+
+	/* get the path of binary */
+	sz = readlink("/proc/self/exe", binpath, sizeof(binpath));
+	slash = NULL;
+	slash = strrchr(binpath, '/');
+	if (sz > 0 && slash != NULL)
+		binpath[slash - binpath] = 0;
 
 	/* generate pcap rx & tx files * for tests using scapy */
-	py_cmd = "python ./test/gtest/test_scapy_gen.py ";
+	py_cmd = "python " + string(binpath) + "/test_scapy_gen.py ";
 	py_cmd = py_cmd + " " + l_ip + " " + r_ip + " " +
 			to_string(l_port) + " " + to_string(r_port) + " " +
 			to_string(nb_pkts);
@@ -356,7 +365,6 @@ test_tle_udp_gen_base::prepare_pcaps(string l_ip, string r_ip, int l_port,
 		py_cmd = py_cmd + " -bc4 " + to_string(l4_chksum);
 	py_cmd = py_cmd + " " + rx_pcap_dest;
 	system(py_cmd.c_str());
-
 	return 0;
 }
 
