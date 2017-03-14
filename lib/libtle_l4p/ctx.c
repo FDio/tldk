@@ -94,6 +94,10 @@ tle_ctx_create(const struct tle_ctx_param *ctx_prm)
 
 	ctx->prm = *ctx_prm;
 
+	if( tle_stream_ops[ctx_prm->proto].init_streams == NULL ) {
+		TCP_LOG(ERR, "stream callbacks for protocol %d are not initizlied\n", ctx_prm->proto);
+		return NULL;
+	}
 	rc = tle_stream_ops[ctx_prm->proto].init_streams(ctx);
 	if (rc != 0) {
 		UDP_LOG(ERR, "init_streams(ctx=%p, proto=%u) failed "
