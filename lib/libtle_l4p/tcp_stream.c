@@ -216,7 +216,7 @@ tcp_init_streams(struct tle_ctx *ctx)
 	if (ts->tmr == NULL) {
 		TCP_LOG(ERR, "alloc_timers(ctx=%p) failed with error=%d\n",
 			ctx, rte_errno);
-		rc = -ENOMEM;
+		rc = -rte_errno;
 	} else {
 		ts->tsq = alloc_ring(ctx->prm.max_streams,
 			RING_F_SC_DEQ, ctx->prm.socket_id);

@@ -141,10 +141,13 @@ stream_get_dest(struct tle_stream *s, const void *dst_addr,
 		d6 = dst_addr;
 		rc = ctx->prm.lookup6(ctx->prm.lookup6_data, d6, dst);
 	} else
-		rc = -ENOENT;
+		rc = -EINVAL;
 
-	if (rc < 0 || dst->dev == NULL || dst->dev->ctx != ctx)
-		return -ENOENT;
+	if (rc<0)
+		return rc;
+
+	if (dst->dev == NULL || dst->dev->ctx != ctx)
+		return -EINVAL;
 
 	dev = dst->dev;
 	if (s->type == TLE_V4) {
