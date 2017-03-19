@@ -34,9 +34,9 @@ SRCS-y += pkt.c
 SRCS-y += main.c
 
 CFLAGS += $(WERROR_FLAGS)
-CFLAGS += -I$(RTE_OUTPUT)/include
+CPPFLAGS += -I$(RTE_OUTPUT)/include
 
-LDLIBS += -L$(RTE_OUTPUT)/lib
+LDFLAGS += -L$(RTE_OUTPUT)/lib
 LDLIBS += -ltle_l4p
 LDLIBS += -ltle_timer
 
