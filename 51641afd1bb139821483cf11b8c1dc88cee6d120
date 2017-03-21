@@ -16,6 +16,24 @@
       "revId": "51641afd1bb139821483cf11b8c1dc88cee6d120",
       "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "3a3291f1_1ddcaae3",
+        "filename": "examples/l4fwd/Makefile",
+        "patchSetId": 1
+      },
+      "lineNbr": 37,
+      "author": {
+        "id": 825
+      },
+      "writtenOn": "2017-03-21T18:23:17Z",
+      "side": 1,
+      "message": "This brings the usage in line with the stated vars semantics (see, https://www.gnu.org/software/make/manual/html_node/Implicit-Variables.html).\n\nIn general, since certain flags need to be present on the command line in a certain order, splitting library paths and usage into separate vars allows more modular ordering.\n\nFor CFLAGS vs. CPPFLAGS, this is less crucial, but still occasionally makes a difference. For example, CPPFLAGS is shared for both C and C++ compilations, while CFLAGS is C only (CXXFLAGS is the corresponding C++ var).",
+      "parentUuid": "3a3291f1_fd4f9ebc",
+      "revId": "51641afd1bb139821483cf11b8c1dc88cee6d120",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
     }
   ]
 }
