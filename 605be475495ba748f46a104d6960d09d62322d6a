@@ -25,6 +25,30 @@
     },
     {
       "key": {
+        "uuid": "3a3291f1_9305297c",
+        "filename": "lib/libtle_l4p/ctx.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 98,
+      "author": {
+        "id": 825
+      },
+      "writtenOn": "2017-03-22T12:55:37Z",
+      "side": 1,
+      "message": "That depends on your tab size. Both Gerrit and my setup have a tab size of 4, and there it most definitely less than 80 (see the red line)\n\nWhat tab size do you work with, and are the code styles documented anywhere?",
+      "parentUuid": "3a3291f1_73e19dcf",
+      "range": {
+        "startLine": 98,
+        "startChar": 2,
+        "endLine": 98,
+        "endChar": 71
+      },
+      "revId": "605be475495ba748f46a104d6960d09d62322d6a",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "3a3291f1_f3cc6d63",
         "filename": "lib/libtle_l4p/stream.h",
         "patchSetId": 2
