@@ -73,6 +73,30 @@
     },
     {
       "key": {
+        "uuid": "3a3291f1_93bd296b",
+        "filename": "lib/libtle_l4p/ctx.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 98,
+      "author": {
+        "id": 407
+      },
+      "writtenOn": "2017-03-22T13:46:04Z",
+      "side": 1,
+      "message": "we also use checkpatches.sh script from dpdk which in fact uses checkpatch.pl from Linux kernel.",
+      "parentUuid": "3a3291f1_b3edc5b9",
+      "range": {
+        "startLine": 98,
+        "startChar": 2,
+        "endLine": 98,
+        "endChar": 71
+      },
+      "revId": "605be475495ba748f46a104d6960d09d62322d6a",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "3a3291f1_f3cc6d63",
         "filename": "lib/libtle_l4p/stream.h",
         "patchSetId": 2
