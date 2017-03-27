@@ -45,7 +45,14 @@ tcp_stream_up(struct tle_tcp_stream *s)
 static inline uint32_t
 calc_rx_wnd(const struct tle_tcp_stream *s, uint32_t scale)
 {
-	return  s->rx.q->prod.mask << scale;
+	uint32_t wnd;
+
+	/* peer doesn't support WSCALE option, wnd size is limited to 64K */
+	if (scale == TCP_WSCALE_NONE) {
+		wnd = s->rx.q->prod.mask << TCP_WSCALE_DEFAULT;
+		return RTE_MIN(wnd, (uint32_t)UINT16_MAX);
+	} else
+		return  s->rx.q->prod.mask << scale;
 }
 
 /* empty stream's receive queue */

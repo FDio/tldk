@@ -1547,6 +1547,11 @@ rx_synack(struct tle_tcp_stream *s, uint32_t ts, uint32_t state,
 	s->tcb.rcv.irs = si->seq;
 	s->tcb.rcv.nxt = si->seq + 1;
 
+	/* if peer doesn't support WSCALE opt, recalculate RCV.WND */
+	s->tcb.rcv.wscale = (so.wscale == TCP_WSCALE_NONE) ?
+		TCP_WSCALE_NONE : TCP_WSCALE_DEFAULT;
+	s->tcb.rcv.wnd = calc_rx_wnd(s, s->tcb.rcv.wscale);
+
 	/* calculate initial rto */
 	rto_estimate(&s->tcb, ts - s->tcb.snd.ts);
 
