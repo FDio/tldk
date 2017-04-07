@@ -33,6 +33,10 @@
    to make the resulting host stack easily usable by existing non-vpp aware
    software.
 
+   The library uses siphash logic from the below source
+   https://github.com/veorq/SipHash
+
+
 2. INSTALLATION GUIDE
 
    1) Obtain latest DPDK and build it.

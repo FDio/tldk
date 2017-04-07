@@ -13,6 +13,9 @@
  * limitations under the License.
  */
 
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
 #include "netbe.h"
 #include "parse.h"
 
@@ -61,6 +64,12 @@ static const struct {
 #define	OPT_SHORT_LISTEN	'L'
 #define	OPT_LONG_LISTEN		"listen"
 
+#define OPT_SHORT_HASH         'H'
+#define OPT_LONG_HASH          "hash"
+
+#define OPT_SHORT_SEC_KEY         'K'
+#define OPT_LONG_SEC_KEY          "seckey"
+
 #define	OPT_SHORT_VERBOSE	'v'
 #define	OPT_LONG_VERBOSE	"verbose"
 
@@ -75,6 +84,8 @@ static const struct option long_opt[] = {
 	{OPT_LONG_STREAMS, 1, 0, OPT_SHORT_STREAMS},
 	{OPT_LONG_UDP, 0, 0, OPT_SHORT_UDP},
 	{OPT_LONG_TCP, 0, 0, OPT_SHORT_TCP},
+	{OPT_LONG_HASH, 1, 0, OPT_SHORT_HASH},
+	{OPT_LONG_SEC_KEY, 1, 0, OPT_SHORT_SEC_KEY},
 	{OPT_LONG_LISTEN, 0, 0, OPT_SHORT_LISTEN},
 	{OPT_LONG_VERBOSE, 1, 0, OPT_SHORT_VERBOSE},
 	{NULL, 0, 0, 0}
@@ -709,6 +720,17 @@ netfe_parse_cfg(const char *fname, struct netfe_lcore_prm *lp)
 	return rc;
 }
 
+static uint32_t
+parse_hash_alg(const char *val)
+{
+	if (strcmp(val, "jhash") == 0)
+		return TLE_JHASH;
+	else if (strcmp(val, "siphash") == 0)
+		return TLE_SIPHASH;
+	else
+		return TLE_HASH_NUM;
+}
+
 int
 parse_app_options(int argc, char **argv, struct netbe_cfg *cfg,
 	struct tle_ctx_param *ctx_prm,
@@ -722,8 +744,8 @@ parse_app_options(int argc, char **argv, struct netbe_cfg *cfg,
 
 	optind = 0;
 	optarg = NULL;
-	while ((opt = getopt_long(argc, argv, "aB:LPR:S:TUb:f:s:v:", long_opt,
-			&opt_idx)) != EOF) {
+	while ((opt = getopt_long(argc, argv, "aB:LPR:S:TUb:f:s:v:H:K:",
+			long_opt, &opt_idx)) != EOF) {
 		if (opt == OPT_SHORT_ARP) {
 			cfg->arp = 1;
 		} else if (opt == OPT_SHORT_SBULK) {
@@ -778,7 +800,28 @@ parse_app_options(int argc, char **argv, struct netbe_cfg *cfg,
 		} else if (opt == OPT_SHORT_LISTEN) {
 			listen = 1;
 			cfg->server = 1;
-		} else {
+		} else if (opt == OPT_SHORT_HASH) {
+			ctx_prm->hash_alg = parse_hash_alg(optarg);
+			if (ctx_prm->hash_alg >= TLE_HASH_NUM) {
+				rte_exit(EXIT_FAILURE,
+					"%s: invalid hash algorithm %s "
+					"for option: \'%c\'\n",
+					__func__, optarg, opt);
+			}
+		} else if (opt == OPT_SHORT_SEC_KEY) {
+			n = strlen(optarg);
+			if (n != sizeof(ctx_prm->secret_key)) {
+				rte_exit(EXIT_FAILURE,
+					"%s: invalid length %s "
+					"for option \'%c\' "
+					"must be 16 characters long\n",
+					__func__, optarg, opt);
+			}
+			memcpy(&ctx_prm->secret_key, optarg,
+				sizeof(ctx_prm->secret_key));
+		}
+
+		else {
 			rte_exit(EXIT_FAILURE,
 				"%s: unknown option: \'%c\'\n",
 				__func__, opt);

@@ -641,7 +641,9 @@ sync_ack(struct tle_tcp_stream *s, const union pkt_info *pi,
 	get_syn_opts(&s->tcb.so, (uintptr_t)(th + 1), m->l4_len - sizeof(*th));
 
 	s->tcb.rcv.nxt = si->seq + 1;
-	seq = sync_gen_seq(pi, s->tcb.rcv.nxt, ts, s->tcb.so.mss);
+	seq = sync_gen_seq(pi, s->tcb.rcv.nxt, ts, s->tcb.so.mss,
+				s->s.ctx->prm.hash_alg,
+				&s->s.ctx->prm.secret_key);
 	s->tcb.so.ts.ecr = s->tcb.so.ts.val;
 	s->tcb.so.ts.val = sync_gen_ts(ts, s->tcb.so.wscale);
 	s->tcb.so.wscale = (s->tcb.so.wscale == TCP_WSCALE_NONE) ?
@@ -762,14 +764,17 @@ rx_check_seqack(struct tcb *tcb, uint32_t seq, uint32_t ack, uint32_t len,
 
 static inline int
 restore_syn_opt(struct syn_opts *so, const union pkt_info *pi,
-	const union seg_info *si, uint32_t ts, const struct rte_mbuf *mb)
+	const union seg_info *si, uint32_t ts, const struct rte_mbuf *mb,
+	uint32_t hash_alg, rte_xmm_t *secret_key)
 {
 	int32_t rc;
 	uint32_t len;
 	const struct tcp_hdr *th;
 
 	/* check that ACK, etc fields are what we expected. */
-	rc = sync_check_ack(pi, si->seq, si->ack - 1, ts);
+	rc = sync_check_ack(pi, si->seq, si->ack - 1, ts,
+				hash_alg,
+				secret_key);
 	if (rc < 0)
 		return rc;
 
@@ -918,11 +923,11 @@ rx_ack_listen(struct tle_tcp_stream *s, struct stbl *st,
 	if (pi->tf.flags != TCP_FLAG_ACK || rx_check_stream(s, pi) != 0)
 		return -EINVAL;
 
-	rc = restore_syn_opt(&so, pi, si, tms, mb);
+	ctx = s->s.ctx;
+	rc = restore_syn_opt(&so, pi, si, tms, mb, ctx->prm.hash_alg,
+				&ctx->prm.secret_key);
 	if (rc < 0)
 		return rc;
-
-	ctx = s->s.ctx;
 
 	/* allocate new stream */
 	ts = get_stream(ctx);
@@ -2059,7 +2064,9 @@ tx_syn(struct tle_tcp_stream *s, const struct sockaddr *addr)
 	s->tcb.so.mss = calc_smss(s->tx.dst.mtu, &s->tx.dst);
 
 	/* note that rcv.nxt is 0 here for sync_gen_seq.*/
-	seq = sync_gen_seq(&pi, s->tcb.rcv.nxt, tms, s->tcb.so.mss);
+	seq = sync_gen_seq(&pi, s->tcb.rcv.nxt, tms, s->tcb.so.mss,
+				s->s.ctx->prm.hash_alg,
+				&s->s.ctx->prm.secret_key);
 	s->tcb.snd.iss = seq;
 	s->tcb.snd.rcvr = seq;
 	s->tcb.snd.una = seq;

@@ -16,6 +16,8 @@
 #ifndef LCORE_H_
 #define LCORE_H_
 
+#include <rte_random.h>
+
 #include "dpdk_legacy.h"
 
 /*
@@ -64,6 +66,11 @@ create_context(struct netbe_lcore *lc, const struct tle_ctx_param *ctx_prm)
 		cprm.lookup4_data = lc;
 		cprm.lookup6 = lpm6_dst_lookup;
 		cprm.lookup6_data = lc;
+		if (cprm.secret_key.u64[0] == 0 &&
+			cprm.secret_key.u64[1] == 0) {
+			cprm.secret_key.u64[0] = rte_rand();
+			cprm.secret_key.u64[1] = rte_rand();
+		}
 
 		frag_cycles = (rte_get_tsc_hz() + MS_PER_S - 1) /
 						MS_PER_S * FRAG_TTL;

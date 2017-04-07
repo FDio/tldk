@@ -97,6 +97,12 @@ enum {
 	TLE_PROTO_NUM
 };
 
+enum {
+	TLE_JHASH,
+	TLE_SIPHASH,
+	TLE_HASH_NUM
+};
+
 struct tle_ctx_param {
 	int32_t socket_id;         /**< socket ID to allocate memory for. */
 	uint32_t proto;            /**< L4 proto to handle. */
@@ -116,6 +122,11 @@ struct tle_ctx_param {
 	/**< will be called by send() to get IPv6 packet destination info. */
 	void *lookup6_data;
 	/**< opaque data pointer for lookup6() callback. */
+
+	uint32_t hash_alg;
+	/**< hash algorithm to be used to generate sequence number. */
+	rte_xmm_t secret_key;
+	/**< secret key to be used to calculate the hash. */
 };
 
 /**

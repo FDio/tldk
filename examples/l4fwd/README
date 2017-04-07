@@ -130,6 +130,11 @@
       -L | --listen /* open TCP streams in server mode (listen). */ \
       -a | --enable-arp /* enable arp responses (request not supported) */ \
       -v | --verbose /* different level of verbose mode */ \
+      -H | --hash <string> /* hash algorithm i.e. siphash or jhash to be */ \
+                           /* used to generate the sequence number. */ \
+      -K | --seckey <string> /* 16 character long secret key used by */ \
+                             /* hash algorithms to generate the */ \
+                             /* sequence number. */ \
       <port0_params> <port1_params> ... <portN_params>
 
    Note that: options -U and -T cannot be used together.

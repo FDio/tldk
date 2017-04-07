@@ -21,6 +21,7 @@
 
 #include "stream.h"
 #include "misc.h"
+#include <halfsiphash.h>
 
 #define	LPORT_START	0x8000
 #define	LPORT_END	MAX_PORT_NUM
@@ -66,6 +67,8 @@ check_ctx_prm(const struct tle_ctx_param *prm)
 {
 	if (prm->proto >= TLE_PROTO_NUM)
 		return -EINVAL;
+	if (prm->hash_alg >= TLE_HASH_NUM)
+		return -EINVAL;
 	return 0;
 }
 
@@ -108,6 +111,13 @@ tle_ctx_create(const struct tle_ctx_param *ctx_prm)
 		tle_pbm_init(ctx->use + i, LPORT_START_BLK);
 
 	ctx->streams.nb_free = ctx->prm.max_streams;
+
+	/* Initialization of siphash state is done here to speed up the
+	 * fastpath processing.
+	 */
+	if (ctx->prm.hash_alg == TLE_SIPHASH)
+		siphash_initialization(&ctx->prm.secret_key,
+					&ctx->prm.secret_key);
 	return ctx;
 }
 

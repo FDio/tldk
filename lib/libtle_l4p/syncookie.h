@@ -16,15 +16,15 @@
 #ifndef _SYNCOOKIE_H_
 #define _SYNCOOKIE_H_
 
-#include "tcp_misc.h"
 #include <rte_jhash.h>
+
+#include "tcp_misc.h"
+#include <tle_ctx.h>
+#include <halfsiphash.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-#define	SYNC_SEED0	0x736f6d65
-#define	SYNC_SEED1	0x646f7261
 
 struct sync_in4 {
 	uint32_t seq;
@@ -64,35 +64,61 @@ static const rte_xmm_t mss6len = {
 /* allow around 2 minutes for 3-way handshake. */
 #define	SYNC_MAX_TMO	0x20000
 
-
 /* ??? use SipHash as FreeBSD does. ??? */
 static inline uint32_t
-sync_hash4(const union pkt_info *pi, uint32_t seq)
+sync_hash4(const union pkt_info *pi, uint32_t seq, rte_xmm_t *secret_key,
+		uint32_t hash_alg)
 {
-	uint32_t v0, v1;
 	struct sync_in4 in4;
+	rte_xmm_t state;
+	uint32_t v0, v1;
 
 	in4.seq = seq;
 	in4.port = pi->port;
 	in4.addr = pi->addr4;
 
-	v0 = SYNC_SEED0;
-	v1 = SYNC_SEED1;
-	rte_jhash_32b_2hashes(&in4.seq, sizeof(in4) / sizeof(uint32_t),
-		&v0, &v1);
-	return v0 + v1;
+	if (hash_alg == TLE_JHASH) {
+		v0 = secret_key->u32[0];
+		v1 = secret_key->u32[1];
+		rte_jhash_32b_2hashes(&in4.seq, sizeof(in4) / sizeof(uint32_t),
+				&v0, &v1);
+		return v0 + v1;
+	} else {
+		state = *secret_key;
+		siphash_compression(&in4.seq, sizeof(in4) / sizeof(uint32_t),
+				&state);
+		siphash_finalization(&state);
+		return (state.u32[0] ^ state.u32[1] ^
+			state.u32[2] ^ state.u32[3]);
+	}
 }
 
 static inline uint32_t
-sync_hash6(const union pkt_info *pi, uint32_t seq)
+sync_hash6(const union pkt_info *pi, uint32_t seq, rte_xmm_t *secret_key,
+		uint32_t hash_alg)
 {
+	uint32_t port_seq[2];
+	rte_xmm_t state;
 	uint32_t v0, v1;
 
-	v0 = SYNC_SEED0;
-	v1 = SYNC_SEED1;
-	rte_jhash_32b_2hashes(pi->addr6->raw.u32,
-		sizeof(*pi->addr6) / sizeof(uint32_t), &v0, &v1);
-	return rte_jhash_3words(v0, seq, pi->port.raw, v1);
+	if (hash_alg == TLE_JHASH) {
+		v0 = secret_key->u32[0];
+		v1 = secret_key->u32[1];
+		rte_jhash_32b_2hashes(pi->addr6->raw.u32,
+				sizeof(*pi->addr6) / sizeof(uint32_t),
+				&v0, &v1);
+		return rte_jhash_3words(v0, seq, pi->port.raw, v1);
+	} else {
+		state = *secret_key;
+		siphash_compression(pi->addr6->raw.u32,
+				sizeof(*pi->addr6) / sizeof(uint32_t), &state);
+		port_seq[0] = pi->port.raw;
+		port_seq[1] = seq;
+		siphash_compression(port_seq, RTE_DIM(port_seq), &state);
+		siphash_finalization(&state);
+		return (state.u32[0] ^ state.u32[1] ^
+			state.u32[2] ^ state.u32[3]);
+	}
 }
 
 static inline uint32_t
@@ -105,15 +131,16 @@ sync_mss2idx(uint16_t mss, const rte_xmm_t *msl)
 }
 
 static inline uint32_t
-sync_gen_seq(const union pkt_info *pi, uint32_t seq, uint32_t ts, uint16_t mss)
+sync_gen_seq(const union pkt_info *pi, uint32_t seq, uint32_t ts, uint16_t mss,
+		uint32_t hash_alg, rte_xmm_t *secret_key)
 {
 	uint32_t h, mi;
 
 	if (pi->tf.type == TLE_V4) {
-		h = sync_hash4(pi, seq);
+		h = sync_hash4(pi, seq, secret_key, hash_alg);
 		mi = sync_mss2idx(mss, &mss4len);
 	} else {
-		h = sync_hash6(pi, seq);
+		h = sync_hash6(pi, seq, secret_key, hash_alg);
 		mi = sync_mss2idx(mss, &mss6len);
 	}
 
@@ -131,11 +158,14 @@ sync_gen_ts(uint32_t ts, uint32_t wscale)
 
 static inline int
 sync_check_ack(const union pkt_info *pi, uint32_t seq, uint32_t ack,
-	uint32_t ts)
+	uint32_t ts, uint32_t hash_alg, rte_xmm_t *secret_key)
 {
 	uint32_t h, mi, pts;
 
-	h = (pi->tf.type == TLE_V4) ? sync_hash4(pi, seq) : sync_hash6(pi, seq);
+	if (pi->tf.type == TLE_V4)
+		h = sync_hash4(pi, seq, secret_key, hash_alg);
+	else
+		h = sync_hash6(pi, seq, secret_key, hash_alg);
 
 	h = ack - h;
 	pts = h & ~SYNC_MSS_MASK;
