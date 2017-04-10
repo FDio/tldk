@@ -79,6 +79,8 @@ SRCS-y += test_tle_udp_stream_gen.cpp
 #SRCS-y += test_tle_tcp_stream.cpp
 #SRCS-y += test_tle_tcp_stream_gen.cpp
 
+SYMLINK-y-app += test_scapy_gen.py
+
 CXXFLAGS += -std=c++11
 
 ifeq ($(shell test $(GCC_VERSION) -lt 50 && echo 1), 1)
