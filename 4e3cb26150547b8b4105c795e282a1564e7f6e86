@@ -1,0 +1,7 @@
+Verified+1: fd.io JJB <jobbuilder@projectrotterdam.info>
+Code-Review+2: Konstantin Ananyev <konstantin.ananyev@intel.com>
+Submitted-by: Konstantin Ananyev <konstantin.ananyev@intel.com>
+Submitted-at: Mon, 10 Apr 2017 16:53:28 +0000
+Reviewed-on: https://gerrit.fd.io/r/6113
+Project: tldk
+Branch: refs/heads/master
