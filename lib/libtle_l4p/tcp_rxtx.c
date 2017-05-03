@@ -1538,7 +1538,7 @@ rx_synack(struct tle_tcp_stream *s, uint32_t ts, uint32_t state,
 	s->tcb.so = so;
 
 	s->tcb.snd.una = s->tcb.snd.nxt;
-	s->tcb.snd.mss = so.mss;
+	s->tcb.snd.mss = calc_smss(so.mss, &s->tx.dst);
 	s->tcb.snd.wnd = si->wnd << so.wscale;
 	s->tcb.snd.wu.wl1 = si->seq;
 	s->tcb.snd.wu.wl2 = si->ack;

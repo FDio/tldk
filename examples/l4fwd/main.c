@@ -68,9 +68,8 @@ static char proto_name[3][10] = {"udp", "tcp", ""};
 
 static const struct rte_eth_conf port_conf_default = {
 	.rxmode = {
-		.max_rx_pkt_len = ETHER_MAX_VLAN_FRAME_LEN,
 		.hw_vlan_strip = 1,
-		.jumbo_frame = 1,
+		.jumbo_frame = 0,
 	},
 };
 

@@ -309,7 +309,7 @@ parse_netbe_arg(struct netbe_port *prt, const char *arg, rte_cpuset_t *pcpu)
 	union parse_val val[RTE_DIM(hndl)];
 
 	memset(val, 0, sizeof(val));
-	val[2].u64 = ETHER_MAX_VLAN_FRAME_LEN - ETHER_CRC_LEN;
+	val[2].u64 = ETHER_MAX_LEN - ETHER_CRC_LEN;
 
 	rc = parse_kvargs(arg, keys_man, RTE_DIM(keys_man),
 		keys_opt, RTE_DIM(keys_opt), hndl, val);

@@ -181,6 +181,8 @@ port_init(struct netbe_port *uprt, uint32_t proto)
 		port_conf.rxmode.hw_ip_checksum = 1;
 	}
 	port_conf.rxmode.max_rx_pkt_len = uprt->mtu + ETHER_CRC_LEN;
+	if (port_conf.rxmode.max_rx_pkt_len > ETHER_MAX_LEN)
+		port_conf.rxmode.jumbo_frame = 1;
 
 	rc = update_rss_conf(uprt, &dev_info, &port_conf, proto);
 	if (rc != 0)
