@@ -154,14 +154,14 @@ static inline void
 stream_drb_free(struct tle_tcp_stream *s, struct tle_drb *drbs[],
 	uint32_t nb_drb)
 {
-	rte_ring_enqueue_burst(s->tx.drb.r, (void **)drbs, nb_drb);
+	_rte_ring_enqueue_burst(s->tx.drb.r, (void **)drbs, nb_drb);
 }
 
 static inline uint32_t
 stream_drb_alloc(struct tle_tcp_stream *s, struct tle_drb *drbs[],
 	uint32_t nb_drb)
 {
-	return rte_ring_dequeue_burst(s->tx.drb.r, (void **)drbs, nb_drb);
+	return _rte_ring_dequeue_burst(s->tx.drb.r, (void **)drbs, nb_drb);
 }
 
 static inline void
@@ -939,7 +939,7 @@ rx_ack_listen(struct tle_tcp_stream *s, struct stbl *st,
 	if (accept_prep_stream(s, st, cs, &so, tms, pi, si) == 0) {
 
 		/* put new stream in the accept queue */
-		if (rte_ring_enqueue_burst(s->rx.q,
+		if (_rte_ring_enqueue_burst(s->rx.q,
 				(void * const *)&ts, 1) == 1) {
 			*csp = cs;
 			return 0;
@@ -1927,7 +1927,7 @@ tle_tcp_stream_accept(struct tle_stream *ts, struct tle_stream *rs[],
 	struct tle_tcp_stream *s;
 
 	s = TCP_STREAM(ts);
-	n = rte_ring_mc_dequeue_burst(s->rx.q, (void **)rs, num);
+	n = _rte_ring_mc_dequeue_burst(s->rx.q, (void **)rs, num);
 	if (n == 0)
 		return 0;
 
@@ -2138,7 +2138,7 @@ tle_tcp_stream_recv(struct tle_stream *ts, struct rte_mbuf *pkt[], uint16_t num)
 	struct tle_tcp_stream *s;
 
 	s = TCP_STREAM(ts);
-	n = rte_ring_mc_dequeue_burst(s->rx.q, (void **)pkt, num);
+	n = _rte_ring_mc_dequeue_burst(s->rx.q, (void **)pkt, num);
 	if (n == 0)
 		return 0;
 
@@ -2174,7 +2174,7 @@ tx_segments(struct tle_tcp_stream *s, uint64_t ol_flags,
 
 	if (i == num) {
 		/* queue packets for further transmission. */
-		rc = rte_ring_mp_enqueue_bulk(s->tx.q, (void **)segs, num);
+		rc = _rte_ring_mp_enqueue_bulk(s->tx.q, (void **)segs, num);
 		if (rc != 0)
 			free_segments(segs, num);
 	}
@@ -2228,8 +2228,8 @@ tle_tcp_stream_send(struct tle_stream *ts, struct rte_mbuf *pkt[], uint16_t num)
 
 		if (i != k) {
 			/* queue packets for further transmission. */
-			n = rte_ring_mp_enqueue_burst(s->tx.q, (void **)pkt + k,
-				(i - k));
+			n = _rte_ring_mp_enqueue_burst(s->tx.q,
+				(void **)pkt + k, (i - k));
 			k += n;
 
 			/*

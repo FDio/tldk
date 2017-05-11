@@ -69,7 +69,7 @@ init_stream(struct tle_ctx *ctx, struct tle_udp_stream *s)
 
 	n = RTE_MAX(ctx->prm.max_stream_rbufs, 1U);
 	n = rte_align32pow2(n);
-	sz = sizeof(*s->rx.q) + n * sizeof(s->rx.q->ring[0]);
+	sz = rte_ring_get_memsize(n);
 
 	s->rx.q = rte_zmalloc_socket(NULL, sz, RTE_CACHE_LINE_SIZE,
 		ctx->prm.socket_id);
@@ -90,7 +90,7 @@ init_stream(struct tle_ctx *ctx, struct tle_udp_stream *s)
 	n = rte_align32pow2(k);
 
 	/* size of the drbs ring */
-	rsz = sizeof(*s->tx.drb.r) + n * sizeof(s->tx.drb.r->ring[0]);
+	rsz = rte_ring_get_memsize(n);
 	rsz = RTE_ALIGN_CEIL(rsz, RTE_CACHE_LINE_SIZE);
 
 	/* size of the drb. */
@@ -137,7 +137,7 @@ udp_free_drbs(struct tle_stream *s, struct tle_drb *drb[], uint32_t nb_drb)
 	struct tle_udp_stream *us;
 
 	us = (struct tle_udp_stream *)s;
-	rte_ring_enqueue_burst(us->tx.drb.r, (void **)drb, nb_drb);
+	_rte_ring_enqueue_burst(us->tx.drb.r, (void **)drb, nb_drb);
 }
 
 static int

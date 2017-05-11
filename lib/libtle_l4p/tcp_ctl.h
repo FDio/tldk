@@ -49,10 +49,10 @@ calc_rx_wnd(const struct tle_tcp_stream *s, uint32_t scale)
 
 	/* peer doesn't support WSCALE option, wnd size is limited to 64K */
 	if (scale == TCP_WSCALE_NONE) {
-		wnd = s->rx.q->prod.mask << TCP_WSCALE_DEFAULT;
+		wnd = _rte_ring_get_mask(s->rx.q) << TCP_WSCALE_DEFAULT;
 		return RTE_MIN(wnd, (uint32_t)UINT16_MAX);
 	} else
-		return  s->rx.q->prod.mask << scale;
+		return  _rte_ring_get_mask(s->rx.q) << scale;
 }
 
 /* empty stream's receive queue */
@@ -74,7 +74,7 @@ empty_lq(struct tle_tcp_stream *s, struct stbl *st)
 	struct stbl_entry *se[MAX_PKT_BURST];
 
 	do {
-		n = rte_ring_dequeue_burst(s->rx.q, (void **)se, RTE_DIM(se));
+		n = _rte_ring_dequeue_burst(s->rx.q, (void **)se, RTE_DIM(se));
 		for (i = 0; i != n; i++) {
 			mb = stbl_get_pkt(se[i]);
 			get_pkt_info(mb, &pi, &si);

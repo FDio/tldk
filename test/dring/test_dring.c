@@ -82,7 +82,7 @@ init_drb_ring(uint32_t num)
 	/* allocate and initialise rte_ring. */
 
 	n = rte_align32pow2(num);
-	sz =  sizeof(*r) + n * sizeof(r->ring[0]);
+	sz =  rte_ring_get_memsize(n);
 
 	r = calloc(1, sz);
 	if (r == NULL) {

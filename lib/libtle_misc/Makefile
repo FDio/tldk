@@ -1,4 +1,4 @@
-# Copyright (c) 2016 Intel Corporation.
+# Copyright (c) 2017 Intel Corporation.
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at:
@@ -15,15 +15,21 @@ ifeq ($(RTE_SDK),)
 $(error "Please define RTE_SDK environment variable")
 endif
 
-ifeq ($(TLDK_ROOT),)
-$(error "Please define TLDK_SDK environment variable")
-endif
+# Default target, can be overwritten by command line or environment
+RTE_TARGET ?= x86_64-native-linuxapp-gcc
 
 include $(RTE_SDK)/mk/rte.vars.mk
 
-DIRS-y += libtle_misc
-DIRS-y += libtle_dring
-DIRS-y += libtle_timer
-DIRS-y += libtle_l4p
+# library name
+LIB = libtle_misc.a
 
-include $(TLDK_ROOT)/mk/tle.subdir.mk
+CFLAGS += -O3
+CFLAGS += $(WERROR_FLAGS) -I$(SRCDIR)
+
+EXPORT_MAP := tle_misc_version.map
+
+LIBABIVER := 1
+
+SYMLINK-y-include += tle_dpdk_wrapper.h
+
+include $(TLDK_ROOT)/mk/tle.lib.mk

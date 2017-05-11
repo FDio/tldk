@@ -230,7 +230,7 @@ _ofodb_enqueue(struct rte_ring *r, const struct ofodb *db, union seqlen *sl)
 
 	num = db->nb_elem;
 	sl->raw = db->sl.raw;
-	n = rte_ring_enqueue_burst(r, (void * const *)db->obj, num);
+	n = _rte_ring_enqueue_burst(r, (void * const *)db->obj, num);
 
 	sl->len -= tcp_mbuf_seq_free(db->obj + n, num - n);
 	return num - n;

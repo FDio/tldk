@@ -80,7 +80,7 @@ rx_ino_enqueue(struct tle_tcp_stream *s, union seqlen *sl,
 {
 	uint32_t i, n;
 
-	n = rte_ring_enqueue_burst(s->rx.q, (void * const *)mb, num);
+	n = _rte_ring_enqueue_burst(s->rx.q, (void * const *)mb, num);
 
 	/* error: can'queue some packets into receive buffer. */
 	for (i = n; i != num; i++)

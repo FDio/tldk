@@ -97,7 +97,7 @@ rx_stream(struct tle_udp_stream *s, void *mb[], struct rte_mbuf *rp[],
 {
 	uint32_t i, k, r;
 
-	r = rte_ring_enqueue_burst(s->rx.q, mb, num);
+	r = _rte_ring_enqueue_burst(s->rx.q, mb, num);
 
 	/* if RX queue was empty invoke user RX notification callback. */
 	if (s->rx.cb.func != NULL && r != 0 && rte_ring_count(s->rx.q) == r)
@@ -223,7 +223,7 @@ stream_drb_release(struct tle_udp_stream *s, struct tle_drb *drb[],
 	uint32_t n;
 
 	n = rte_ring_count(s->tx.drb.r);
-	rte_ring_enqueue_burst(s->tx.drb.r, (void **)drb, nb_drb);
+	_rte_ring_enqueue_burst(s->tx.drb.r, (void **)drb, nb_drb);
 
 	/* If stream is still open, then mark it as avaialble for writing. */
 	if (rwl_try_acquire(&s->tx.use) > 0) {
@@ -310,7 +310,7 @@ tle_udp_stream_recv(struct tle_stream *us, struct rte_mbuf *pkt[], uint16_t num)
 	struct tle_udp_stream *s;
 
 	s = UDP_STREAM(us);
-	n = rte_ring_mc_dequeue_burst(s->rx.q, (void **)pkt, num);
+	n = _rte_ring_mc_dequeue_burst(s->rx.q, (void **)pkt, num);
 	if (n == 0)
 		return 0;
 
@@ -451,14 +451,14 @@ static inline void
 stream_drb_free(struct tle_udp_stream *s, struct tle_drb *drbs[],
 	uint32_t nb_drb)
 {
-	rte_ring_enqueue_burst(s->tx.drb.r, (void **)drbs, nb_drb);
+	_rte_ring_enqueue_burst(s->tx.drb.r, (void **)drbs, nb_drb);
 }
 
 static inline uint32_t
 stream_drb_alloc(struct tle_udp_stream *s, struct tle_drb *drbs[],
 	uint32_t nb_drb)
 {
-	return rte_ring_dequeue_burst(s->tx.drb.r, (void **)drbs, nb_drb);
+	return _rte_ring_dequeue_burst(s->tx.drb.r, (void **)drbs, nb_drb);
 }
 
 /* enqueue up to num packets to the destination device queue. */

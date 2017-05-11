@@ -27,15 +27,15 @@ tcp_txq_get_nxt_objs(const struct tle_tcp_stream *s, uint32_t *num)
 	struct rte_ring *r;
 
 	r = s->tx.q;
-	sz = r->prod.size;
-	mask = r->prod.mask;
+	sz = _rte_ring_get_size(r);
+	mask = _rte_ring_get_mask(r);
 	head = r->cons.head & mask;
 	tail = r->prod.tail & mask;
 
 	cnt = (tail >= head) ? tail - head : sz - head;
 
 	*num = cnt;
-	return (struct rte_mbuf **)(r->ring + head);
+	return (struct rte_mbuf **)(_rte_ring_get_data(r) + head);
 }
 
 static inline struct rte_mbuf **
@@ -45,15 +45,15 @@ tcp_txq_get_una_objs(const struct tle_tcp_stream *s, uint32_t *num)
 	struct rte_ring *r;
 
 	r = s->tx.q;
-	sz = r->prod.size;
-	mask = r->prod.mask;
+	sz = _rte_ring_get_size(r);
+	mask = _rte_ring_get_mask(r);
 	head = r->prod.tail & mask;
 	tail = r->cons.tail & mask;
 
 	cnt = (head >= tail) ? head - tail : sz - tail;
 
 	*num = cnt;
-	return (struct rte_mbuf **)(r->ring + tail);
+	return (struct rte_mbuf **)(_rte_ring_get_data(r) + tail);
 }
 
 static inline void
@@ -90,7 +90,7 @@ tcp_txq_nxt_cnt(struct tle_tcp_stream *s)
 	struct rte_ring *r;
 
 	r = s->tx.q;
-	return (r->prod.tail - r->cons.head) & r->prod.mask;
+	return (r->prod.tail - r->cons.head) & _rte_ring_get_mask(r);
 }
 
 static inline void
@@ -101,7 +101,7 @@ txs_enqueue(struct tle_ctx *ctx, struct tle_tcp_stream *s)
 
 	if (rte_atomic32_add_return(&s->tx.arm, 1) == 1) {
 		r = CTX_TCP_TSQ(ctx);
-		n = rte_ring_enqueue_burst(r, (void * const *)&s, 1);
+		n = _rte_ring_enqueue_burst(r, (void * const *)&s, 1);
 		RTE_VERIFY(n == 1);
 	}
 }
@@ -112,7 +112,7 @@ txs_dequeue_bulk(struct tle_ctx *ctx, struct tle_tcp_stream *s[], uint32_t num)
 	struct rte_ring *r;
 
 	r = CTX_TCP_TSQ(ctx);
-	return rte_ring_dequeue_burst(r, (void **)s, num);
+	return _rte_ring_dequeue_burst(r, (void **)s, num);
 }
 
 #ifdef __cplusplus

@@ -28,7 +28,6 @@
 #include "tcp_ofo.h"
 #include "tcp_txq.h"
 
-
 static void
 unuse_stream(struct tle_tcp_stream *s)
 {
@@ -81,7 +80,7 @@ alloc_ring(uint32_t n, uint32_t flags, int32_t socket)
 	char name[RTE_RING_NAMESIZE];
 
 	n = rte_align32pow2(n);
-	sz = sizeof(*r) + n * sizeof(r->ring[0]);
+	sz =  rte_ring_get_memsize(n);
 
 	r = rte_zmalloc_socket(NULL, sz, RTE_CACHE_LINE_SIZE, socket);
 	if (r == NULL) {
@@ -127,7 +126,7 @@ init_stream(struct tle_ctx *ctx, struct tle_tcp_stream *s)
 	n = rte_align32pow2(k);
 
 	/* size of the drbs ring */
-	rsz = sizeof(*s->tx.drb.r) + n * sizeof(s->tx.drb.r->ring[0]);
+	rsz = rte_ring_get_memsize(n);
 	rsz = RTE_ALIGN_CEIL(rsz, RTE_CACHE_LINE_SIZE);
 
 	/* size of the drb. */
@@ -174,7 +173,7 @@ tcp_free_drbs(struct tle_stream *s, struct tle_drb *drb[], uint32_t nb_drb)
 	struct tle_tcp_stream *us;
 
 	us = (struct tle_tcp_stream *)s;
-	rte_ring_enqueue_burst(us->tx.drb.r, (void **)drb, nb_drb);
+	_rte_ring_enqueue_burst(us->tx.drb.r, (void **)drb, nb_drb);
 }
 
 static struct tle_timer_wheel *

@@ -16,6 +16,8 @@
 #ifndef _MISC_H_
 #define _MISC_H_
 
+#include <tle_dpdk_wrapper.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -402,7 +404,7 @@ empty_mbuf_ring(struct rte_ring *r)
 	struct rte_mbuf *mb[MAX_PKT_BURST];
 
 	do {
-		n = rte_ring_dequeue_burst(r, (void **)mb, RTE_DIM(mb));
+		n = _rte_ring_dequeue_burst(r, (void **)mb, RTE_DIM(mb));
 		for (i = 0; i != n; i++)
 			rte_pktmbuf_free(mb[i]);
 	} while (n != 0);
