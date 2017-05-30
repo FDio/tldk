@@ -199,6 +199,9 @@ netfe_lcore_init_tcp(const struct netfe_lcore_prm *prm)
 		} else if (prm->stream[i].op == TXONLY) {
 			fes->txlen = prm->stream[i].txlen;
 			fes->raddr = prm->stream[i].sprm.remote_addr;
+		} else if (prm->stream[i].op == RXTX) {
+			fes->txlen = prm->stream[i].txlen;
+			fes->rxlen = prm->stream[i].rxlen;
 		}
 
 		if (becfg.server == 1) {
@@ -348,6 +351,7 @@ netfe_new_conn_tcp(struct netfe_lcore *fe, uint32_t lcore,
 		ts->proto = fes->proto;
 		ts->family = fes->family;
 		ts->txlen = fes->txlen;
+		ts->rxlen = fes->rxlen;
 
 		tle_event_active(ts->erev, TLE_SEV_DOWN);
 		if (fes->op == TXONLY || fes->op == FWD) {
@@ -516,7 +520,12 @@ netfe_rxtx_process_tcp(__rte_unused uint32_t lcore, struct netfe_stream *fes)
 	if (k == 0)
 		return 0;
 
-	if (n == RTE_DIM(fes->pbuf.pkt)) {
+	/* Mark stream for reading if:
+	 * ECHO: Buffer full
+	 * RXTX: All outbound packets successfully dispatched
+	 */
+	if ((fes->op == ECHO && n == RTE_DIM(fes->pbuf.pkt)) ||
+			(fes->op == RXTX && n - k == 0)) {
 		/* mark stream as readable */
 		tle_event_active(fes->rxev, TLE_SEV_UP);
 		fes->stat.rxev[TLE_SEV_UP]++;
@@ -608,12 +617,14 @@ netfe_lcore_tcp(void)
 
 			rc = 0;
 
-			if (fs[j]->op == RXTX)
+			if (fs[j]->op == ECHO)
 				rc = netfe_rxtx_process_tcp(lcore, fs[j]);
 			else if (fs[j]->op == FWD)
 				rc = netfe_fwd_tcp(lcore, fs[j]);
 			else if (fs[j]->op == TXONLY)
 				rc = netfe_tx_process_tcp(lcore, fs[j]);
+			else if (fs[j]->op == RXTX)
+				rc = netfe_rxtx_process_tcp(lcore, fs[j]);
 
 			/* we are ok to close the stream */
 			if (rc == 0 && fs[j]->posterr != 0)

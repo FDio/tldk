@@ -510,7 +510,7 @@ netfe_lcore_udp(void)
 		NETFE_TRACE("%s(%u): tle_evq_get(txevq=%p) returns %u\n",
 			__func__, lcore, fe->txeq, n);
 		for (j = 0; j != n; j++) {
-			if (fs[j]->op == RXTX)
+			if (fs[j]->op == ECHO)
 				netfe_rxtx_process_udp(lcore, fs[j]);
 			else if (fs[j]->op == FWD)
 				netfe_fwd_udp(lcore, fs[j]);
