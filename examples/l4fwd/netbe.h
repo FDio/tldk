@@ -44,6 +44,8 @@
 #include <tle_udp.h>
 #include <tle_event.h>
 
+#define TLE_DEFAULT_MSS 536
+
 #define	MAX_PKT_BURST	0x20
 
 /* Used to allocate the memory for hash key. */
@@ -161,6 +163,7 @@ enum {
 	RXONLY,
 	TXONLY,
 	RXTX,
+	ECHO,
 	FWD,
 };
 
@@ -175,7 +178,8 @@ struct netfe_stream_prm {
 	uint32_t belcore;
 	uint16_t line;
 	uint16_t op;
-	uint16_t txlen; /* valid/used only for TXONLY op. */
+	uint32_t txlen; /* valid/used only for TXONLY op. */
+	uint32_t rxlen; /* Used by RXTX */
 	struct netfe_sprm sprm;
 	struct netfe_sprm fprm;  /* valid/used only for FWD op. */
 };
@@ -194,7 +198,10 @@ struct netfe_stream {
 	uint16_t op;
 	uint16_t proto;
 	uint16_t family;
-	uint16_t txlen;
+	uint32_t txlen;
+	uint32_t rxlen;
+	uint16_t reply_count;
+	uint32_t rx_run_len;
 	uint16_t posterr; /* # of time error event handling was postponed */
 	struct {
 		uint64_t rxp;
