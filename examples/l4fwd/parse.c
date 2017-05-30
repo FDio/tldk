@@ -27,7 +27,8 @@ static const struct {
 } name2feop[] = {
 	{ .name = "rx", .op = RXONLY,},
 	{ .name = "tx", .op = TXONLY,},
-	{ .name = "echo", .op = RXTX,},
+	{ .name = "echo", .op = ECHO,},
+	{ .name = "rxtx", .op = RXTX,},
 	{ .name = "fwd", .op = FWD,},
 };
 
@@ -520,6 +521,7 @@ parse_netfe_arg(struct netfe_stream_prm *sp, const char *arg)
 		"fwraddr",
 		"fwrport",
 		"belcore",
+		"rxlen",
 	};
 
 	static const arg_handler_t hndl[] = {
@@ -533,6 +535,7 @@ parse_netfe_arg(struct netfe_stream_prm *sp, const char *arg)
 		parse_ip_val,
 		parse_uint_val,
 		parse_ip_val,
+		parse_uint_val,
 		parse_uint_val,
 		parse_uint_val,
 	};
@@ -553,6 +556,7 @@ parse_netfe_arg(struct netfe_stream_prm *sp, const char *arg)
 	pv2saddr(&sp->fprm.local_addr, val + 7, val + 8);
 	pv2saddr(&sp->fprm.remote_addr, val + 9, val + 10);
 	sp->belcore = val[11].u64;
+	sp->rxlen = val[12].u64;
 
 	return 0;
 }
@@ -629,6 +633,18 @@ check_netfe_arg(const struct netfe_stream_prm *sp)
 				format_addr(&sp->fprm.remote_addr,
 				buf, sizeof(buf)),
 				format_feop(sp->op));
+			return -EINVAL;
+		}
+	} else if (sp->op == RXTX) {
+		/* RXTX: Check tx pkt size */
+		if (sp->txlen == 0) {
+			RTE_LOG(ERR, USER1, "invalid arg at line %u: "
+				"txlen cannot be zero.\n", sp->line);
+			return -EINVAL;
+		}
+		if (sp->rxlen == 0) {
+			RTE_LOG(ERR, USER1, "invalid arg at line %u: "
+				"rxlen cannot be zero.\n", sp->line);
 			return -EINVAL;
 		}
 	}
