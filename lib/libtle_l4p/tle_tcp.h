@@ -362,6 +362,15 @@ uint16_t tle_tcp_tx_bulk(struct tle_dev *dev, struct rte_mbuf *pkt[],
  */
 int tle_tcp_process(struct tle_ctx *ctx, uint32_t num);
 
+/**
+ * Get current TCP maximum segment size
+ * @param stream
+ *   Stream to get MSS from.
+ * @return
+ *   Maximum segment size in bytes
+ */
+uint32_t tle_tcp_stream_get_mss(struct tle_stream *stream);
+
 #ifdef __cplusplus
 }
 #endif
