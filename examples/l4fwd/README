@@ -55,10 +55,10 @@
 
    FE configuration record format:
 
-   lcore=<uint>,op=<"rx|tx|echo|fwd">,\
+   lcore=<uint>,op=<"rx|tx|echo|fwd|rxtx">,\
    laddr=<ip>,lport=<uint16>,raddr=<ip>,rport=<uint16>,\
    [txlen=<uint>,fwladdr=<ip>,fwlport=<uint16>,fwraddr=<ip>,fwrport=<uint16>,\
-   belcore=<uint>]
+   belcore=<uint>,rxlen=<uint>]
 
    lcore -   EAL lcore to manage that stream(s) in the FE. It is an mandatory
              option.
@@ -70,12 +70,15 @@
              "echo" - mimic recvfrom(..., &addr);sendto(..., &addr);
              on that stream.
              "fwd" - forward packets between streams.
+             "rxtx" - Receive/reply transactions on stream.
              It is an mandatory option.
    laddr -   local address for the stream to open. It is an mandatory option.
    lport -   local port for the stream to open. It is an mandatory option.
    raddr -   remote address for the stream to open. It is an mandatory option.
    rport -   remote port for the stream to open. It is an mandatory option.
-   txlen -   data length sending in each packet (mandatory for "tx" mode only).
+   txlen -   data length sending in each packet.
+             (mandatory for "tx" & "rxtx" modes only).
+   rxlen -   Expected response length (mandatory for "rxtx" mode only).
    fwladdr - local address for the forwarding stream(s) to open
              (mandatory for "fwd" mode only).
    fwlport - local port for the forwarding stream(s) to open

@@ -620,9 +620,78 @@ netbe_lcore(void)
 }
 
 static inline int
-netfe_rx_process(__rte_unused uint32_t lcore, struct netfe_stream *fes)
+netfe_rxtx_get_mss(struct netfe_stream *fes)
+{
+	switch (fes->proto) {
+	case TLE_PROTO_TCP:
+		return tle_tcp_stream_get_mss(fes->s);
+
+	case TLE_PROTO_UDP:
+		/* The UDP code doesn't have MSS discovery, so have to
+		 * assume arbitary MTU. Going to use default mbuf
+		 * data space as TLDK uses this internally as a
+		 * maximum segment size.
+		 */
+		return RTE_MBUF_DEFAULT_DATAROOM - TLE_DST_MAX_HDR;
+	default:
+		NETFE_TRACE("%s(%u): Unhandled MSS query (family=%i)\n",
+			__func__, lcore, fes->proto, fes->family);
+		return -EINVAL;
+	}
+}
+
+static inline int
+netfe_rxtx_dispatch_reply(uint32_t lcore, struct netfe_stream *fes)
+
+{
+	struct pkt_buf *pb;
+	int32_t sid;
+	int32_t cnt_mtu_pkts;
+	int32_t cnt_all_pkts;
+	int32_t idx_pkt;
+	int32_t len_tail;
+	int32_t mtu;
+
+	pb = &fes->pbuf;
+	sid = rte_lcore_to_socket_id(lcore) + 1;
+	mtu = netfe_rxtx_get_mss(fes);
+
+	cnt_mtu_pkts = (fes->txlen / mtu);
+	cnt_all_pkts = cnt_mtu_pkts;
+	len_tail = fes->txlen - (mtu * cnt_mtu_pkts);
+
+	if (len_tail > 0)
+		cnt_all_pkts++;
+
+	if (pb->num + cnt_all_pkts >= RTE_DIM(pb->pkt)) {
+		NETFE_TRACE("%s(%u): Insufficent space for outbound burst\n",
+			__func__, lcore);
+		return -ENOMEM;
+	}
+	if (rte_pktmbuf_alloc_bulk(mpool[sid], &pb->pkt[pb->num], cnt_all_pkts)
+			!= 0) {
+		NETFE_TRACE("%s(%u): rte_pktmbuf_alloc_bulk() failed\n",
+			__func__, lcore);
+		return -ENOMEM;
+	}
+
+	/* Full MTU packets */
+	for (idx_pkt = 0; idx_pkt < cnt_mtu_pkts; idx_pkt++) {
+		rte_pktmbuf_append(pb->pkt[pb->num++], mtu);
+	}
+
+	/* Last non-MTU packet, if any */
+	if (len_tail > 0)
+		rte_pktmbuf_append(pb->pkt[pb->num++], len_tail);
+
+	return 0;
+}
+
+static inline int
+netfe_rx_process(uint32_t lcore, struct netfe_stream *fes)
 {
 	uint32_t k, n;
+	uint64_t count_bytes;
 
 	n = fes->pbuf.num;
 	k = RTE_DIM(fes->pbuf.pkt) - n;
@@ -647,9 +716,32 @@ netfe_rx_process(__rte_unused uint32_t lcore, struct netfe_stream *fes)
 	/* free all received mbufs. */
 	if (fes->op == RXONLY)
 		fes->stat.rxb += pkt_buf_empty(&fes->pbuf);
+	else if (fes->op == RXTX) {
+		/* RXTX mode. Count incoming bytes then discard.
+		 * If receive threshold (rxlen) exceeded, send out a packet.
+		 */
+		count_bytes = pkt_buf_empty(&fes->pbuf);
+		fes->stat.rxb += count_bytes;
+		fes->rx_run_len += count_bytes;
+		if (fes->rx_run_len >= fes->rxlen) {
+			/* Idle Rx as buffer needed for Tx */
+			tle_event_idle(fes->rxev);
+			fes->stat.rxev[TLE_SEV_IDLE]++;
+
+			/* Discard surplus bytes. For now pipelining of
+			 * requests is not supported.
+			 */
+			fes->rx_run_len = 0;
+			netfe_rxtx_dispatch_reply(lcore, fes);
+
+			/* Kick off a Tx event */
+			tle_event_active(fes->txev, TLE_SEV_UP);
+			fes->stat.txev[TLE_SEV_UP]++;
+		}
+	}
 	/* mark stream as writable */
 	else if (k == RTE_DIM(fes->pbuf.pkt)) {
-		if (fes->op == RXTX) {
+		if (fes->op == ECHO) {
 			tle_event_active(fes->txev, TLE_SEV_UP);
 			fes->stat.txev[TLE_SEV_UP]++;
 		} else if (fes->op == FWD) {

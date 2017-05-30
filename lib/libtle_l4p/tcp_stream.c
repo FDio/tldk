@@ -604,3 +604,15 @@ tle_tcp_stream_update_cfg(struct tle_stream *ts[],
 
 	return i;
 }
+
+int
+tle_tcp_stream_get_mss(struct tle_stream * const stream)
+{
+	struct tle_tcp_stream *tcp;
+
+	if (stream == NULL)
+		return -EINVAL;
+
+	tcp = TCP_STREAM(stream);
+	return tcp->tcb.snd.mss;
+}
