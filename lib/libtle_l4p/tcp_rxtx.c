@@ -2417,11 +2417,12 @@ tle_tcp_process(struct tle_ctx *ctx, uint32_t num)
 	for (i = 0; i != k; i++) {
 
 		s = rs[i];
-		if (rwl_try_acquire(&s->tx.use) > 0 &&
-				rte_atomic32_read(&s->tx.arm) > 0) {
-			rte_atomic32_set(&s->tx.arm, 0);
+		rte_atomic32_set(&s->tx.arm, 0);
+
+		if (rwl_try_acquire(&s->tx.use) > 0)
 			tx_stream(s, tms);
-		}
+		else
+			txs_enqueue(s->s.ctx, s);
 		rwl_release(&s->tx.use);
 	}
 
