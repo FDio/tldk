@@ -55,8 +55,16 @@ calc_rx_wnd(const struct tle_tcp_stream *s, uint32_t scale)
 		return  _rte_ring_get_mask(s->rx.q) << scale;
 }
 
+/* empty stream's send queue */
+static inline void
+empty_tq(struct tle_tcp_stream *s)
+{
+	s->tx.q->cons.head = s->tx.q->cons.tail;
+	empty_mbuf_ring(s->tx.q);
+}
+
 /* empty stream's receive queue */
-static void
+static inline void
 empty_rq(struct tle_tcp_stream *s)
 {
 	empty_mbuf_ring(s->rx.q);
@@ -64,7 +72,7 @@ empty_rq(struct tle_tcp_stream *s)
 }
 
 /* empty stream's listen queue */
-static void
+static inline void
 empty_lq(struct tle_tcp_stream *s, struct stbl *st)
 {
 	uint32_t i, n;
@@ -117,7 +125,7 @@ tcp_stream_reset(struct tle_ctx *ctx, struct tle_tcp_stream *s)
 	}
 
 	/* empty TX queue */
-	empty_mbuf_ring(s->tx.q);
+	empty_tq(s);
 
 	/*
 	 * mark the stream as free again.

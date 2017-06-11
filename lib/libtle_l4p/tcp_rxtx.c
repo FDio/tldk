@@ -1080,8 +1080,17 @@ rx_fin(struct tle_tcp_stream *s, uint32_t state,
 			return -ENOBUFS;
 	}
 
-	/* process ack here */
-	rx_ackdata(s, si->ack);
+	/*
+	 * fast-path: all data & FIN was already sent out
+	 * and now is acknowledged.
+	 */
+	if (s->tcb.snd.fss == s->tcb.snd.nxt &&
+			si->ack == (uint32_t)s->tcb.snd.nxt) {
+		s->tcb.snd.una = s->tcb.snd.fss;
+		empty_tq(s);
+	/* conventional ACK processiing */
+	} else
+		rx_ackdata(s, si->ack);
 
 	/* some fragments still missing */
 	if (seq + plen != s->tcb.rcv.nxt) {
@@ -1470,7 +1479,7 @@ rx_ackfin(struct tle_tcp_stream *s)
 	uint32_t state;
 
 	s->tcb.snd.una = s->tcb.snd.fss;
-	empty_mbuf_ring(s->tx.q);
+	empty_tq(s);
 
 	state = s->tcb.state;
 	if (state == TCP_ST_LAST_ACK)
@@ -1656,7 +1665,7 @@ rx_stream(struct tle_tcp_stream *s, uint32_t ts,
 		 * and now is acknowledged.
 		 */
 		if (s->tcb.snd.fss == s->tcb.snd.nxt &&
-				tack.ack == (uint32_t) s->tcb.snd.nxt)
+				tack.ack == (uint32_t)s->tcb.snd.nxt)
 			rx_ackfin(s);
 		else
 			rx_process_ack(s, ts, &tack);
