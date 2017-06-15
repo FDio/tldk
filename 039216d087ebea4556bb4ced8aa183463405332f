@@ -16,6 +16,24 @@
       "revId": "039216d087ebea4556bb4ced8aa183463405332f",
       "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "fa5d592f_e6c73711",
+        "filename": "lib/libtle_l4p/tcp_stream.c",
+        "patchSetId": 3
+      },
+      "lineNbr": 609,
+      "author": {
+        "id": 867
+      },
+      "writtenOn": "2017-06-15T12:17:55Z",
+      "side": 1,
+      "message": "ah - you meant const pointer rather than pointer to const. Probably ought to be both..",
+      "parentUuid": "fa5d592f_e6b617dc",
+      "revId": "039216d087ebea4556bb4ced8aa183463405332f",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
     }
   ]
 }
