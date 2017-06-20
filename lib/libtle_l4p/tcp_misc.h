@@ -193,7 +193,7 @@ struct resp_info {
 /* window update information (RFC 793 WL1, WL2) */
 union wui {
 	uint64_t raw;
-	union {
+	struct {
 		uint32_t wl1;
 		uint32_t wl2;
 	};
