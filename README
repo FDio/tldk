@@ -55,7 +55,7 @@
 
    cd tldk
    make all
-   ./x86_64-native-linuxapp-gcc/app/l4fwd ...
+   ./x86_64-native-linuxapp-gcc/app/l4fwd ... 
 
 3. CONTENTS
 
