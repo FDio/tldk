@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016  Intel Corporation.
+ * Copyright (c) 2016-2017  Intel Corporation.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at:
@@ -30,15 +30,63 @@ extern "C" {
 static inline void
 tcp_stream_down(struct tle_tcp_stream *s)
 {
-	rwl_down(&s->rx.use);
-	rwl_down(&s->tx.use);
+	if ((s->flags & TLE_CTX_FLAG_ST) == 0)
+		rwl_down(&s->use);
+	else
+		rte_atomic32_set(&s->use, INT32_MIN);
 }
 
 static inline void
 tcp_stream_up(struct tle_tcp_stream *s)
 {
-	rwl_up(&s->rx.use);
-	rwl_up(&s->tx.use);
+	int32_t v;
+
+	if ((s->flags & TLE_CTX_FLAG_ST) == 0)
+		rwl_up(&s->use);
+	else {
+		v = rte_atomic32_read(&s->use) - INT32_MIN;
+		rte_atomic32_set(&s->use, v);
+	}
+}
+
+static inline int
+tcp_stream_try_acquire(struct tle_tcp_stream *s)
+{
+	int32_t v;
+
+	if ((s->flags & TLE_CTX_FLAG_ST) == 0)
+		return rwl_try_acquire(&s->use);
+
+	v = rte_atomic32_read(&s->use) + 1;
+	rte_atomic32_set(&s->use, v);
+	return v;
+}
+
+static inline void
+tcp_stream_release(struct tle_tcp_stream *s)
+{
+	int32_t v;
+
+	if ((s->flags & TLE_CTX_FLAG_ST) == 0)
+		rwl_release(&s->use);
+	else {
+		v = rte_atomic32_read(&s->use) - 1;
+		rte_atomic32_set(&s->use, v);
+	}
+}
+
+static inline int
+tcp_stream_acquire(struct tle_tcp_stream *s)
+{
+	int32_t v;
+
+	if ((s->flags & TLE_CTX_FLAG_ST) == 0)
+		return rwl_acquire(&s->use);
+
+	v = rte_atomic32_read(&s->use) + 1;
+	if (v > 0)
+		rte_atomic32_set(&s->use, v);
+	return v;
 }
 
 /* calculate RCV.WND value based on size of stream receive buffer */
@@ -67,28 +115,28 @@ empty_tq(struct tle_tcp_stream *s)
 static inline void
 empty_rq(struct tle_tcp_stream *s)
 {
-	empty_mbuf_ring(s->rx.q);
+	uint32_t n;
+	struct rte_mbuf *mb[MAX_PKT_BURST];
+
+	do {
+		n = _rte_ring_mcs_dequeue_burst(s->rx.q, (void **)mb,
+			RTE_DIM(mb));
+		free_mbufs(mb, n);
+	} while (n != 0);
+
 	tcp_ofo_reset(s->rx.ofo);
 }
 
 /* empty stream's listen queue */
 static inline void
-empty_lq(struct tle_tcp_stream *s, struct stbl *st)
+empty_lq(struct tle_tcp_stream *s)
 {
-	uint32_t i, n;
-	struct rte_mbuf *mb;
-	union pkt_info pi;
-	union seg_info si;
-	struct stbl_entry *se[MAX_PKT_BURST];
+	uint32_t n;
+	struct tle_stream *ts[MAX_PKT_BURST];
 
 	do {
-		n = _rte_ring_dequeue_burst(s->rx.q, (void **)se, RTE_DIM(se));
-		for (i = 0; i != n; i++) {
-			mb = stbl_get_pkt(se[i]);
-			get_pkt_info(mb, &pi, &si);
-			stbl_del_pkt_lock(st, se[i], &pi);
-			rte_pktmbuf_free(mb);
-		}
+		n = _rte_ring_dequeue_burst(s->rx.q, (void **)ts, RTE_DIM(ts));
+		tle_tcp_stream_close_bulk(ts, n);
 	} while (n != 0);
 }
 
@@ -114,12 +162,13 @@ tcp_stream_reset(struct tle_ctx *ctx, struct tle_tcp_stream *s)
 		/* free stream's destination port */
 		stream_clear_ctx(ctx, &s->s);
 		if (uop == TCP_OP_LISTEN)
-			empty_lq(s, st);
+			empty_lq(s);
 	}
 
 	if (s->ste != NULL) {
 		/* remove entry from RX streams table */
-		stbl_del_stream_lock(st, s->ste, s);
+		stbl_del_stream(st, s->ste, s,
+			(s->flags & TLE_CTX_FLAG_ST) == 0);
 		s->ste = NULL;
 		empty_rq(s);
 	}

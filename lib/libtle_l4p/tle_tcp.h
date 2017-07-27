@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016  Intel Corporation.
+ * Copyright (c) 2016-2017  Intel Corporation.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at:
@@ -118,6 +118,16 @@ tle_tcp_stream_close_bulk(struct tle_stream *ts[], uint32_t num);
 int
 tle_tcp_stream_get_addr(const struct tle_stream *s,
 	struct tle_tcp_stream_addr *addr);
+
+/**
+ * Get current TCP maximum segment size
+ * @param ts
+ *   Stream to retrieve MSS information from.
+ * @return
+ *   Maximum segment size in bytes, if successful.
+ *   Negative on failure.
+ */
+int tle_tcp_stream_get_mss(const struct tle_stream *ts);
 
 /**
  * Client mode connect API.
@@ -258,6 +268,28 @@ uint16_t tle_tcp_stream_recv(struct tle_stream *s, struct rte_mbuf *pkt[],
 	uint16_t num);
 
 /**
+ * Reads iovcnt buffers from the for given TCP stream.
+ * Note that the stream has to be in connected state.
+ * Data ordering is preserved.
+ * Buffers are processed in array order.
+ * This means that the function will comppletely fill iov[0]
+ * before proceeding to iov[1], and so on.
+ * If there is insufficient data, then not all buffers pointed to by iov
+ * may be filled.
+ * @param ts
+ *   TCP stream to receive data from.
+ * @param iov
+ *   Points to an array of iovec structures.
+ * @param iovcnt
+ *   Number of elements in the *iov* array.
+ * @return
+ *   On success, number of bytes read in the stream receive buffer.
+ *   In case of error, returns -1 and error code will be set in rte_errno.
+ */
+ssize_t tle_tcp_stream_readv(struct tle_stream *ts, const struct iovec *iov,
+	int iovcnt);
+
+/**
  * Consume and queue up to *num* packets, that will be sent eventually
  * by tle_tcp_tx_bulk().
  * Note that the stream has to be in connected state.
@@ -281,12 +313,38 @@ uint16_t tle_tcp_stream_recv(struct tle_stream *s, struct rte_mbuf *pkt[],
  *   number of packets successfully queued in the stream send buffer.
  *   In case of error, error code can be set in rte_errno.
  *   Possible rte_errno errors include:
- *   - EAGAIN - operation can be perfomed right now
+ *   - EAGAIN - operation can't be perfomed right now
  *              (most likely close() was perfomed on that stream allready).
  *   - ENOTCONN - the stream is not connected.
  */
 uint16_t tle_tcp_stream_send(struct tle_stream *s, struct rte_mbuf *pkt[],
 	uint16_t num);
+
+/**
+ * Writes iovcnt buffers of data described by iov to the for given TCP stream.
+ * Note that the stream has to be in connected state.
+ * Data ordering is preserved.
+ * Buffers are processed in array order.
+ * This means that the function will write out the entire contents of iov[0]
+ * before proceeding to iov[1], and so on.
+ * If there is insufficient space in stream send buffer,
+ * then not all buffers pointed to by iov may be written out.
+ * @param ts
+ *   TCP stream to send data to.
+ * @param iov
+ *   Points to an array of iovec structures.
+ * @param iovcnt
+ *   Number of elements in the *iov* array.
+ * @return
+ *   On success, number of bytes written to the stream send buffer.
+ *   In case of error, returns -1 and error code will be set in rte_errno.
+ *   - EAGAIN - operation can't be perfomed right now
+ *              (most likely close() was perfomed on that stream allready).
+ *   - ENOTCONN - the stream is not connected.
+ *   - ENOMEM - not enough internal buffer (mbuf) to store user provided data.
+ */
+ssize_t tle_tcp_stream_writev(struct tle_stream *ts, struct rte_mempool *mp,
+	const struct iovec *iov, int iovcnt);
 
 /**
  * Back End (BE) API.
@@ -361,16 +419,6 @@ uint16_t tle_tcp_tx_bulk(struct tle_dev *dev, struct rte_mbuf *pkt[],
  * @return
  */
 int tle_tcp_process(struct tle_ctx *ctx, uint32_t num);
-
-/**
- * Get current TCP maximum segment size
- * @param stream
- *   Stream to get MSS from.
- * @return
- *   Maximum segment size in bytes, if successful.
- *   Negative on failure.
- */
-int tle_tcp_stream_get_mss(const struct tle_stream * const stream);
 
 #ifdef __cplusplus
 }

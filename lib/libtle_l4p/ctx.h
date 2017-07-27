@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016  Intel Corporation.
+ * Copyright (c) 2016-2017  Intel Corporation.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at:
@@ -53,6 +53,7 @@ struct tle_dev {
 
 struct tle_ctx {
 	struct tle_ctx_param prm;
+	uint32_t cycles_ms_shift;  /* to convert from cycles to ms */
 	struct {
 		rte_spinlock_t lock;
 		uint32_t nb_free; /* number of free streams. */

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016  Intel Corporation.
+ * Copyright (c) 2016-2017  Intel Corporation.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at:
@@ -19,7 +19,7 @@ TEST_F(dring, test_dring_st)
 {
 	printf("%s started;\n", __func__);
 
-	tle_dring_reset(&dr);
+	tle_dring_reset(&dr, 0);
 	r = init_drb_ring(OBJ_NUM);
 
 	ASSERT_NE(r, (void *) NULL) << "Out of memory";

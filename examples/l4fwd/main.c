@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016  Intel Corporation.
+ * Copyright (c) 2016-2017  Intel Corporation.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at:
@@ -209,6 +209,7 @@ main(int argc, char *argv[])
 			__func__, rc);
 
 	memset(&ctx_prm, 0, sizeof(ctx_prm));
+	ctx_prm.timewait = TLE_TCP_TIMEWAIT_DEFAULT;
 
 	signal(SIGINT, sig_handle);
 

@@ -57,6 +57,18 @@ _rte_ring_enqueue_burst(struct rte_ring *r, void * const *obj_table, uint32_t n)
 }
 
 static inline uint32_t
+_rte_ring_enqueue_bulk(struct rte_ring *r, void * const *obj_table, uint32_t n)
+{
+	uint32_t rc;
+
+	rc = rte_ring_enqueue_bulk(r, (void * const *)obj_table, n, NULL);
+	if (rc == n)
+		return 0;
+	else
+		return -ENOSPC;
+}
+
+static inline uint32_t
 _rte_ring_dequeue_burst(struct rte_ring *r, void **obj_table, uint32_t n)
 {
 	return rte_ring_dequeue_burst(r, (void **)obj_table, n, NULL);
@@ -78,6 +90,17 @@ static inline void **
 _rte_ring_get_data(struct rte_ring *r)
 {
 	return (void **)(&r[1]);
+}
+
+static inline void
+_rte_ring_dequeue_ptrs(struct rte_ring *r, void **obj_table, uint32_t num)
+{
+	uint32_t tail;
+	void **data;
+
+	tail = r->cons.tail;
+	data = _rte_ring_get_data(r);
+	DEQUEUE_PTRS(r, data, tail, obj_table, num, void *);
 }
 
 #else
@@ -109,6 +132,13 @@ _rte_ring_enqueue_burst(struct rte_ring *r, void * const *obj_table, uint32_t n)
 }
 
 static inline uint32_t
+_rte_ring_enqueue_bulk(struct rte_ring *r, void * const *obj_table,
+	uint32_t n)
+{
+	return rte_ring_enqueue_bulk(r, (void * const *)obj_table, n);
+}
+
+static inline uint32_t
 _rte_ring_dequeue_burst(struct rte_ring *r, void **obj_table, uint32_t n)
 {
 	return rte_ring_dequeue_burst(r, (void **)obj_table, n);
@@ -132,10 +162,91 @@ _rte_ring_get_data(struct rte_ring *r)
 	return (void **)r->ring;
 }
 
-#endif
+static inline void
+_rte_ring_dequeue_ptrs(struct rte_ring *r, void **obj_table, uint32_t num)
+{
+	uint32_t i, n;
+	uint32_t mask, cons_head;
+
+	n = num;
+	cons_head = r->cons.tail;
+	mask = _rte_ring_get_mask(r);
+
+	DEQUEUE_PTRS();
+}
+
+#endif /* RTE_VERSION >= RTE_VERSION_NUM(17, 5, 0, 0) */
+
+/*
+ * Serialized variation of DPDK rte_ring dequeue mechanism.
+ * At any given moment, only one consumer is allowed to dequeue
+ * objects from the ring.
+ */
+
+static inline __attribute__((always_inline)) uint32_t
+_rte_ring_mcs_dequeue_start(struct rte_ring *r, uint32_t num)
+{
+	uint32_t n, end, head, tail;
+	int32_t rc;
+
+	rc = 0;
+	do {
+		head = r->cons.head;
+		tail = r->cons.tail;
+		end = r->prod.tail;
+
+		if (head != tail) {
+			rte_pause();
+			continue;
+		}
+
+		n = end - head;
+		n = RTE_MIN(num, n);
+		if (n == 0)
+			return 0;
+
+		rc = rte_atomic32_cmpset(&r->cons.head, head, head + n);
+	} while (rc == 0);
+
+	return n;
+}
+
+static inline __attribute__((always_inline)) void
+_rte_ring_mcs_dequeue_finish(struct rte_ring *r, uint32_t num)
+{
+	uint32_t n, head, tail;
+
+	head = r->cons.head;
+	rte_smp_rmb();
+	tail = r->cons.tail;
+	n = head - tail;
+	RTE_ASSERT(n >= num);
+	RTE_SET_USED(n);
+	head = tail + num;
+	r->cons.head = head;
+	r->cons.tail = head;
+}
+
+static inline __attribute__((always_inline)) void
+_rte_ring_mcs_dequeue_abort(struct rte_ring *r)
+{
+	r->cons.head = r->cons.tail;
+}
+
+static inline uint32_t
+_rte_ring_mcs_dequeue_burst(struct rte_ring *r, void **obj_table, uint32_t num)
+{
+	uint32_t n;
+
+	n = _rte_ring_mcs_dequeue_start(r, num);
+	_rte_ring_dequeue_ptrs(r, obj_table, n);
+	_rte_ring_mcs_dequeue_finish(r, n);
+	return n;
+}
 
 #ifdef __cplusplus
 }
 #endif
+
 
 #endif /* TLE_DPDK_WRAPPER_H_ */

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016  Intel Corporation.
+ * Copyright (c) 2016-2017  Intel Corporation.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at:
@@ -376,7 +376,7 @@ test_dring_mt(int32_t master_enq_type, int32_t master_deq_type,
 	struct tle_dring dr;
 	struct dring_arg arg[RTE_MAX_LCORE];
 
-	tle_dring_reset(&dr);
+	tle_dring_reset(&dr, 0);
 	r = init_drb_ring(OBJ_NUM);
 	if (r == NULL)
 		return -ENOMEM;

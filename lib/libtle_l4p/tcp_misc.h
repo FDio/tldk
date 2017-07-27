@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016  Intel Corporation.
+ * Copyright (c) 2016-2017  Intel Corporation.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at:
@@ -54,6 +54,10 @@ extern "C" {
 
 #define TCP6_OP_MSS	(TCP6_NOP_MSS - TCP_TX_OPT_LEN_MAX)
 
+/* Initial Window Configuration parameter, probably will be configured during
+ * the startup in future */
+#define TCP_INITIAL_CWND_MAX 14600
+
 /*
  * TCP flags
  */
@@ -93,8 +97,8 @@ union seg_info {
 	struct {
 		uint32_t seq;
 		uint32_t ack;
-		uint16_t hole1;
 		uint16_t wnd;
+		uint16_t mss; /* valid only at SYN time */
 	};
 };
 
@@ -223,11 +227,10 @@ struct dack_info {
 
 /* get current timestamp in ms */
 static inline uint32_t
-tcp_get_tms(void)
+tcp_get_tms(uint32_t mshift)
 {
-	uint64_t ts, ms;
-	ms = (rte_get_tsc_hz() + MS_PER_S - 1) / MS_PER_S;
-	ts = rte_get_tsc_cycles() / ms;
+	uint64_t ts;
+	ts = rte_get_tsc_cycles() >> mshift;
 	return ts;
 }
 
@@ -248,8 +251,11 @@ static inline void
 get_seg_info(const struct tcp_hdr *th, union seg_info *si)
 {
 	__m128i v;
-	const  __m128i bswap_mask = _mm_set_epi8(15, 14, 13, 12, 10, 11, 9, 8,
-			4, 5, 6, 7, 0, 1, 2, 3);
+	const  __m128i bswap_mask =
+		_mm_set_epi8(UINT8_MAX, UINT8_MAX, UINT8_MAX, UINT8_MAX,
+			UINT8_MAX, UINT8_MAX, 10, 11,
+			4, 5, 6, 7,
+			0, 1, 2, 3);
 
 	v = _mm_loadu_si128((const __m128i *)&th->sent_seq);
 	si->raw.x = _mm_shuffle_epi8(v, bswap_mask);

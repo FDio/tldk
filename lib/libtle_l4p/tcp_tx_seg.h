@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016  Intel Corporation.
+ * Copyright (c) 2016-2017  Intel Corporation.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at:
@@ -19,15 +19,6 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-static inline void
-free_segments(struct rte_mbuf *mb[], uint32_t num)
-{
-	uint32_t i;
-
-	for (i = 0; i != num; i++)
-		rte_pktmbuf_free(mb[i]);
-}
 
 static inline int32_t
 tcp_segmentation(struct rte_mbuf *mbin, struct rte_mbuf *mbout[], uint16_t num,
@@ -53,7 +44,7 @@ tcp_segmentation(struct rte_mbuf *mbin, struct rte_mbuf *mbout[], uint16_t num,
 		/* Allocate direct buffer */
 		out_pkt = rte_pktmbuf_alloc(dst->head_mp);
 		if (out_pkt == NULL) {
-			free_segments(mbout, nbseg);
+			free_mbufs(mbout, nbseg);
 			return -ENOMEM;
 		}
 
@@ -67,7 +58,7 @@ tcp_segmentation(struct rte_mbuf *mbin, struct rte_mbuf *mbout[], uint16_t num,
 			out_seg = rte_pktmbuf_alloc(dst->head_mp);
 			if (out_seg == NULL) {
 				rte_pktmbuf_free(out_pkt);
-				free_segments(mbout, nbseg);
+				free_mbufs(mbout, nbseg);
 				return -ENOMEM;
 			}
 			out_seg_prev->next = out_seg;

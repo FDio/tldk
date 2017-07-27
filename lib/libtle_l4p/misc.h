@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016  Intel Corporation.
+ * Copyright (c) 2016-2017  Intel Corporation.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at:
@@ -396,18 +396,101 @@ compress_pkt_list(struct rte_mbuf *pkt[], uint32_t nb_pkt, uint32_t nb_zero)
 	return nb_pkt;
 }
 
+static inline void
+free_mbufs(struct rte_mbuf *mb[], uint32_t num)
+{
+	uint32_t i;
+
+	for (i = 0; i != num; i++)
+		rte_pktmbuf_free(mb[i]);
+}
+
 /* empty ring and free queued mbufs */
 static inline void
 empty_mbuf_ring(struct rte_ring *r)
 {
-	uint32_t i, n;
+	uint32_t n;
 	struct rte_mbuf *mb[MAX_PKT_BURST];
 
 	do {
 		n = _rte_ring_dequeue_burst(r, (void **)mb, RTE_DIM(mb));
-		for (i = 0; i != n; i++)
-			rte_pktmbuf_free(mb[i]);
+		free_mbufs(mb, n);
 	} while (n != 0);
+}
+
+static inline uint32_t
+_mbus_to_iovec(struct iovec *iv, struct rte_mbuf *mb[], uint32_t num)
+{
+	uint32_t i, ns;
+	uint32_t len, slen, tlen;
+	struct rte_mbuf *m, *next;
+	const void *src;
+
+	for (i = 0; i != num; i++) {
+
+		m = mb[i];
+		tlen = 0;
+		ns = 0;
+
+		do {
+			slen = m->data_len;
+			src = rte_pktmbuf_mtod(m, const void *);
+			len = RTE_MIN(iv->iov_len - tlen, slen);
+			rte_memcpy((uint8_t *)iv->iov_base + tlen, src, len);
+			slen -= len;
+			tlen += len;
+			if (slen != 0)
+				break;
+			ns++;
+			next = m->next;
+			rte_pktmbuf_free_seg(m);
+ 			m = next;
+		 } while (m != NULL);
+
+		iv->iov_base = (uint8_t *)iv->iov_base + tlen;
+		iv->iov_len -= tlen;
+
+		/* partly consumed mbuf */
+		if (m != NULL) {
+			m->pkt_len = mb[i]->pkt_len - tlen;
+			m->data_len = slen;
+			m->data_off += len;
+			m->nb_segs = mb[i]->nb_segs - ns;
+			mb[i] = m;
+			break;
+		}
+	}
+
+	return i;
+}
+
+static inline uint32_t
+_iovec_to_mbsegs(struct iovec *iv, uint32_t seglen, struct rte_mbuf *mb[],
+	uint32_t num)
+{
+	uint32_t i;
+	uint32_t len, slen, tlen;
+	struct rte_mbuf *m;
+	void *dst;
+
+	tlen = 0;
+	for (i = 0; i != num; i++) {
+
+		m = mb[i];
+		slen = rte_pktmbuf_tailroom(m);
+		slen = RTE_MIN(slen, seglen - m->data_len);
+		len = RTE_MIN(iv->iov_len - tlen, slen);
+		dst = rte_pktmbuf_append(m, len);
+		rte_memcpy(dst, (uint8_t *)iv->iov_base + tlen, len);
+		tlen += len;
+		if (len != slen)
+			break;
+	}
+
+	iv->iov_base = (uint8_t *)iv->iov_base + tlen;
+	iv->iov_len -= tlen;
+
+	return i;
 }
 
 #ifdef __cplusplus

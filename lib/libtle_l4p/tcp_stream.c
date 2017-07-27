@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016  Intel Corporation.
+ * Copyright (c) 2016-2017  Intel Corporation.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at:
@@ -32,8 +32,7 @@ static void
 unuse_stream(struct tle_tcp_stream *s)
 {
 	s->s.type = TLE_VNUM;
-	rte_atomic32_set(&s->rx.use, INT32_MIN);
-	rte_atomic32_set(&s->tx.use, INT32_MIN);
+	rte_atomic32_set(&s->use, INT32_MIN);
 }
 
 static void
@@ -99,14 +98,17 @@ static int
 init_stream(struct tle_ctx *ctx, struct tle_tcp_stream *s)
 {
 	size_t bsz, rsz, sz;
-	uint32_t i, k, n, nb;
+	uint32_t f, i, k, n, nb;
 	struct tle_drb *drb;
 	char name[RTE_RING_NAMESIZE];
+
+	f = ((ctx->prm.flags & TLE_CTX_FLAG_ST) == 0) ? 0 :
+		(RING_F_SP_ENQ |  RING_F_SC_DEQ);
 
 	/* init RX part. */
 
 	n = RTE_MAX(ctx->prm.max_stream_rbufs, 1U);
-	s->rx.q = alloc_ring(n, RING_F_SP_ENQ, ctx->prm.socket_id);
+	s->rx.q = alloc_ring(n, f | RING_F_SP_ENQ, ctx->prm.socket_id);
 	if (s->rx.q == NULL)
 		return -ENOMEM;
 
@@ -117,7 +119,7 @@ init_stream(struct tle_ctx *ctx, struct tle_tcp_stream *s)
 	/* init TX part. */
 
 	n = RTE_MAX(ctx->prm.max_stream_sbufs, 1U);
-	s->tx.q = alloc_ring(n, RING_F_SC_DEQ, ctx->prm.socket_id);
+	s->tx.q = alloc_ring(n, f | RING_F_SC_DEQ, ctx->prm.socket_id);
 	if (s->tx.q == NULL)
 		return -ENOMEM;
 
@@ -145,7 +147,7 @@ init_stream(struct tle_ctx *ctx, struct tle_tcp_stream *s)
 	}
 
 	snprintf(name, sizeof(name), "%p@%zu", s, sz);
-	rte_ring_init(s->tx.drb.r, name, n, 0);
+	rte_ring_init(s->tx.drb.r, name, n, f);
 
 	for (i = 0; i != k; i++) {
 		drb = (struct tle_drb *)((uintptr_t)s->tx.drb.r +
@@ -177,23 +179,26 @@ tcp_free_drbs(struct tle_stream *s, struct tle_drb *drb[], uint32_t nb_drb)
 }
 
 static struct tle_timer_wheel *
-alloc_timers(uint32_t num, int32_t socket)
+alloc_timers(uint32_t num, uint32_t mshift, int32_t socket)
 {
 	struct tle_timer_wheel_args twprm;
 
 	twprm.tick_size = TCP_RTO_GRANULARITY;
 	twprm.max_timer = num;
 	twprm.socket_id = socket;
-	return tle_timer_create(&twprm, tcp_get_tms());
+	return tle_timer_create(&twprm, tcp_get_tms(mshift));
 }
 
 static int
 tcp_init_streams(struct tle_ctx *ctx)
 {
 	size_t sz;
-	uint32_t i;
+	uint32_t f, i;
 	int32_t rc;
 	struct tcp_streams *ts;
+
+	f = ((ctx->prm.flags & TLE_CTX_FLAG_ST) == 0) ? 0 :
+		(RING_F_SP_ENQ |  RING_F_SC_DEQ);
 
 	sz = sizeof(*ts) + sizeof(ts->s[0]) * ctx->prm.max_streams;
 	ts = rte_zmalloc_socket(NULL, sz, RTE_CACHE_LINE_SIZE,
@@ -211,14 +216,15 @@ tcp_init_streams(struct tle_ctx *ctx)
 	ctx->streams.buf = ts;
 	STAILQ_INIT(&ctx->streams.free);
 
-	ts->tmr = alloc_timers(ctx->prm.max_streams, ctx->prm.socket_id);
+	ts->tmr = alloc_timers(ctx->prm.max_streams, ctx->cycles_ms_shift,
+		ctx->prm.socket_id);
 	if (ts->tmr == NULL) {
 		TCP_LOG(ERR, "alloc_timers(ctx=%p) failed with error=%d\n",
 			ctx, rte_errno);
 		rc = -ENOMEM;
 	} else {
 		ts->tsq = alloc_ring(ctx->prm.max_streams,
-			RING_F_SC_DEQ, ctx->prm.socket_id);
+			f | RING_F_SC_DEQ, ctx->prm.socket_id);
 		if (ts->tsq == NULL)
 			rc = -ENOMEM;
 		else
@@ -329,8 +335,13 @@ tle_tcp_stream_open(struct tle_ctx *ctx,
 	s->err.cb = prm->cfg.err_cb;
 
 	/* store other params */
+	s->flags = ctx->prm.flags;
 	s->tcb.snd.nb_retm = (prm->cfg.nb_retries != 0) ? prm->cfg.nb_retries :
 		TLE_TCP_DEFAULT_RETRIES;
+	s->tcb.snd.cwnd = (ctx->prm.icw == 0) ? TCP_INITIAL_CWND_MAX :
+				ctx->prm.icw;
+	s->tcb.snd.rto_tw = (ctx->prm.timewait == TLE_TCP_TIMEWAIT_DEFAULT) ?
+				TCP_RTO_2MSL : ctx->prm.timewait;
 
 	tcp_stream_up(s);
 	return &s->s;
@@ -438,15 +449,6 @@ tle_tcp_stream_close(struct tle_stream *ts)
 		return -EINVAL;
 
 	ctx = s->s.ctx;
-
-	/* reset stream events if any. */
-	if (s->rx.ev != NULL)
-		tle_event_idle(s->rx.ev);
-	if (s->tx.ev != NULL)
-		tle_event_idle(s->tx.ev);
-	if (s->err.ev != NULL)
-		tle_event_idle(s->err.ev);
-
 	return stream_close(ctx, s);
 }
 
@@ -505,7 +507,7 @@ tle_tcp_stream_listen(struct tle_stream *ts)
 		return -EINVAL;
 
 	/* mark stream as not closable. */
-	if (rwl_try_acquire(&s->rx.use) > 0) {
+	if (tcp_stream_try_acquire(s) > 0) {
 		rc = rte_atomic16_cmpset(&s->tcb.state, TCP_ST_CLOSED,
 				TCP_ST_LISTEN);
 		if (rc != 0) {
@@ -517,7 +519,7 @@ tle_tcp_stream_listen(struct tle_stream *ts)
 	} else
 		rc = -EINVAL;
 
-	rwl_release(&s->rx.use);
+	tcp_stream_release(s);
 	return rc;
 }
 
@@ -527,17 +529,12 @@ tle_tcp_stream_listen(struct tle_stream *ts)
 static inline int
 stream_update_cfg(struct tle_stream *ts,struct tle_tcp_stream_cfg *prm)
 {
-	int32_t rc1, rc2;
 	struct tle_tcp_stream *s;
 
 	s = TCP_STREAM(ts);
 
-	rc1 = rwl_try_acquire(&s->rx.use);
-	rc2 = rwl_try_acquire(&s->tx.use);
-
-	if (rc1 < 0 || rc2 < 0 || (s->tcb.uop & TCP_OP_CLOSE) != 0) {
-		rwl_release(&s->tx.use);
-		rwl_release(&s->rx.use);
+	if (tcp_stream_try_acquire(s) < 0 || (s->tcb.uop & TCP_OP_CLOSE) != 0) {
+		tcp_stream_release(s);
 		return -EINVAL;
 	}
 
@@ -581,9 +578,7 @@ stream_update_cfg(struct tle_stream *ts,struct tle_tcp_stream_cfg *prm)
 			s->err.cb.func(s->err.cb.data, &s->s);
 	}
 
-	rwl_release(&s->tx.use);
-	rwl_release(&s->rx.use);
-
+	tcp_stream_release(s);
 	return 0;
 }
 
@@ -606,13 +601,13 @@ tle_tcp_stream_update_cfg(struct tle_stream *ts[],
 }
 
 int
-tle_tcp_stream_get_mss(const struct tle_stream * stream)
+tle_tcp_stream_get_mss(const struct tle_stream * ts)
 {
-	struct tle_tcp_stream *tcp;
+	struct tle_tcp_stream *s;
 
-	if (stream == NULL)
+	if (ts == NULL)
 		return -EINVAL;
 
-	tcp = TCP_STREAM(stream);
-	return tcp->tcb.snd.mss;
+	s = TCP_STREAM(ts);
+	return s->tcb.snd.mss;
 }
