@@ -349,7 +349,7 @@ test_dring_st(void)
 
 	printf("%s started;\n", __func__);
 
-	tle_dring_reset(&dr);
+	tle_dring_reset(&dr, 0);
 	r = init_drb_ring(OBJ_NUM);
 	if (r == NULL)
 		return -ENOMEM;
@@ -397,7 +397,7 @@ test_dring_mt(int32_t master_enq_type, int32_t master_deq_type,
 	struct tle_dring dr;
 	struct dring_arg arg[RTE_MAX_LCORE];
 
-	tle_dring_reset(&dr);
+	tle_dring_reset(&dr, 0);
 	r = init_drb_ring(OBJ_NUM);
 	if (r == NULL)
 		return -ENOMEM;

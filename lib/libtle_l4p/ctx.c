@@ -16,6 +16,7 @@
 #include <string.h>
 #include <rte_malloc.h>
 #include <rte_errno.h>
+#include <rte_cycles.h>
 #include <rte_ethdev.h>
 #include <rte_ip.h>
 
@@ -77,6 +78,7 @@ tle_ctx_create(const struct tle_ctx_param *ctx_prm)
 {
 	struct tle_ctx *ctx;
 	size_t sz;
+	uint64_t ms;
 	uint32_t i;
 	int32_t rc;
 
@@ -94,6 +96,10 @@ tle_ctx_create(const struct tle_ctx_param *ctx_prm)
 			sz, ctx_prm->socket_id);
 		return NULL;
 	}
+
+	/* caclulate closest shift to convert from cycles to ms (approximate) */
+	ms = (rte_get_tsc_hz() + MS_PER_S - 1) / MS_PER_S;
+	ctx->cycles_ms_shift = sizeof(ms) * CHAR_BIT - __builtin_clzll(ms) - 1;
 
 	ctx->prm = *ctx_prm;
 
@@ -195,6 +201,7 @@ struct tle_dev *
 tle_add_dev(struct tle_ctx *ctx, const struct tle_dev_param *dev_prm)
 {
 	int32_t rc;
+	uint32_t df;
 	struct tle_dev *dev;
 
 	if (ctx == NULL || dev_prm == NULL || check_dev_prm(dev_prm) != 0) {
@@ -247,7 +254,9 @@ tle_add_dev(struct tle_ctx *ctx, const struct tle_dev_param *dev_prm)
 	}
 
 	/* setup TX data. */
-	tle_dring_reset(&dev->tx.dr);
+	df = ((ctx->prm.flags & TLE_CTX_FLAG_ST) == 0) ? 0 :
+		RING_F_SP_ENQ | RING_F_SC_DEQ;
+	tle_dring_reset(&dev->tx.dr, df);
 
 	if ((dev_prm->tx_offload & DEV_TX_OFFLOAD_UDP_CKSUM) != 0 &&
 			ctx->prm.proto == TLE_PROTO_UDP) {

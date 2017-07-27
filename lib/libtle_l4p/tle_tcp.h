@@ -257,6 +257,9 @@ uint32_t tle_tcp_stream_update_cfg(struct tle_stream *ts[],
 uint16_t tle_tcp_stream_recv(struct tle_stream *s, struct rte_mbuf *pkt[],
 	uint16_t num);
 
+ssize_t tle_tcp_stream_readv(struct tle_stream *ts, const struct iovec *iov,
+	int iovcnt);
+
 /**
  * Consume and queue up to *num* packets, that will be sent eventually
  * by tle_tcp_tx_bulk().
@@ -287,6 +290,9 @@ uint16_t tle_tcp_stream_recv(struct tle_stream *s, struct rte_mbuf *pkt[],
  */
 uint16_t tle_tcp_stream_send(struct tle_stream *s, struct rte_mbuf *pkt[],
 	uint16_t num);
+
+ssize_t tle_tcp_stream_writev(struct tle_stream *ts, struct rte_mempool *mp,
+	const struct iovec *iov, int iovcnt);
 
 /**
  * Back End (BE) API.
@@ -364,13 +370,13 @@ int tle_tcp_process(struct tle_ctx *ctx, uint32_t num);
 
 /**
  * Get current TCP maximum segment size
- * @param stream
- *   Stream to get MSS from.
+ * @param ts
+ *   Stream to retrieve MSS information from.
  * @return
  *   Maximum segment size in bytes, if successful.
  *   Negative on failure.
  */
-int tle_tcp_stream_get_mss(const struct tle_stream * const stream);
+int tle_tcp_stream_get_mss(const struct tle_stream *ts);
 
 #ifdef __cplusplus
 }

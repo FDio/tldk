@@ -21,6 +21,7 @@
 #include <rte_common.h>
 #include <rte_atomic.h>
 #include <rte_memory.h>
+#include <rte_ring.h>
 #include <rte_debug.h>
 
 #ifdef __cplusplus
@@ -68,11 +69,13 @@ struct tle_drb {
 struct tle_dring {
 	uint32_t flags;
 	struct  {
+		uint32_t single;                /**< true if single producer */
 		volatile uint32_t head;         /**< producer head */
 		volatile uint32_t tail;         /**< producer tail */
 		struct tle_drb * volatile crb;  /**< block to enqueue to */
 	} prod __rte_cache_aligned;
 	struct  {
+		uint32_t single;                /**< true if single consumer */
 		volatile uint32_t head;         /**< consumer head */
 		volatile uint32_t tail;         /**< consumer tail */
 		struct tle_drb * volatile crb;  /**< block to dequeue from */
@@ -259,6 +262,36 @@ tle_dring_sp_enqueue(struct tle_dring *dr, const void * const objs[],
 	return nb_obj;
 }
 
+/**
+ * Enqueue several objects on the dring.
+ * Note that it is a caller responsibility to provide enough drbs
+ * to enqueue all requested objects.
+ *
+ * @param dr
+ *   A pointer to the ring structure.
+ * @param objs
+ *   An array of pointers to objects to enqueue.
+ * @param nb_obj
+ *   The number of objects to add to the dring from the objs[].
+ * @param drbs
+ *   An array of pointers to the drbs that can be used by the dring
+ *   to perform enqueue operation.
+ * @param nb_drb
+ *   at input: number of elements in the drbs[] array.
+ *   at output: number of unused by the dring elements in the drbs[] array.
+ * @return
+ *   - number of enqueued objects.
+ */
+static inline uint32_t
+tle_dring_enqueue(struct tle_dring *dr, const void * const objs[],
+	uint32_t nb_obj, struct tle_drb *drbs[], uint32_t *nb_drb)
+{
+	if (dr->prod.single == 0)
+		return tle_dring_mp_enqueue(dr, objs, nb_obj, drbs, nb_drb);
+	else
+		return tle_dring_sp_enqueue(dr, objs, nb_obj, drbs, nb_drb);
+}
+
 /*
  * helper routine, to dequeue objects from the ring.
  */
@@ -429,6 +462,40 @@ tle_dring_sc_dequeue(struct tle_dring *dr, const void *objs[], uint32_t nb_obj,
 }
 
 /**
+ * Dequeue several objects from the dring.
+ * Note, that it is a caller responsibility to provide drbs[] large
+ * enough to store pointers to all drbs that might become unused
+ * after that dequeue operation. It is a caller responsibility to manage
+ * unused drbs after the dequeue operation is completed
+ * (i.e mark them as free/reusable again, etc.).
+ *
+ * @param dr
+ *   A pointer to the ring structure.
+ * @param objs
+ *   An array of pointers to objects that will be dequeued.
+ * @param nb_obj
+ *   The number of objects to dequeue from the dring.
+ * @param drbs
+ *   An array of pointers to the drbs that will become unused after that
+ *   dequeue operation.
+ * @param nb_drb
+ *   at input: number of elements in the drbs[] array.
+ *   at output: number of filled entries in the drbs[] array.
+ * @return
+ *   - number of dequeued objects.
+ */
+static inline uint32_t
+tle_dring_dequeue(struct tle_dring *dr, const void *objs[], uint32_t nb_obj,
+	struct tle_drb *drbs[], uint32_t *nb_drb)
+{
+	if (dr->cons.single == 0)
+		return tle_dring_mc_dequeue(dr, objs, nb_obj, drbs, nb_drb);
+	else
+		return tle_dring_sc_dequeue(dr, objs, nb_obj, drbs, nb_drb);
+	
+}
+
+/**
  * Reset given dring to the initial state.
  * Note, that information about all queued objects will be lost.
  *
@@ -436,11 +503,14 @@ tle_dring_sc_dequeue(struct tle_dring *dr, const void *objs[], uint32_t nb_obj,
  *   A pointer to the dring structure.
  */
 static inline void
-tle_dring_reset(struct tle_dring *dr)
+tle_dring_reset(struct tle_dring *dr, uint32_t flags)
 {
 	memset(dr, 0, sizeof(*dr));
 	dr->prod.crb = &dr->dummy;
 	dr->cons.crb = &dr->dummy;
+	dr->prod.single = ((flags & RING_F_SP_ENQ) != 0);
+	dr->cons.single = ((flags & RING_F_SC_DEQ) != 0);
+	dr->flags = flags;
 }
 
 /**

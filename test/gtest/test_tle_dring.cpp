@@ -19,7 +19,7 @@ TEST_F(dring, test_dring_st)
 {
 	printf("%s started;\n", __func__);
 
-	tle_dring_reset(&dr);
+	tle_dring_reset(&dr, 0);
 	r = init_drb_ring(OBJ_NUM);
 
 	ASSERT_NE(r, (void *) NULL) << "Out of memory";

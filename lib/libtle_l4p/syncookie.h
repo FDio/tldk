@@ -178,37 +178,40 @@ sync_check_ack(const union pkt_info *pi, uint32_t seq, uint32_t ack,
 }
 
 static inline void
-sync_get_opts(struct syn_opts *so, uintptr_t p, uint32_t len)
+sync_fill_tcb(struct tcb *tcb, const union seg_info *si, const union tsopt *to)
 {
-	so->ts = get_tms_opts(p, len);
-	so->wscale = so->ts.ecr & SYNC_TMS_WSCALE_MASK;
-}
+	uint32_t ack, mss, seq, wscale;
 
-static inline void
-sync_fill_tcb(struct tcb *tcb, const union seg_info *si,
-	const struct syn_opts *so)
-{
-	tcb->rcv.nxt = si->seq;
-	tcb->rcv.irs = si->seq - 1;
+	seq = si->seq;
 
-	tcb->snd.nxt = si->ack;
-	tcb->snd.una = si->ack;
-	tcb->snd.iss = si->ack - 1;
-	tcb->snd.rcvr = tcb->snd.iss;
+	tcb->rcv.nxt = seq;
+	tcb->rcv.irs = seq - 1;
+	tcb->snd.wu.wl1 = seq;
 
-	tcb->snd.wu.wl1 = si->seq;
-	tcb->snd.wu.wl2 = si->ack;
+	ack = si->ack;
 
-	tcb->so = *so;
+	tcb->snd.nxt = ack;
+	tcb->snd.una = ack;
+	tcb->snd.iss = ack - 1;
+	tcb->snd.rcvr = ack - 1;
+	tcb->snd.wu.wl2 = ack;
 
-	tcb->snd.wscale = tcb->so.wscale;
-	tcb->snd.mss = tcb->so.mss;
-	tcb->snd.wnd = si->wnd << tcb->snd.wscale;
+	mss = si->mss;
 
-	tcb->snd.ts = tcb->so.ts.ecr;
-	tcb->rcv.ts = tcb->so.ts.val;
+	tcb->snd.mss = mss;
+	tcb->so.mss = mss;
 
-	tcb->rcv.wscale = (tcb->so.wscale == TCP_WSCALE_NONE) ?
+	tcb->snd.ts = to->ecr;
+	tcb->rcv.ts = to->val;
+	tcb->so.ts.raw = to->raw;
+
+	wscale = to->ecr & SYNC_TMS_WSCALE_MASK;
+
+	tcb->snd.wscale = wscale;
+	tcb->snd.wnd = si->wnd << wscale;
+	tcb->so.wscale = wscale;
+
+	tcb->rcv.wscale = (wscale == TCP_WSCALE_NONE) ?
 		TCP_WSCALE_NONE : TCP_WSCALE_DEFAULT;
 }
 

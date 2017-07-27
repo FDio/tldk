@@ -38,6 +38,9 @@ static const struct {
 #define	OPT_SHORT_SBULK		'B'
 #define	OPT_LONG_SBULK		"sburst"
 
+#define	OPT_SHORT_CTXFLAGS	'C'
+#define	OPT_LONG_CTXFLAGS	"ctxflags"
+
 #define	OPT_SHORT_PROMISC	'P'
 #define	OPT_LONG_PROMISC	"promisc"
 
@@ -74,9 +77,16 @@ static const struct {
 #define	OPT_SHORT_VERBOSE	'v'
 #define	OPT_LONG_VERBOSE	"verbose"
 
+#define	OPT_SHORT_WINDOW	'w'
+#define	OPT_LONG_WINDOW		"initial-window"
+
+#define	OPT_SHORT_TIMEWAIT	'W'
+#define	OPT_LONG_TIMEWAIT	"timewait"
+
 static const struct option long_opt[] = {
 	{OPT_LONG_ARP, 1, 0, OPT_SHORT_ARP},
 	{OPT_LONG_SBULK, 1, 0, OPT_SHORT_SBULK},
+	{OPT_LONG_CTXFLAGS, 1, 0, OPT_SHORT_CTXFLAGS},
 	{OPT_LONG_PROMISC, 0, 0, OPT_SHORT_PROMISC},
 	{OPT_LONG_RBUFS, 1, 0, OPT_SHORT_RBUFS},
 	{OPT_LONG_SBUFS, 1, 0, OPT_SHORT_SBUFS},
@@ -89,6 +99,8 @@ static const struct option long_opt[] = {
 	{OPT_LONG_SEC_KEY, 1, 0, OPT_SHORT_SEC_KEY},
 	{OPT_LONG_LISTEN, 0, 0, OPT_SHORT_LISTEN},
 	{OPT_LONG_VERBOSE, 1, 0, OPT_SHORT_VERBOSE},
+	{OPT_LONG_WINDOW, 1, 0, OPT_SHORT_WINDOW},
+	{OPT_LONG_TIMEWAIT, 1, 0, OPT_SHORT_TIMEWAIT},
 	{NULL, 0, 0, 0}
 };
 
@@ -760,7 +772,7 @@ parse_app_options(int argc, char **argv, struct netbe_cfg *cfg,
 
 	optind = 0;
 	optarg = NULL;
-	while ((opt = getopt_long(argc, argv, "aB:LPR:S:TUb:f:s:v:H:K:",
+	while ((opt = getopt_long(argc, argv, "aB:C:LPR:S:TUb:f:s:v:H:K:w:",
 			long_opt, &opt_idx)) != EOF) {
 		if (opt == OPT_SHORT_ARP) {
 			cfg->arp = 1;
@@ -771,6 +783,14 @@ parse_app_options(int argc, char **argv, struct netbe_cfg *cfg,
 					"for option: \'%c\'\n",
 					__func__, optarg, opt);
 			ctx_prm->send_bulk_size = v;
+		} else if (opt == OPT_SHORT_CTXFLAGS) {
+			rc = parse_uint_val(NULL, optarg, &v);
+			if (rc < 0)
+				rte_exit(EXIT_FAILURE, "%s: invalid value: %s "
+					"for option: \'%c\'\n",
+					__func__, optarg, opt);
+			ctx_prm->flags = v;
+		} else if (opt == OPT_SHORT_PROMISC) {
 		} else if (opt == OPT_SHORT_PROMISC) {
 			cfg->promisc = 1;
 		} else if (opt == OPT_SHORT_RBUFS) {
@@ -835,9 +855,21 @@ parse_app_options(int argc, char **argv, struct netbe_cfg *cfg,
 			}
 			memcpy(&ctx_prm->secret_key, optarg,
 				sizeof(ctx_prm->secret_key));
-		}
-
-		else {
+		} else if (opt == OPT_SHORT_WINDOW) {
+			rc = parse_uint_val(NULL, optarg, &v);
+			if (rc < 0)
+				rte_exit(EXIT_FAILURE, "%s: invalid value: %s "
+					"for option: \'%c\'\n",
+					__func__, optarg, opt);
+			ctx_prm->icw = v;
+		} else if (opt == OPT_SHORT_TIMEWAIT) {
+			rc = parse_uint_val(NULL, optarg, &v);
+			if (rc < 0)
+				rte_exit(EXIT_FAILURE, "%s: invalid value: %s "
+					"for option: \'%c\'\n",
+					__func__, optarg, opt);
+			ctx_prm->timewait = v;
+		} else {
 			rte_exit(EXIT_FAILURE,
 				"%s: unknown option: \'%c\'\n",
 				__func__, opt);

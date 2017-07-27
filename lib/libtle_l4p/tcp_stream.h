@@ -82,6 +82,7 @@ struct tcb {
 		uint32_t cwnd;     /* congestion window */
 		uint32_t ssthresh; /* slow start threshold */
 		uint32_t rto;      /* retransmission timeout */
+		uint32_t rto_tw;   /* TIME_WAIT retransmission timeout */
 		uint32_t iss;      /* initial send sequence */
 		uint16_t mss;
 		uint8_t  wscale;
@@ -91,10 +92,12 @@ struct tcb {
 	struct syn_opts so; /* initial syn options. */
 };
 
-
 struct tle_tcp_stream {
 
 	struct tle_stream s;
+
+	uint32_t flags;
+	rte_atomic32_t use;
 
 	struct stbl_entry *ste;     /* entry in streams table. */
 	struct tcb tcb;
@@ -109,7 +112,6 @@ struct tle_tcp_stream {
 	} err;
 
 	struct {
-		rte_atomic32_t use;
 		struct rte_ring *q;     /* listen (syn) queue */
 		struct ofo *ofo;
 		struct tle_event *ev;    /* user provided recv event. */
@@ -117,7 +119,6 @@ struct tle_tcp_stream {
 	} rx __rte_cache_aligned;
 
 	struct {
-		rte_atomic32_t use;
 		rte_atomic32_t arm;  /* when > 0 stream is in to-send queue */
 		struct {
 			uint32_t nb_elem;  /* number of objects per drb. */

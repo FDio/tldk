@@ -23,9 +23,6 @@
 extern "C" {
 #endif
 
-/* current stbl entry contains packet. */
-#define	STE_PKT	1
-
 struct stbl_entry {
 	void *data;
 };
@@ -138,18 +135,6 @@ stbl_find_entry(struct stbl *st, const union pkt_info *pi)
 	return ht->ent + rc;
 }
 
-static inline int
-stbl_data_pkt(const void *p)
-{
-	return ((uintptr_t)p & STE_PKT);
-}
-
-static inline void *
-stbl_get_pkt(const struct stbl_entry *se)
-{
-	return (void *)((uintptr_t)se->data ^ STE_PKT);
-}
-
 static inline void *
 stbl_find_data(struct stbl *st, const union pkt_info *pi)
 {
@@ -157,35 +142,6 @@ stbl_find_data(struct stbl *st, const union pkt_info *pi)
 
 	ent = stbl_find_entry(st, pi);
 	return (ent == NULL) ? NULL : ent->data;
-}
-
-static inline void
-stbl_del_pkt(struct stbl *st, struct stbl_entry *se, const union pkt_info *pi)
-{
-	uint32_t type;
-	struct stbl_key k;
-
-	se->data = NULL;
-
-	type = pi->tf.type;
-	stbl_pkt_fill_key(&k, pi, type);
-	rte_hash_del_key(st->ht[type].t, &k);
-}
-
-static inline void
-stbl_del_pkt_lock(struct stbl *st, struct stbl_entry *se,
-	const union pkt_info *pi)
-{
-	uint32_t type;
-	struct stbl_key k;
-
-	se->data = NULL;
-
-	type = pi->tf.type;
-	stbl_pkt_fill_key(&k, pi, type);
-	stbl_lock(st, type);
-	rte_hash_del_key(st->ht[type].t, &k);
-	stbl_unlock(st, type);
 }
 
 #include "tcp_stream.h"
@@ -235,8 +191,8 @@ stbl_add_stream_lock(struct stbl *st, const struct tle_tcp_stream *s)
 }
 
 static inline void
-stbl_del_stream_lock(struct stbl *st, struct stbl_entry *se,
-	const struct tle_tcp_stream *s)
+stbl_del_stream(struct stbl *st, struct stbl_entry *se,
+	const struct tle_tcp_stream *s, uint32_t lock)
 {
 	uint32_t type;
 	struct stbl_key k;
@@ -248,9 +204,11 @@ stbl_del_stream_lock(struct stbl *st, struct stbl_entry *se,
 
 	type = s->s.type;
 	stbl_stream_fill_key(&k, &s->s, type);
-	stbl_lock(st, type);
+	if (lock != 0)
+		stbl_lock(st, type);
 	rte_hash_del_key(st->ht[type].t, &k);
-	stbl_unlock(st, type);
+	if (lock != 0)
+		stbl_unlock(st, type);
 }
 
 #ifdef __cplusplus

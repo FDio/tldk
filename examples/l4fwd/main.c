@@ -209,6 +209,7 @@ main(int argc, char *argv[])
 			__func__, rc);
 
 	memset(&ctx_prm, 0, sizeof(ctx_prm));
+	ctx_prm.timewait = TLE_TCP_TIMEWAIT_DEFAULT;
 
 	signal(SIGINT, sig_handle);
 

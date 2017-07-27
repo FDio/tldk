@@ -80,8 +80,9 @@ struct tle_dev_param {
 struct tle_dest {
 	struct rte_mempool *head_mp;
 	/**< MP for fragment headers and control packets. */
-	struct tle_dev *dev;     /**< device to send packets through. */
-	uint16_t mtu;                /**< MTU for given destination. */
+	struct tle_dev *dev;    /**< device to send packets through. */
+	uint64_t ol_flags;      /**< tx ofload flags. */
+	uint16_t mtu;           /**< MTU for given destination. */
 	uint8_t l2_len;  /**< L2 header length. */
 	uint8_t l3_len;  /**< L3 header length. */
 	uint8_t hdr[TLE_DST_MAX_HDR]; /**< L2/L3 headers. */
@@ -103,6 +104,10 @@ enum {
 	TLE_HASH_NUM
 };
 
+enum {
+	TLE_CTX_FLAG_ST = 1,  /**< ctx will be used by single thread */
+};
+
 struct tle_ctx_param {
 	int32_t socket_id;         /**< socket ID to allocate memory for. */
 	uint32_t proto;            /**< L4 proto to handle. */
@@ -110,6 +115,7 @@ struct tle_ctx_param {
 	uint32_t max_stream_rbufs; /**< max recv mbufs per stream. */
 	uint32_t max_stream_sbufs; /**< max send mbufs per stream. */
 	uint32_t send_bulk_size;   /**< expected # of packets per send call. */
+	uint32_t flags;            /**< specific flags */
 
 	int (*lookup4)(void *opaque, const struct in_addr *addr,
 		struct tle_dest *res);
@@ -127,7 +133,17 @@ struct tle_ctx_param {
 	/**< hash algorithm to be used to generate sequence number. */
 	rte_xmm_t secret_key;
 	/**< secret key to be used to calculate the hash. */
+
+	uint32_t icw; /**< initial congestion window, default is 2*MSS if 0. */
+	uint32_t timewait;
+	/**< TCP TIME_WAIT state timeout duration in milliseconds,
+	 * default 2MSL, if UINT32_MAX */
 };
+
+/**
+ * use default TIMEWAIT timeout value.
+ */
+#define	TLE_TCP_TIMEWAIT_DEFAULT	UINT32_MAX
 
 /**
  * create L4 processing context.

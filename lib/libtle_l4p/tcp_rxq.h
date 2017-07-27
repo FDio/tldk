@@ -22,6 +22,11 @@
 extern "C" {
 #endif
 
+struct rxq_objs {
+	struct rte_mbuf **mb;
+	uint32_t num;
+};
+
 static inline uint32_t
 rx_ofo_enqueue(struct tle_tcp_stream *s, union seqlen *sl,
 	struct rte_mbuf *mb[], uint32_t num)
@@ -140,6 +145,41 @@ rx_data_enqueue(struct tle_tcp_stream *s, uint32_t seq, uint32_t len,
 	}
 
 	return t;
+}
+
+static inline uint32_t
+tcp_rxq_get_objs(struct tle_tcp_stream *s, struct rxq_objs obj[2])
+{
+	struct rte_ring *r;
+	uint32_t n, head, sz;
+
+	r = s->rx.q;
+
+	n = _rte_ring_mcs_dequeue_start(r, UINT32_MAX);
+	if (n == 0)
+		return 0;
+
+	sz = _rte_ring_get_size(r);
+	head = (r->cons.head - n) & _rte_ring_get_mask(r);
+
+	obj[0].mb = (struct rte_mbuf **)(_rte_ring_get_data(r) + head);
+	obj[1].mb = (struct rte_mbuf **)_rte_ring_get_data(r);
+
+	if (head + n <= sz) {
+		obj[0].num = n;
+		obj[1].num = 0;
+		return 1;
+	} else {
+		obj[0].num = sz - head;
+		obj[1].num = n + head - sz;
+		return 2;
+	}
+}
+
+static inline void
+tcp_rxq_consume(struct tle_tcp_stream *s, uint32_t num)
+{
+	_rte_ring_mcs_dequeue_finish(s->rx.q, num);
 }
 
 #ifdef __cplusplus

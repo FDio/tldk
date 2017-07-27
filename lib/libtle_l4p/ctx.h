@@ -53,6 +53,7 @@ struct tle_dev {
 
 struct tle_ctx {
 	struct tle_ctx_param prm;
+	uint32_t cycles_ms_shift;  /* to convert from cycles to ms */
 	struct {
 		rte_spinlock_t lock;
 		uint32_t nb_free; /* number of free streams. */
