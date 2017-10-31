@@ -61,6 +61,11 @@
 
    $(TLDK_ROOT)
    |
+   +----app
+   |      |
+   |      +-- nginx - a clone of nginx integrated with TLDK
+   |          (refer to app/nginx/README.TLDK for more information)
+   |
    +----lib
    |      |
    |      +--libtle_dring - dring library

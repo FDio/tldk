@@ -1,0 +1,148 @@
+1. INTRODUCTION
+
+This is a clone of nginx (from https://github.com/nginx/nginx)
+to demonstrate and benchmark TLDK library integration with real
+world application.
+A new nginx module is created and and BSD socket-like API is implemented
+on top of native TLDK API.
+Note, that right now only minimalistic subset of socket-like API is provided:
+- accept
+- close
+- readv
+- recv
+- writev
+so only limited nginx functionality is available for a moment.
+
+2. HOW TO BUILD/RUN
+
+  cd to your TLDK root directory
+  Build TLDK as usual (and explained in README), then:
+  export TLDK_ROOT=${PWD}
+  cd app/nginx/
+  auto/configure --prefix=${TLDK_ROOT}/${RTE_TARGET} --with-tldk \
+  --with-cc-opt="-march=native -D_GNU_SOURCE"
+  make install
+
+  create a copy of app/nginx/conf/nginx-tldk.conf and modify it accrodingly
+  to your system setup.
+  ${TLDK_ROOT}/${RTE_TARGET}/sbin/nginx -c <path_to_your_config_file>
+
+  On your peer system:
+  make sure your net interface connected to the TLDK system is up and running
+  add TLDK assigned ip address into ip neighbor table
+  run your favorite web client
+  as an example:
+  ifconfig eth1 192.168.1.90/24 up
+  ip neigh add 192.168.1.60 lladdr 3c:fd:fe:9f:ce:e9 nud permanent dev eth1
+  wget --no-proxy 192.168.1.60:6000
+
+3. NGINX.CONF TLDK RELATED PARAMETERS 
+
+  Syntax:	tldk_main { ... }
+  Default:	-
+  Context:	main
+  Provides the configuration file context in which the directives that affect
+  global DPDK/TLDK startup parameters are specified. 
+
+  Syntax:	eal_main <DPDK cmdline startup parameters>;
+  Default:	""
+  Context:	tldk_main
+  Example:	eal_cmd --lcores=8-10 -n 4 -w 03:00.1; 
+  Provides command-line arguments list for rte_eal_init().
+
+  Syntax:	port <uint> mtu <uint> rx_offload <uint> tx_offload <uint> ipv4 <ipv4> ipv6 <ipv6>; 
+  Default:	-
+  Context:	tldk_main
+  Example:	port 0 rx_offload 0xf tx_offload 0xf ipv4 192.168.1.60;
+  Provides configuration information for particular DPDK ethdev port.
+  port -	DPDK port id to be used to receive/send packets.
+		It is an mandatory option.
+  mtu - 	MTU to be used on that port (= application data size + L2/L3/L4
+		headers sizes, default=1514). It is an optional option.
+  rx_offload -	RX HW offload capabilities to enable/use on this port.
+		(bitmask of DPDK DEV_RX_OFFLOAD_* values).
+		It is an optional option.
+  tx_offload -	TX HW offload capabilities to enable/use on this port.
+		(bitmask of DPDK DEV_TX_OFFLOAD_* values).
+		It is an optional option.
+  ipv4 -	IPv4 network address that will be assigned to that port.
+		At least one of ipv4/ipv6 has to be specified.
+  ipv6 -	IPv6 network address that will be assigned to that port.
+		At least one of ipv4/ipv6 has to be specified.
+
+  For more details regarding TLDK related parameters in nginx config file,
+  please refer to app/nginx/conf/nginx-tldk.conf. 
+
+  Syntax:	tldk_ctx { ... }
+  Default:	-
+  Context:	main
+  Provides the configuration for particular TLDK context.
+  In current implementation there is one to one mapping between NGINX workers
+  and TLDK contents:
+  - each NGINX worker has to be assigned to work with only one TLDK context.
+  - each TLDK context services only one NGINX worker.
+  
+  Syntax:	worker <uint>;
+  Default:	-
+  Context:	tldk_ctx
+  Example:	worker 0;
+  Associates given TLDK context with NGINX worker # 0.
+  
+  Syntax:	lcore <uint>;
+  Default:	-
+  Context:	tldk_ctx
+  Example:	lcore 9;
+  Specifies on which lcore given TLDK context will run on.
+  
+  Syntax:	be_in_worker;
+  Default:	off
+  Context:	tldk_ctx
+  Example:	be_in_worker;
+  Specifies should TLDK context processing (Back-End) run inside NGINX worker
+  process, or as a separate thread (DPDK lcore) inside NGINX master process.
+  
+  Syntax:	tcp_timewait <uint>;
+  Default:	120s
+  Context:	tldk_ctx
+  Example:	tcp_timewait 0;
+  Specifies TCP TIME_WAIT state timeout duration in milliseconds for given
+  TLDK context.
+  
+  Syntax:	mbufs <uint>;
+  Default:	0x20000
+  Context:	tldk_ctx
+  Example:	mbufs 0x20000;
+  Specifies maximum number of DPDK mbufs to be created for given TLDK context.
+  
+  Syntax:	sbufs <uint>;
+  Default:	1
+  Context:	tldk_ctx
+  Example:	sbufs 0x100;
+  Specifies maximum number of send mbufs per stream (connection)
+  for given TLDK context.
+  
+  Syntax:	rbufs <uint>;
+  Default:	1
+  Context:	tldk_ctx
+  Example:	rbufs 0x100;
+  Specifies maximum number of recv mbufs per stream (connection)
+  for given TLDK context.
+  
+  Syntax:	dev <uint> port <uint> queue <uint>;
+  Default:	-
+  Context:	tldk_ctx
+  Example:	dev 0 port 0 queue 0;
+  Assigns DPDK ethdev devices to the given TLDK context.
+  dev -		dev id inside given TLDK context.
+  port -	DPDK port id to be used to receive/send packets.
+  queue -	DPDK queue id to be used to receive/send packets.
+  
+  Syntax:	dest dev <uint> addr <ipv4/ipv6> masklen <uint> mac <ether>
+  Default:	-
+  Context:	tldk_ctx
+  Example:	dest dev 0 addr 192.168.1.0 masklen 24 mac 3C:FD:FE:9F:D1:E1;
+  Specifies routing information for given TLDK context.
+  dev -		dev id inside given TLDK context.
+  addr -	ipv4/ipv6 destination address.
+  masklen - 	destination network prefix length.
+  mac - 	destination ethernet address.
