@@ -1646,7 +1646,6 @@ rx_stream(struct tle_tcp_stream *s, uint32_t ts,
 
 	/* process <SYN,ACK> */
 	} else if ((pi->tf.flags & TCP_FLAG_SYN) != 0) {
-		ret = 0;
 		for (i = 0; i != num; i++) {
 			ret = rx_synack(s, ts, state, &si[i], mb[i], &rsp);
 			if (ret == 0)
@@ -1728,7 +1727,7 @@ rx_stream(struct tle_tcp_stream *s, uint32_t ts,
 
 	/* unprocessed packets */
 	for (; i != num; i++, k++) {
-		rc[k] = EINVAL;
+		rc[k] = ENODATA;
 		rp[k] = mb[i];
 	}
 
