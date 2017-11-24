@@ -22,6 +22,30 @@
       "revId": "3726dc50dd2a9873ac05847be80ca615ea4a708b",
       "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "8a0e0be7_62d05cd7",
+        "filename": "examples/l4fwd/common.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 706,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2017-11-24T18:26:46Z",
+      "side": 1,
+      "message": "no it shouldn\u0027t. If the payload is not provided we still want to send specified number of bytes in response.",
+      "parentUuid": "69c6cc19_39289a49",
+      "range": {
+        "startLine": 706,
+        "startChar": 2,
+        "endLine": 706,
+        "endChar": 6
+      },
+      "revId": "3726dc50dd2a9873ac05847be80ca615ea4a708b",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
     }
   ]
 }
