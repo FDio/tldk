@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "69c6cc19_39289a49",
+        "filename": "examples/l4fwd/common.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 706,
+      "author": {
+        "id": 407
+      },
+      "writtenOn": "2017-11-24T16:38:08Z",
+      "side": 1,
+      "message": "should this line be inside the if(csz\u003e0) statement? We may not need to increment it if no data. In fact, we can bring the append statement inside the if condition as well.",
+      "range": {
+        "startLine": 706,
+        "startChar": 2,
+        "endLine": 706,
+        "endChar": 6
+      },
+      "revId": "3726dc50dd2a9873ac05847be80ca615ea4a708b",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    }
+  ]
+}
