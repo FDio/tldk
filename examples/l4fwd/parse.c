@@ -16,6 +16,10 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <fcntl.h>
+
 #include "netbe.h"
 #include "parse.h"
 
@@ -32,9 +36,6 @@ static const struct {
 	{ .name = "fwd", .op = FWD,},
 };
 
-#define	OPT_SHORT_ARP		'a'
-#define	OPT_LONG_ARP		"enable-arp"
-
 #define	OPT_SHORT_SBULK		'B'
 #define	OPT_LONG_SBULK		"sburst"
 
@@ -50,8 +51,14 @@ static const struct {
 #define	OPT_SHORT_SBUFS	'S'
 #define	OPT_LONG_SBUFS	"sbufs"
 
+#define	OPT_SHORT_ARP		'a'
+#define	OPT_LONG_ARP		"enable-arp"
+
 #define	OPT_SHORT_BECFG	'b'
 #define	OPT_LONG_BECFG	"becfg"
+
+#define	OPT_SHORT_TXCNT	'c'
+#define	OPT_LONG_TXCNT	"txcnt"
 
 #define	OPT_SHORT_FECFG	'f'
 #define	OPT_LONG_FECFG	"fecfg"
@@ -101,6 +108,7 @@ static const struct option long_opt[] = {
 	{OPT_LONG_VERBOSE, 1, 0, OPT_SHORT_VERBOSE},
 	{OPT_LONG_WINDOW, 1, 0, OPT_SHORT_WINDOW},
 	{OPT_LONG_TIMEWAIT, 1, 0, OPT_SHORT_TIMEWAIT},
+	{OPT_LONG_TXCNT, 1, 0, OPT_SHORT_TXCNT},
 	{NULL, 0, 0, 0}
 };
 
@@ -759,6 +767,42 @@ parse_hash_alg(const char *val)
 		return TLE_HASH_NUM;
 }
 
+static int
+read_tx_content(const char *fname, struct tx_content *tx)
+{
+	int32_t fd, rc;
+	ssize_t sz;
+	struct stat st;
+
+	rc = stat(fname, &st);
+	if (rc != 0)
+		return -errno;
+
+	tx->data = rte_malloc(NULL, st.st_size, RTE_CACHE_LINE_SIZE);
+	if (tx->data == NULL) {
+		RTE_LOG(ERR, USER1, "%s(%s): failed to alloc %zu bytes;\n",
+			__func__, fname, st.st_size);
+		return -ENOMEM;
+	}
+
+	fd = open(fname, O_RDONLY);
+	sz = read(fd, tx->data, st.st_size);
+
+	RTE_LOG(NOTICE, USER1, "%s(%s): read %zd bytes from fd=%d;\n",
+		__func__, fname, sz, fd);
+
+	close(fd);
+
+	if (sz != st.st_size) {
+		rc = -errno;
+		sz = 0;
+		rte_free(tx->data);
+	}
+
+	tx->sz = sz;
+	return rc;
+}
+
 int
 parse_app_options(int argc, char **argv, struct netbe_cfg *cfg,
 	struct tle_ctx_param *ctx_prm,
@@ -772,7 +816,7 @@ parse_app_options(int argc, char **argv, struct netbe_cfg *cfg,
 
 	optind = 0;
 	optarg = NULL;
-	while ((opt = getopt_long(argc, argv, "aB:C:LPR:S:TUb:f:s:v:H:K:W:w:",
+	while ((opt = getopt_long(argc, argv, "aB:C:c:LPR:S:TUb:f:s:v:H:K:W:w:",
 			long_opt, &opt_idx)) != EOF) {
 		if (opt == OPT_SHORT_ARP) {
 			cfg->arp = 1;
@@ -869,6 +913,13 @@ parse_app_options(int argc, char **argv, struct netbe_cfg *cfg,
 					"for option: \'%c\'\n",
 					__func__, optarg, opt);
 			ctx_prm->timewait = v;
+		} else if (opt == OPT_SHORT_TXCNT) {
+			rc = read_tx_content(optarg, &tx_content);
+			if (rc < 0)
+				rte_exit(EXIT_FAILURE,
+					"%s: failed to read tx contents "
+					"from \'%s\', error code: %d(%s)\n",
+					__func__, optarg, rc, strerror(-rc));
 		} else {
 			rte_exit(EXIT_FAILURE,
 				"%s: unknown option: \'%c\'\n",

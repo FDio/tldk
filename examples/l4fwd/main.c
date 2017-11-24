@@ -73,6 +73,11 @@ static const struct rte_eth_conf port_conf_default = {
 	},
 };
 
+struct tx_content tx_content = {
+	.sz = 0,
+	.data = NULL,
+};
+
 /* function pointers */
 static TLE_RX_BULK_FUNCTYPE tle_rx_bulk;
 static TLE_TX_BULK_FUNCTYPE tle_tx_bulk;

@@ -634,23 +634,24 @@ netfe_rxtx_get_mss(struct netfe_stream *fes)
 		 */
 		return RTE_MBUF_DEFAULT_DATAROOM - TLE_DST_MAX_HDR;
 	default:
-		NETFE_TRACE("%s(%u): Unhandled MSS query (family=%i)\n",
-			__func__, lcore, fes->proto, fes->family);
 		return -EINVAL;
 	}
 }
 
 static inline int
 netfe_rxtx_dispatch_reply(uint32_t lcore, struct netfe_stream *fes)
-
 {
 	struct pkt_buf *pb;
 	int32_t sid;
-	int32_t cnt_mtu_pkts;
-	int32_t cnt_all_pkts;
-	int32_t idx_pkt;
-	int32_t len_tail;
-	int32_t mtu;
+	uint32_t n;
+	uint32_t cnt_mtu_pkts;
+	uint32_t cnt_all_pkts;
+	uint32_t idx_pkt;
+	uint32_t len_tail;
+	uint32_t mtu;
+	size_t csz, len;
+	char *dst;
+	const uint8_t *src;
 
 	pb = &fes->pbuf;
 	sid = rte_lcore_to_socket_id(lcore) + 1;
@@ -675,14 +676,37 @@ netfe_rxtx_dispatch_reply(uint32_t lcore, struct netfe_stream *fes)
 		return -ENOMEM;
 	}
 
+	csz = tx_content.sz;
+	src = tx_content.data;
+
+	n = pb->num;
+
 	/* Full MTU packets */
-	for (idx_pkt = 0; idx_pkt < cnt_mtu_pkts; idx_pkt++) {
-		rte_pktmbuf_append(pb->pkt[pb->num++], mtu);
+	for (idx_pkt = 0; idx_pkt < cnt_mtu_pkts; idx_pkt++, n++) {
+		rte_pktmbuf_reset(pb->pkt[n]);
+		dst = rte_pktmbuf_append(pb->pkt[n], mtu);
+		if (csz > 0) {
+			len = RTE_MIN(mtu, csz);
+			rte_memcpy(dst, src, len);
+			src += len;
+			csz -= len;
+		}
 	}
 
 	/* Last non-MTU packet, if any */
-	if (len_tail > 0)
-		rte_pktmbuf_append(pb->pkt[pb->num++], len_tail);
+	if (len_tail > 0) {
+		rte_pktmbuf_reset(pb->pkt[n]);
+		dst = rte_pktmbuf_append(pb->pkt[n], len_tail);
+		if (csz > 0) {
+			len = RTE_MIN(len_tail, csz);
+			rte_memcpy(dst, src, len);
+			src += len;
+			csz -= len;
+		}
+		n++;
+	}
+
+	pb->num = n;
 
 	return 0;
 }

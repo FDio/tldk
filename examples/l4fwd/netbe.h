@@ -251,6 +251,13 @@ struct lcore_prm {
 	struct netfe_lcore_prm fe;
 };
 
+struct tx_content {
+	size_t sz;
+	uint8_t *data;
+};
+
+extern struct tx_content tx_content;
+
 /*
  * debug/trace macros.
  */
