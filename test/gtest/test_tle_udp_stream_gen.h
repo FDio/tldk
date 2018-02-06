@@ -177,8 +177,8 @@ struct stream_s {
 struct dev_s {
 	string l_ipv4;
 	string l_ipv6;
-	int rx_offload;
-	int tx_offload;
+	uint64_t rx_offload;
+	uint64_t tx_offload;
 	int exp_pkts_bulk_rx;
 	int exp_pkts_bulk_tx;
 	int exp_pkts_enoent;
@@ -201,15 +201,15 @@ class test_tle_udp_gen_base : public testing::TestWithParam<test_str> {
 public:
 
 	tle_ctx *setup_ctx(void);
-	tle_dev *setup_dev(tle_ctx *ctx, uint32_t rx_offload,
-		uint32_t tx_offload, const char *local_ipv4,
+	tle_dev *setup_dev(tle_ctx *ctx, uint64_t rx_offload,
+		uint64_t tx_offload, const char *local_ipv4,
 		const char *local_ipv6);
 	tle_evq *setup_evq(void);
 	tle_event *setup_event(void);
 	tle_stream *setup_stream(struct tle_ctx *ctx, int family,
 		const char *l_ip, const char *r_ip, int l_port, int r_port);
-	int setup_devices(uint8_t *portid);
-	int cleanup_devices(uint8_t portid);
+	int setup_devices(dpdk_port_t *portid);
+	int cleanup_devices(dpdk_port_t portid);
 	int prepare_pcaps(string l_ip, string r_ip, int l_port, int r_port,
 		int nb_pkts, int l3_chksum, int l4_chksum, string rx_pcap_dest);
 
@@ -296,8 +296,8 @@ public:
 		cleanup_pcaps(TX_PCAP);
 	}
 
-	uint8_t nb_ports;
-	uint8_t portid;
+	dpdk_port_t nb_ports;
+	dpdk_port_t portid;
 	uint32_t socket_id;
 	uint32_t max_events;
 	struct tle_ctx *ctx;
@@ -311,7 +311,7 @@ public:
 };
 
 int
-test_tle_udp_gen_base::setup_devices(uint8_t *portid)
+test_tle_udp_gen_base::setup_devices(dpdk_port_t *portid)
 {
 	/* attach + configure + start pmd device */
 	if (rte_eth_dev_attach(vdevargs[0], portid) != 0)
@@ -325,7 +325,7 @@ test_tle_udp_gen_base::setup_devices(uint8_t *portid)
 }
 
 int
-test_tle_udp_gen_base::cleanup_devices(uint8_t portid)
+test_tle_udp_gen_base::cleanup_devices(dpdk_port_t portid)
 {
 	/* release mbufs + detach device */
 	char name[RTE_ETH_NAME_MAX_LEN];
@@ -391,8 +391,8 @@ test_tle_udp_gen_base::setup_ctx(void)
 }
 
 struct tle_dev *
-test_tle_udp_gen_base::setup_dev(struct tle_ctx *ctx, uint32_t rx_offload,
-	uint32_t tx_offload, const char *l_ipv4, const char *l_ipv6)
+test_tle_udp_gen_base::setup_dev(struct tle_ctx *ctx, uint64_t rx_offload,
+	uint64_t tx_offload, const char *l_ipv4, const char *l_ipv6)
 {
 	struct tle_dev *dev;
 	struct tle_dev_param dev_prm;

@@ -24,14 +24,15 @@
  * SUCH DAMAGE.
  */
 
-#include <rte_ethdev.h>
-#include <rte_lpm6.h>
-#include <rte_lpm.h>
-
 #include <ngx_config.h>
 #include <ngx_core.h>
 
 #include "ngx_tldk.h"
+
+#include <rte_ethdev.h>
+#include <rte_lpm6.h>
+#include <rte_lpm.h>
+
 #include "be.h"
 #include "tldk_sock.h"
 

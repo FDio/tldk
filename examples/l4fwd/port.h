@@ -162,15 +162,17 @@ port_init(struct netbe_port *uprt, uint32_t proto)
 	if ((dev_info.rx_offload_capa & uprt->rx_offload) != uprt->rx_offload) {
 		RTE_LOG(ERR, USER1,
 			"port#%u supported/requested RX offloads don't match, "
-			"supported: %#x, requested: %#x;\n",
-			uprt->id, dev_info.rx_offload_capa, uprt->rx_offload);
+			"supported: %#" PRIx64 ", requested: %#" PRIx64 ";\n",
+			uprt->id, (uint64_t)dev_info.rx_offload_capa,
+			(uint64_t)uprt->rx_offload);
 		return -EINVAL;
 	}
 	if ((dev_info.tx_offload_capa & uprt->tx_offload) != uprt->tx_offload) {
 		RTE_LOG(ERR, USER1,
 			"port#%u supported/requested TX offloads don't match, "
-			"supported: %#x, requested: %#x;\n",
-			uprt->id, dev_info.tx_offload_capa, uprt->tx_offload);
+			"supported: %#" PRIx64 ", requested: %#" PRIx64 ";\n",
+			uprt->id, (uint64_t)dev_info.tx_offload_capa,
+			(uint64_t)uprt->tx_offload);
 		return -EINVAL;
 	}
 
@@ -282,7 +284,7 @@ log_netbe_prt(const struct netbe_port *uprt)
 
 	RTE_LOG(NOTICE, USER1,
 		"uprt %p = <id = %u, lcore = <%s>, mtu = %u, "
-		"rx_offload = %u, tx_offload = %u,\n"
+		"rx_offload = %#" PRIx64 ", tx_offload = %#" PRIx64 ",\n"
 		"ipv4 = %#x, "
 		"ipv6 = %04hx:%04hx:%04hx:%04hx:%04hx:%04hx:%04hx:%04hx, "
 		"mac = %02hhx:%02hhx:%02hhx:%02hhx:%02hhx:%02hhx>;\n"

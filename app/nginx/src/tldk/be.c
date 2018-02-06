@@ -27,6 +27,10 @@
 #include <assert.h>
 #include <netinet/ip6.h>
 
+#include <ngx_config.h>
+#include <ngx_core.h>
+
+#include "be.h"
 #include <rte_version.h>
 #include <rte_cycles.h>
 #include <rte_ethdev.h>
@@ -38,10 +42,11 @@
 
 #include <tle_tcp.h>
 
-#include <ngx_config.h>
-#include <ngx_core.h>
-
-#include "be.h"
+#if RTE_VERSION_NUM(17, 11, 0, 0) <= RTE_VERSION
+typedef uint16_t dpdk_port_t;
+#else
+typedef uint8_t dpdk_port_t;
+#endif
 
 #define RX_RING_SIZE    0x400
 #define TX_RING_SIZE    0x800
@@ -177,15 +182,17 @@ port_init(const struct tldk_port_conf *pcf)
 	if ((dev_info.rx_offload_capa & pcf->rx_offload) != pcf->rx_offload) {
 		RTE_LOG(ERR, USER1,
 			"port#%u supported/requested RX offloads don't match, "
-			"supported: %#x, requested: %#x;\n",
-			pcf->id, dev_info.rx_offload_capa, pcf->rx_offload);
+			"supported: %#" PRIx64 ", requested: %#" PRIx64 ";\n",
+			pcf->id, (uint64_t)dev_info.rx_offload_capa,
+			pcf->rx_offload);
 		return NGX_ERROR;
 	}
 	if ((dev_info.tx_offload_capa & pcf->tx_offload) != pcf->tx_offload) {
 		RTE_LOG(ERR, USER1,
 			"port#%u supported/requested TX offloads don't match, "
-			"supported: %#x, requested: %#x;\n",
-			pcf->id, dev_info.tx_offload_capa, pcf->tx_offload);
+			"supported: %#" PRIx64 ", requested: %#" PRIx64 ";\n",
+			pcf->id, (uint64_t)dev_info.tx_offload_capa,
+			pcf->tx_offload);
 		return NGX_ERROR;
 	}
 
@@ -852,7 +859,8 @@ fill_eth_tcp_hdr_len(struct rte_mbuf *m)
  * HW can recognize L2/L3 with/without extensions/L4 (ixgbe/igb/fm10k)
  */
 static uint16_t
-type0_tcp_rx_callback(__rte_unused uint8_t port, __rte_unused uint16_t queue,
+type0_tcp_rx_callback(__rte_unused dpdk_port_t port,
+	__rte_unused uint16_t queue,
 	struct rte_mbuf *pkt[], uint16_t nb_pkts,
 	__rte_unused uint16_t max_pkts, __rte_unused void *user_param)
 {
@@ -916,7 +924,8 @@ type0_tcp_rx_callback(__rte_unused uint8_t port, __rte_unused uint16_t queue,
  * HW can recognize L2/L3/L4 and fragments (i40e).
  */
 static uint16_t
-type1_tcp_rx_callback(__rte_unused uint8_t port, __rte_unused uint16_t queue,
+type1_tcp_rx_callback(__rte_unused dpdk_port_t port,
+	__rte_unused uint16_t queue,
 	struct rte_mbuf *pkt[], uint16_t nb_pkts,
 	__rte_unused uint16_t max_pkts, void *user_param)
 {
@@ -965,7 +974,8 @@ type1_tcp_rx_callback(__rte_unused uint8_t port, __rte_unused uint16_t queue,
 }
 
 static uint16_t
-typen_tcp_rx_callback(__rte_unused uint8_t port, __rte_unused uint16_t queue,
+typen_tcp_rx_callback(__rte_unused dpdk_port_t port,
+	__rte_unused uint16_t queue,
 	struct rte_mbuf *pkt[], uint16_t nb_pkts,
 	__rte_unused uint16_t max_pkts, __rte_unused void *user_param)
 {

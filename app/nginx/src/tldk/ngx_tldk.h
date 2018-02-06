@@ -54,8 +54,8 @@ struct tldk_port_conf {
 	uint32_t nb_queues;
 	uint32_t queue_map;
 	uint32_t mtu;
-	uint32_t rx_offload;
-	uint32_t tx_offload;
+	uint64_t rx_offload;
+	uint64_t tx_offload;
 	uint32_t ipv4;
 	struct in6_addr ipv6;
 	struct ether_addr mac;
