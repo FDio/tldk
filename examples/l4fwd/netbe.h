@@ -71,8 +71,8 @@ struct netbe_port {
 	uint32_t nb_lcore;
 	uint32_t *lcore_id;
 	uint32_t mtu;
-	uint32_t rx_offload;
-	uint32_t tx_offload;
+	uint64_t rx_offload;
+	uint64_t tx_offload;
 	uint32_t ipv4;
 	struct in6_addr ipv6;
 	struct ether_addr mac;

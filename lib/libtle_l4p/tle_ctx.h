@@ -67,8 +67,8 @@ struct tle_bl_port {
  * device parameters.
  */
 struct tle_dev_param {
-	uint32_t rx_offload; /**< DEV_RX_OFFLOAD_* supported. */
-	uint32_t tx_offload; /**< DEV_TX_OFFLOAD_* supported. */
+	uint64_t rx_offload; /**< DEV_RX_OFFLOAD_* supported. */
+	uint64_t tx_offload; /**< DEV_TX_OFFLOAD_* supported. */
 	struct in_addr local_addr4;  /**< local IPv4 address assigned. */
 	struct in6_addr local_addr6; /**< local IPv6 address assigned. */
 	struct tle_bl_port bl4; /**< blocked ports for IPv4 address. */

@@ -91,6 +91,8 @@ CXXFLAGS += -I$(GTEST_DIR)/include
 CXXFLAGS += -I$(GMOCK_DIR)/include
 CXXFLAGS += -I$(RTE_OUTPUT)/include
 
+CXXFLAGS += $(EXTRA_CFLAGS)
+
 LDFLAGS += -lstdc++
 LDFLAGS += -L$(GMOCK_DIR) -lgmock
 LDLIBS += -whole-archive -ltle_l4p -ltle_dring
@@ -121,6 +123,7 @@ LDLIBS += gtest-rfc.o
 
 LDLIBS += -lstdc++
 LDLIBS += -L$(GMOCK_DIR) -lgmock
+LDLIBS += -L$(GMOCK_DIR)/gtest -lgtest
 LDLIBS += -L$(RTE_OUTPUT)/lib
 LDLIBS += -whole-archive -ltle_l4p -ltle_dring -ltle_timer
 

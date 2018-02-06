@@ -17,6 +17,7 @@
 #include <rte_arp.h>
 
 #include "netbe.h"
+#include "dpdk_legacy.h"
 
 struct ptype2cb {
 	uint32_t mask;
@@ -230,7 +231,7 @@ fill_ipv6_hdr_len(struct rte_mbuf *m, uint32_t l2, uint32_t fproto,
 }
 
 static inline struct rte_mbuf *
-handle_arp(struct rte_mbuf *m, struct netbe_lcore *lc, uint8_t port,
+handle_arp(struct rte_mbuf *m, struct netbe_lcore *lc, dpdk_port_t port,
 	uint32_t l2len)
 {
 	const struct arp_hdr *ahdr;
@@ -258,7 +259,7 @@ handle_arp(struct rte_mbuf *m, struct netbe_lcore *lc, uint8_t port,
 
 static inline struct rte_mbuf *
 fill_eth_tcp_arp_hdr_len(struct rte_mbuf *m, struct netbe_lcore *lc,
-	uint8_t port)
+	dpdk_port_t port)
 {
 	uint32_t dlen, l2_len, l3_len, l4_len;
 	uint16_t etp;
@@ -431,7 +432,7 @@ fix_reassembled(struct rte_mbuf *m, int32_t hwcsum, uint32_t proto)
 
 static struct rte_mbuf *
 reassemble(struct rte_mbuf *m, struct netbe_lcore *lc, uint64_t tms,
-	uint8_t port, uint32_t proto)
+	dpdk_port_t port, uint32_t proto)
 {
 	uint32_t l3cs;
 	struct rte_ip_frag_tbl *tbl;
@@ -526,7 +527,8 @@ do { \
  * HW can recognize L2/L3 with/without extensions/L4 (ixgbe/igb/fm10k)
  */
 static uint16_t
-type0_tcp_rx_callback(__rte_unused uint8_t port, __rte_unused uint16_t queue,
+type0_tcp_rx_callback(__rte_unused dpdk_port_t port,
+	__rte_unused uint16_t queue,
 	struct rte_mbuf *pkt[], uint16_t nb_pkts,
 	__rte_unused uint16_t max_pkts, void *user_param)
 {
@@ -594,7 +596,7 @@ type0_tcp_rx_callback(__rte_unused uint8_t port, __rte_unused uint16_t queue,
  * HW can recognize L2/L3 with/without extensions/L4 (ixgbe/igb/fm10k)
  */
 static uint16_t
-type0_udp_rx_callback(uint8_t port, __rte_unused uint16_t queue,
+type0_udp_rx_callback(dpdk_port_t port, __rte_unused uint16_t queue,
 	struct rte_mbuf *pkt[], uint16_t nb_pkts,
 	__rte_unused uint16_t max_pkts, void *user_param)
 {
@@ -680,7 +682,8 @@ type0_udp_rx_callback(uint8_t port, __rte_unused uint16_t queue,
  * HW can recognize L2/L3/L4 and fragments (i40e).
  */
 static uint16_t
-type1_tcp_rx_callback(__rte_unused uint8_t port, __rte_unused uint16_t queue,
+type1_tcp_rx_callback(__rte_unused dpdk_port_t port,
+	__rte_unused uint16_t queue,
 	struct rte_mbuf *pkt[], uint16_t nb_pkts,
 	__rte_unused uint16_t max_pkts, void *user_param)
 {
@@ -734,7 +737,7 @@ type1_tcp_rx_callback(__rte_unused uint8_t port, __rte_unused uint16_t queue,
  * HW can recognize L2/L3/L4 and fragments (i40e).
  */
 static uint16_t
-type1_udp_rx_callback(uint8_t port, __rte_unused uint16_t queue,
+type1_udp_rx_callback(dpdk_port_t port, __rte_unused uint16_t queue,
 	struct rte_mbuf *pkt[], uint16_t nb_pkts,
 	__rte_unused uint16_t max_pkts, void *user_param)
 {
@@ -804,8 +807,9 @@ type1_udp_rx_callback(uint8_t port, __rte_unused uint16_t queue,
  * generic, assumes HW doesn't recognize any packet type.
  */
 static uint16_t
-typen_tcp_arp_rx_callback(uint8_t port, uint16_t queue, struct rte_mbuf *pkt[],
-	uint16_t nb_pkts, uint16_t max_pkts, void *user_param)
+typen_tcp_arp_rx_callback(dpdk_port_t port, uint16_t queue,
+	struct rte_mbuf *pkt[], uint16_t nb_pkts, uint16_t max_pkts,
+	void *user_param)
 {
 	uint32_t j, x;
 	struct netbe_lcore *lc;
@@ -830,8 +834,8 @@ typen_tcp_arp_rx_callback(uint8_t port, uint16_t queue, struct rte_mbuf *pkt[],
 }
 
 static uint16_t
-typen_tcp_rx_callback(__rte_unused uint8_t port, __rte_unused uint16_t queue,
-	struct rte_mbuf *pkt[], uint16_t nb_pkts,
+typen_tcp_rx_callback(__rte_unused dpdk_port_t port,
+	__rte_unused uint16_t queue, struct rte_mbuf *pkt[], uint16_t nb_pkts,
 	__rte_unused uint16_t max_pkts, void *user_param)
 {
 	uint32_t j;
@@ -851,7 +855,7 @@ typen_tcp_rx_callback(__rte_unused uint8_t port, __rte_unused uint16_t queue,
 }
 
 static uint16_t
-typen_udp_rx_callback(uint8_t port, __rte_unused uint16_t queue,
+typen_udp_rx_callback(dpdk_port_t port, __rte_unused uint16_t queue,
 	struct rte_mbuf *pkt[], uint16_t nb_pkts,
 	__rte_unused uint16_t max_pkts, void *user_param)
 {

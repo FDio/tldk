@@ -35,6 +35,13 @@
 #include <rte_ip.h>
 #include <rte_ip_frag.h>
 #include <rte_udp.h>
+#include <rte_version.h>
+
+#if RTE_VERSION_NUM(17, 11, 0, 0) <= RTE_VERSION
+typedef uint16_t dpdk_port_t;
+#else
+typedef uint8_t dpdk_port_t;
+#endif
 
 #define RX_RING_SIZE 128
 #define TX_RING_SIZE 128
@@ -47,7 +54,7 @@ extern struct rte_mempool *frag_mp;
 
 extern char binpath[PATH_MAX];
 
-int port_init(uint8_t port, struct rte_mempool *mbuf_pool);
+int port_init(dpdk_port_t port, struct rte_mempool *mbuf_pool);
 
 uint64_t
 _mbuf_tx_offload(uint64_t il2, uint64_t il3, uint64_t il4, uint64_t tso,
@@ -86,7 +93,7 @@ void
 fill_eth_hdr_len(struct rte_mbuf *m);
 
 uint16_t
-typen_rx_callback(uint8_t port, __rte_unused uint16_t queue,
+typen_rx_callback(dpdk_port_t port, __rte_unused uint16_t queue,
 	struct rte_mbuf *pkt[], uint16_t nb_pkts,
 	__rte_unused uint16_t max_pkts, void *user_param);
 

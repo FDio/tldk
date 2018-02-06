@@ -16,16 +16,13 @@
 #include "test_common.h"
 
 int
-port_init(uint8_t port, struct rte_mempool *mbuf_pool)
+port_init(dpdk_port_t port, struct rte_mempool *mbuf_pool)
 {
 	struct rte_eth_conf port_conf;
 	const uint16_t rx_rings = 1, tx_rings = 1;
 	uint16_t q;
 	int retval;
 	int socket_id;
-
-	if (port >= rte_eth_dev_count())
-		return -1;
 
 	socket_id = rte_eth_dev_socket_id(port);
 
@@ -243,7 +240,7 @@ fill_eth_hdr_len(struct rte_mbuf *m)
  * generic, assumes HW doesn't recognise any packet type.
  */
 uint16_t
-typen_rx_callback(uint8_t port, __rte_unused uint16_t queue,
+typen_rx_callback(dpdk_port_t port, __rte_unused uint16_t queue,
 	struct rte_mbuf *pkt[], uint16_t nb_pkts,
 	__rte_unused uint16_t max_pkts, void *user_param)
 {
