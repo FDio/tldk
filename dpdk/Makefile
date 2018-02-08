@@ -14,7 +14,7 @@
 # Scripts require non-POSIX parts of bash
 SHELL := /bin/bash
 
-DPDK_VERSION ?= 16.11
+DPDK_VERSION ?= v17.11
 DPDK_BUILD_DIR        ?= $(CURDIR)/_build
 DPDK_INSTALL_DIR      ?= $(DPDK_BUILD_DIR)/dpdk/$(RTE_TARGET)
 DPDK_PKTMBUF_HEADROOM ?= 128
@@ -125,6 +125,8 @@ $(B)/custom-config: $(B)/.patch.ok Makefile
 	$(call set,RTE_LIBRTE_PORT,n)
 	$(call set,RTE_LIBRTE_TABLE,n)
 	$(call set,RTE_LIBRTE_PIPELINE,n)
+	$(call set,RTE_LIBRTE_FLOW_CLASSIFY,n)
+	$(call set,RTE_LIBRTE_PMD_CRYPTO_SCHEDULER,n)
 	$(call set,RTE_KNI_KMOD,n)
 	@rm -f .config.ok
 
@@ -133,11 +135,7 @@ $(B)/.download.ok:
 	@if [ -e $(DPDK_SOURCE) ] ; \
 		then rm -rf $(DPDK_SOURCE) ; \
 	fi
-ifeq ($(DPDK_VERSION),master)
 	@git clone $(DPDK_GIT_REPO) --branch $(DPDK_VERSION) $(DPDK_SOURCE)
-else
-	@git clone $(DPDK_GIT_REPO) --branch v$(DPDK_VERSION) $(DPDK_SOURCE)
-endif
 	@touch $@
 
 .PHONY: download

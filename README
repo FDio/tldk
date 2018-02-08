@@ -39,8 +39,9 @@
 
 2. INSTALLATION GUIDE
 
-   1) Obtain latest DPDK and build it.
+   1) Obtain latest supported DPDK version and build it.
    (refer to http://dpdk.org for information how to download and build it).
+   Currently supported(tested) DPDK versions: 16.11 LTS, 17.11 LTS, 18.02.
    2) Make sure that RTE_SDK and RTE_TARGET DPDK related environment variables
    are setup correctly.
    3) Go to the TLDK root directory and type: 'make all'.
