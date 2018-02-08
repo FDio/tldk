@@ -293,7 +293,7 @@ be_queue_init(struct tldk_ctx *tcx, const tldk_conf_t *cf)
 {
 	int32_t socket, rc;
 	uint16_t queue_id;
-	uint32_t port_id, i;
+	uint32_t port_id, i, nb_rxd, nb_txd;
 	struct rte_eth_dev_info dev_info;
 	const struct tldk_ctx_conf *ctx;
 	const struct tldk_port_conf *pcf;
@@ -305,8 +305,12 @@ be_queue_init(struct tldk_ctx *tcx, const tldk_conf_t *cf)
 		pcf = &cf->port[port_id];
 
 		rte_eth_dev_info_get(port_id, &dev_info);
+
 		dev_info.default_rxconf.rx_drop_en = 1;
-		dev_info.default_txconf.tx_free_thresh = TX_RING_SIZE / 2;
+
+		nb_rxd = RTE_MIN(RX_RING_SIZE, dev_info.rx_desc_lim.nb_max);
+		nb_txd = RTE_MIN(TX_RING_SIZE, dev_info.tx_desc_lim.nb_max);
+		dev_info.default_txconf.tx_free_thresh = nb_txd / 2;
 
 		if (pcf->tx_offload != 0) {
 			RTE_LOG(ERR, USER1,
@@ -317,7 +321,7 @@ be_queue_init(struct tldk_ctx *tcx, const tldk_conf_t *cf)
 
 		socket = rte_eth_dev_socket_id(port_id);
 
-		rc = rte_eth_rx_queue_setup(port_id, queue_id, RX_RING_SIZE,
+		rc = rte_eth_rx_queue_setup(port_id, queue_id, nb_rxd,
 				socket, &dev_info.default_rxconf, tcx->mpool);
 		if (rc < 0) {
 			RTE_LOG(ERR, USER1,
@@ -326,7 +330,7 @@ be_queue_init(struct tldk_ctx *tcx, const tldk_conf_t *cf)
 			return rc;
 		}
 
-		rc = rte_eth_tx_queue_setup(port_id, queue_id, TX_RING_SIZE,
+		rc = rte_eth_tx_queue_setup(port_id, queue_id, nb_txd,
 				socket, &dev_info.default_txconf);
 		if (rc < 0) {
 			RTE_LOG(ERR, USER1,
