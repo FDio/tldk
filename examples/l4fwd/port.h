@@ -207,6 +207,7 @@ queue_init(struct netbe_port *uprt, struct rte_mempool *mp)
 {
 	int32_t socket, rc;
 	uint16_t q;
+	uint32_t nb_rxd, nb_txd;
 	struct rte_eth_dev_info dev_info;
 
 	rte_eth_dev_info_get(uprt->id, &dev_info);
@@ -215,7 +216,10 @@ queue_init(struct netbe_port *uprt, struct rte_mempool *mp)
 
 	dev_info.default_rxconf.rx_drop_en = 1;
 
-	dev_info.default_txconf.tx_free_thresh = TX_RING_SIZE / 2;
+	nb_rxd = RTE_MIN(RX_RING_SIZE, dev_info.rx_desc_lim.nb_max);
+	nb_txd = RTE_MIN(TX_RING_SIZE, dev_info.tx_desc_lim.nb_max);
+
+	dev_info.default_txconf.tx_free_thresh = nb_txd / 2;
 	if (uprt->tx_offload != 0) {
 		RTE_LOG(ERR, USER1, "%s(%u): enabling full featured TX;\n",
 			__func__, uprt->id);
@@ -223,7 +227,7 @@ queue_init(struct netbe_port *uprt, struct rte_mempool *mp)
 	}
 
 	for (q = 0; q < uprt->nb_lcore; q++) {
-		rc = rte_eth_rx_queue_setup(uprt->id, q, RX_RING_SIZE,
+		rc = rte_eth_rx_queue_setup(uprt->id, q, nb_rxd,
 			socket, &dev_info.default_rxconf, mp);
 		if (rc < 0) {
 			RTE_LOG(ERR, USER1,
@@ -234,7 +238,7 @@ queue_init(struct netbe_port *uprt, struct rte_mempool *mp)
 	}
 
 	for (q = 0; q < uprt->nb_lcore; q++) {
-		rc = rte_eth_tx_queue_setup(uprt->id, q, TX_RING_SIZE,
+		rc = rte_eth_tx_queue_setup(uprt->id, q, nb_txd,
 			socket, &dev_info.default_txconf);
 		if (rc < 0) {
 			RTE_LOG(ERR, USER1,
