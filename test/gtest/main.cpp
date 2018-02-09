@@ -25,6 +25,8 @@
 #include <rte_mbuf.h>
 #include <rte_errno.h>
 
+#include <tle_version.h>
+
 #include "test_common.h"
 
 struct rte_mempool *mbuf_pool;
@@ -45,6 +47,8 @@ main(int argc, char *argv[])
 		rte_exit(EXIT_FAILURE, "Invalid EAL arguments\n");
 	argc -= ret;
 	argv += ret;
+
+	printf("%s UT\n", tle_version);
 
 	/* get the path of binary and save in a global variable to be used later*/
 	realpath(argv[0], binpath);

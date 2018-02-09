@@ -31,5 +31,6 @@ EXPORT_MAP := tle_misc_version.map
 LIBABIVER := 1
 
 SYMLINK-y-include += tle_dpdk_wrapper.h
+SYMLINK-y-include += tle_version.h
 
 include $(TLDK_ROOT)/mk/tle.lib.mk
