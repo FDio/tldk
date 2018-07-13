@@ -33,6 +33,7 @@ SRCS-y += test_dring.c
 
 CFLAGS += $(WERROR_FLAGS)
 CFLAGS += -I$(RTE_OUTPUT)/include
+CFLAGS += -Wimplicit-fallthrough=0
 
 LDLIBS += -L$(RTE_OUTPUT)/lib
 LDLIBS += -ltle_dring

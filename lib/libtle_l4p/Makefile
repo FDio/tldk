@@ -25,6 +25,7 @@ LIB = libtle_l4p.a
 
 CFLAGS += -O3
 CFLAGS += $(WERROR_FLAGS) -I$(SRCDIR)
+CFLAGS += -Wimplicit-fallthrough=0
 
 EXPORT_MAP := tle_l4p_version.map
 

@@ -25,6 +25,7 @@ LIB = libtle_dring.a
 
 CFLAGS += -O3
 CFLAGS += $(WERROR_FLAGS) -I$(SRCDIR)
+CFLAGS += -Wimplicit-fallthrough=0
 
 EXPORT_MAP := tle_dring_version.map
 
