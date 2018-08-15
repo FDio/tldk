@@ -1,0 +1,66 @@
+---
+project: 'tldk'
+project_creation_date: '2016-05-19'
+project_category: ''
+lifecycle_state: 'Incubation'
+project_lead: &tldk_ptl
+    name: 'n/a'
+    email: ''
+    id: ''
+    company: ''
+    timezone: ''
+primary_contact: *tldk_ptl
+issue_tracking:
+    type: 'jira'
+    url: 'https://jira.fd.io/browse/TLDK'
+    key: 'TLDK'
+mailing_list:
+    type: 'groups.io'
+    url: 'https://lists.fd.io/g/tldk-dev'
+    tag: '<[sub-project_name]>'
+realtime_discussion:
+    type: 'irc'
+    server: 'freenode'
+    channel: 'fdio-tldk'
+meetings:
+    - type: 'n/a'
+      agenda: ''
+      url: 'https://wiki.fd.io/view/TLDK/Meeting'
+      server: 'n/a'
+      channel: 'n/a'
+      repeats: 'n/a'
+      time: 'n/a'
+repositories:
+    - 'tldk'
+committers:
+    - <<: *tldk_ptl
+    - name: 'Mohammad Abdul Awal'
+      company: 'gmail'
+      email: 'abdulawal@gmail.com'
+      id: 'abdulawal'
+      timezone: 'Atlantis/Shangri-la'
+    - name: 'Ed Warnicke'
+      company: 'gmail'
+      email: 'hagbard@gmail.com'
+      id: 'hagbard'
+      timezone: 'Atlantis/Shangri-la'
+    - name: 'Keith Wiles'
+      company: 'intel'
+      email: 'keith.wiles@intel.com'
+      id: 'keithwiles'
+      timezone: 'Atlantis/Shangri-la'
+    - name: 'Konstantin Ananyev'
+      company: 'intel'
+      email: 'konstantin.ananyev@intel.com'
+      id: 'konstantin_ananyev'
+      timezone: 'Atlantis/Shangri-la'
+tsc:
+    # yamllint disable rule:line-length
+    approval: ''
+    changes:
+        - type: 'removal'
+          name: ''
+          link: ''
+        - type: 'promotion'
+          name: ''
+          link: ''
