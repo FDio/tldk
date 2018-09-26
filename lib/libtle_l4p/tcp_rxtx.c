@@ -2361,9 +2361,10 @@ tle_tcp_stream_send(struct tle_stream *ts, struct rte_mbuf *pkt[], uint16_t num)
 				rte_pktmbuf_free(pkt[i]);
 				/* set the mbuf as consumed */
 				k++;
-			} else
+			} else {
 				/* no space left in tx queue */
 				break;
+			}
 		}
 	}
 
