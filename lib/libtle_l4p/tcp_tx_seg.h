@@ -27,6 +27,7 @@ tcp_segmentation(struct rte_mbuf *mbin, struct rte_mbuf *mbout[], uint16_t num,
 	struct rte_mbuf *in_seg = NULL;
 	uint32_t nbseg, in_seg_data_pos;
 	uint32_t more_in_segs;
+	uint16_t bytes_left;
 
 	in_seg = mbin;
 	in_seg_data_pos = 0;
@@ -48,6 +49,7 @@ tcp_segmentation(struct rte_mbuf *mbin, struct rte_mbuf *mbout[], uint16_t num,
 			return -ENOMEM;
 		}
 
+		bytes_left = mss;
 		out_seg_prev = out_pkt;
 		more_out_segs = 1;
 		while (more_out_segs && more_in_segs) {
@@ -66,7 +68,7 @@ tcp_segmentation(struct rte_mbuf *mbin, struct rte_mbuf *mbout[], uint16_t num,
 
 			/* Prepare indirect buffer */
 			rte_pktmbuf_attach(out_seg, in_seg);
-			len = mss;
+			len = bytes_left;
 			if (len > (in_seg->data_len - in_seg_data_pos))
 				len = in_seg->data_len - in_seg_data_pos;
 
@@ -75,9 +77,10 @@ tcp_segmentation(struct rte_mbuf *mbin, struct rte_mbuf *mbout[], uint16_t num,
 			out_pkt->pkt_len = (uint16_t)(len + out_pkt->pkt_len);
 			out_pkt->nb_segs += 1;
 			in_seg_data_pos += len;
+			bytes_left -= len;
 
 			/* Current output packet (i.e. fragment) done ? */
-			if (out_pkt->pkt_len >= mss)
+			if (bytes_left == 0)
 				more_out_segs = 0;
 
 			/* Current input segment done ? */
