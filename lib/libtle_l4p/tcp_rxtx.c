@@ -473,10 +473,9 @@ tx_nxt_data(struct tle_tcp_stream *s, uint32_t tms)
 static inline void
 free_una_data(struct tle_tcp_stream *s, uint32_t len)
 {
-	uint32_t i, n, num, plen;
+	uint32_t i, num, plen;
 	struct rte_mbuf **mi;
 
-	n = 0;
 	plen = 0;
 
 	do {
@@ -487,12 +486,14 @@ free_una_data(struct tle_tcp_stream *s, uint32_t len)
 			break;
 
 		/* free acked data */
-		for (i = 0; i != num && n != len; i++, n = plen) {
-			plen += PKT_L4_PLEN(mi[i]);
-			if (plen > len) {
+		for (i = 0; i != num && plen != len; i++) {
+			uint32_t next_pkt_len = PKT_L4_PLEN(mi[i]);
+			if (plen + next_pkt_len > len) {
 				/* keep SND.UNA at the start of the packet */
-				len -= RTE_MIN(len, plen - len);
+				len = plen;
 				break;
+			} else {
+				plen += next_pkt_len;
 			}
 			rte_pktmbuf_free(mi[i]);
 		}
