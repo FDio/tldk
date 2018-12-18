@@ -559,8 +559,10 @@ tle_udp_stream_send(struct tle_stream *us, struct rte_mbuf *pkt[],
 	mtu = dst.mtu - dst.l2_len - dst.l3_len;
 
 	/* mark stream as not closable. */
-	if (rwl_acquire(&s->tx.use) < 0)
+	if (rwl_acquire(&s->tx.use) < 0) {
+		rte_errno = EAGAIN;
 		return 0;
+	}
 
 	nb = 0;
 	for (i = 0, k = 0; k != num; k = i) {
@@ -590,8 +592,10 @@ tle_udp_stream_send(struct tle_stream *us, struct rte_mbuf *pkt[],
 				drb, &nb);
 
 			/* stream TX queue is full. */
-			if (k != i)
+			if (k != i) {
+				rte_errno = EAGAIN;
 				break;
+			}
 		}
 
 		/* enqueue packet that need to be fragmented */
@@ -611,6 +615,7 @@ tle_udp_stream_send(struct tle_stream *us, struct rte_mbuf *pkt[],
 			if (n == 0) {
 				while (rc-- != 0)
 					rte_pktmbuf_free(frag[rc]);
+				rte_errno = EAGAIN;
 				break;
 			}
 
