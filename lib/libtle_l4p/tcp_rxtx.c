@@ -1333,17 +1333,13 @@ rx_data_ack(struct tle_tcp_stream *s, struct dack_info *tack,
 			/* account for segment received */
 			ack_info_update(tack, &si[j], ret != 0, plen, ts);
 
-			if (ret != 0) {
-				rp[k] = mb[j];
-				rc[k] = -ret;
-				k++;
+			if (ret != 0)
 				break;
-			}
+
 			rte_pktmbuf_adj(mb[j], hlen);
 		}
 
 		n = j - i;
-		j += (ret != 0);
 
 		/* account for OFO data */
 		if (seq != s->tcb.rcv.nxt)
