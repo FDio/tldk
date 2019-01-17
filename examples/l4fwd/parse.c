@@ -835,7 +835,6 @@ parse_app_options(int argc, char **argv, struct netbe_cfg *cfg,
 					__func__, optarg, opt);
 			ctx_prm->flags = v;
 		} else if (opt == OPT_SHORT_PROMISC) {
-		} else if (opt == OPT_SHORT_PROMISC) {
 			cfg->promisc = 1;
 		} else if (opt == OPT_SHORT_RBUFS) {
 			rc = parse_uint_val(NULL, optarg, &v);
