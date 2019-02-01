@@ -860,10 +860,12 @@ accept_prep_stream(struct tle_tcp_stream *ps, struct stbl *st,
 	cs->s.pmsk.raw = UINT32_MAX;
 
 	if (pi->tf.type == TLE_V4) {
+		cs->s.type = TLE_V4;
 		cs->s.ipv4.addr = pi->addr4;
 		cs->s.ipv4.mask.src = INADDR_NONE;
 		cs->s.ipv4.mask.dst = INADDR_NONE;
 	} else if (pi->tf.type == TLE_V6) {
+		cs->s.type = TLE_V6;
 		cs->s.ipv6.addr = *pi->addr6;
 		rte_memcpy(&cs->s.ipv6.mask.src, &tle_ipv6_none,
 			sizeof(cs->s.ipv6.mask.src));
