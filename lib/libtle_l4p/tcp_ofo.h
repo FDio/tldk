@@ -34,6 +34,15 @@ struct ofo {
 };
 
 static inline void
+_ofodb_copy(struct ofodb *dst, struct ofodb *src)
+{
+	dst->nb_elem = src->nb_elem;
+	dst->sl = src->sl;
+	rte_memcpy(dst->obj, src->obj,
+			src->nb_elem * sizeof(struct rte_mbuf*));
+}
+
+static inline void
 _ofodb_free(struct ofodb *db)
 {
 	uint32_t i;
@@ -49,7 +58,7 @@ _ofo_remove(struct ofo *ofo, uint32_t pos, uint32_t num)
 
 	n = ofo->nb_elem - num - pos;
 	for (i = 0; i != n; i++)
-		ofo->db[pos + i] = ofo->db[pos + num + i];
+		_ofodb_copy(&ofo->db[pos + i], &ofo->db[pos + num + i]);
 	ofo->nb_elem -= num;
 }
 
@@ -83,7 +92,7 @@ _ofo_insert_new(struct ofo *ofo, uint32_t pos, union seqlen *sl,
 
 	/* insert into a proper position. */
 	for (i = n; i != pos; i--)
-		ofo->db[i] = ofo->db[i - 1];
+		_ofodb_copy(&ofo->db[i], &ofo->db[i - 1]);
 
 	/* fill new block */
 	n = RTE_MIN(db->nb_max, num);
@@ -119,11 +128,10 @@ _ofo_insert_right(struct ofo *ofo, uint32_t pos, union seqlen *sl,
 
 	/* skip overlapping packets */
 	for (i = 0, n = skip; i != num && n != 0; i++, n -= plen) {
-
 		plen = mb[i]->pkt_len;
 		if (n < plen) {
 			/* adjust partially overlapped packet. */
-			rte_pktmbuf_adj(mb[i], plen - n);
+			rte_pktmbuf_adj(mb[i], n);
 			break;
 		}
 	}
@@ -155,12 +163,12 @@ static inline uint32_t
 _ofo_step(struct ofo *ofo, union seqlen *sl, struct rte_mbuf *mb[],
 	uint32_t num)
 {
-	uint32_t i, n, end, lo, ro;
-	struct ofodb *db;
+	uint32_t i, j, n, ro, mn;
+	struct ofodb *db, *nextdb;
 
 	db = NULL;
-	end = sl->seq + sl->len;
 	n = ofo->nb_elem;
+	mn = num;
 
 	/*
 	 * start from the right side, assume that after some gap,
@@ -172,25 +180,58 @@ _ofo_step(struct ofo *ofo, union seqlen *sl, struct rte_mbuf *mb[],
 			break;
 	}
 
-	/* new db required */
-	if ((int32_t)i < 0 || tcp_seq_lt(db->sl.seq + db->sl.len, sl->seq))
-		return _ofo_insert_new(ofo, i + 1, sl, mb, num);
-
-	/* new one is right adjacent, or overlap */
-
-	ro = sl->seq - db->sl.seq;
-	lo = end - db->sl.seq;
+	if (i != n - 1) {
+		nextdb = ofo->db + (i + 1);
+		/* overlap with right side, remove overlapped part from mb */
+		if (tcp_seq_lt(nextdb->sl.seq, sl->seq + sl->len)) {
+			ro = sl->seq + sl->len - nextdb->sl.seq;
+			j = num - 1;
+			while (ro > 0) {
+				if (ro >= mb[j]->pkt_len) {
+					ro -= mb[j]->pkt_len;
+					sl->len -= mb[j]->pkt_len;
+					rte_pktmbuf_free(mb[j]);
+					num--;
+					j--;
+				} else {
+					rte_pktmbuf_trim(mb[j], ro);
+					break;
+				}
+			}
+		}
+	}
 
 	/* new one is completely overlapped by old one */
-	if (lo <= db->sl.len)
-		return 0;
+	if ((int32_t)i >= 0 && tcp_seq_leq(sl->seq + sl->len, db->sl.seq + db->sl.len)) {
+		for (j = 0; j < num; j++) {
+			rte_pktmbuf_free(mb[j]);
+		}
+		return mn;
+	}
 
-	/* either overlap OR (adjacent AND some free space remains) */
-	if (ro < db->sl.len || db->nb_elem != db->nb_max)
-		return _ofo_insert_right(ofo, i, sl, mb, num);
+	/* new one is partially overlapped by old one
+	 * OR new one is right adjacent and current db still have space*/
+	j = 0;
+	if ((int32_t)i >= 0 &&
+			(tcp_seq_lt(sl->seq, db->sl.seq + db->sl.len) ||
+					(sl->seq == db->sl.seq + db->sl.len &&
+							db->nb_elem < db->nb_max))) {
+		j = _ofo_insert_right(ofo, i, sl, mb, num);
+	}
 
-	/* adjacent, no free space in current block */
-	return _ofo_insert_new(ofo, i + 1, sl, mb, num);
+	while (j != num) {
+		i++;
+		n = _ofo_insert_new(ofo, i, sl, mb + j, num - j);
+		if (n == 0)
+			break;
+		j += n;
+	}
+
+	for (; j < num; j++) {
+		rte_pktmbuf_free(mb[j]);
+	}
+
+	return mn;
 }
 
 static inline void
@@ -224,15 +265,37 @@ _ofo_compact(struct ofo *ofo)
 }
 
 static inline uint32_t
-_ofodb_enqueue(struct rte_ring *r, const struct ofodb *db, union seqlen *sl)
+_ofodb_enqueue(struct rte_ring *r, const struct ofodb *db, uint32_t *seq)
 {
-	uint32_t n, num;
+	uint32_t i, n, num, begin, end;
+	struct rte_mbuf* pkt;
 
+	n = 0;
 	num = db->nb_elem;
-	sl->raw = db->sl.raw;
-	n = _rte_ring_enqueue_burst(r, (void * const *)db->obj, num);
+	begin = db->sl.seq;
+	i = 0;
+	pkt = db->obj[0];
 
-	sl->len -= tcp_mbuf_seq_free(db->obj + n, num - n);
+	/* removed overlapped part from db */
+	while (tcp_seq_lt(begin, *seq)) {
+		end = begin + pkt->pkt_len;
+		if (tcp_seq_leq(end, *seq)) {
+			/* pkt is completely overlapped */
+			begin = end;
+			rte_pktmbuf_free(pkt);
+			pkt = db->obj[++i];
+		} else {
+			/* pkt is partly overlapped */
+			rte_pktmbuf_adj(pkt, *seq - begin);
+			break;
+		}
+	}
+
+	n = i;
+	n += _rte_ring_enqueue_burst(r, (void * const *)(db->obj + i), num - i);
+
+	*seq = db->sl.seq + db->sl.len;
+	*seq -= tcp_mbuf_seq_free(db->obj + n, num - n);
 	return num - n;
 }
 
