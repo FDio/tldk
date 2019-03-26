@@ -31,14 +31,9 @@ static inline uint32_t
 rx_ofo_enqueue(struct tle_tcp_stream *s, union seqlen *sl,
 	struct rte_mbuf *mb[], uint32_t num)
 {
-	uint32_t i, n;
+	uint32_t n;
 
-	n = 0;
-	do {
-		i = _ofo_step(s->rx.ofo, sl, mb + n, num - n);
-		n += i;
-	} while (i != 0 && n != num);
-
+	n = _ofo_step(s->rx.ofo, sl, mb, num);
 	_ofo_compact(s->rx.ofo);
 	return n;
 }
@@ -46,10 +41,9 @@ rx_ofo_enqueue(struct tle_tcp_stream *s, union seqlen *sl,
 static inline uint32_t
 rx_ofo_reduce(struct tle_tcp_stream *s)
 {
-	uint32_t i, n, end, seq;
+	uint32_t i, n, seq;
 	struct ofo *ofo;
 	struct ofodb *db;
-	union seqlen sl;
 
 	seq = s->tcb.rcv.nxt;
 	ofo = s->rx.ofo;
@@ -63,15 +57,11 @@ rx_ofo_reduce(struct tle_tcp_stream *s)
 		if (tcp_seq_lt(seq, db->sl.seq))
 			break;
 
-		end = db->sl.seq + db->sl.len;
-
 		/* this db is fully overlapped */
-		if (tcp_seq_leq(end, seq))
+		if (tcp_seq_leq(db->sl.seq + db->sl.len, seq))
 			_ofodb_free(db);
 		else
-			n += _ofodb_enqueue(s->rx.q, db, &sl);
-
-		seq = sl.seq + sl.len;
+			n += _ofodb_enqueue(s->rx.q, db, &seq);
 	}
 
 	s->tcb.rcv.nxt = seq;
