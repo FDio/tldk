@@ -181,7 +181,7 @@ _ofo_step(struct ofo *ofo, union seqlen *sl, struct rte_mbuf *mb[],
 	}
 
 	if (i != n - 1) {
-		nextdb = ofo->db + i + 1;
+		nextdb = ofo->db + (i + 1);
 		/* overlap with right side, remove overlapped part from mb */
 		if (tcp_seq_lt(nextdb->sl.seq, sl->seq + sl->len)) {
 			ro = sl->seq + sl->len - nextdb->sl.seq;
