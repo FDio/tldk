@@ -22,6 +22,8 @@
 extern "C" {
 #endif
 
+#include <rte_version.h>
+
 static inline int
 xmm_cmp(const rte_xmm_t *da, const rte_xmm_t *sa)
 {
@@ -296,16 +298,40 @@ check_pkt_csum(const struct rte_mbuf *m, uint64_t ol_flags, uint32_t type,
 	int32_t ret;
 	uint16_t csum;
 
+#if RTE_VERSION >= RTE_VERSION_NUM(18, 5, 0, 0)
+	/* case 0: both ip and l4 cksum is verified or data is valid */
+	if ((ol_flags & PKT_RX_IP_CKSUM_GOOD) &&
+	    (ol_flags & PKT_RX_L4_CKSUM_GOOD))
+		return 0;
+
+	/* case 1: either ip or l4 cksum bad */
+	if ((ol_flags & PKT_RX_IP_CKSUM_MASK) == PKT_RX_IP_CKSUM_BAD)
+		return 1;
+
+	if ((ol_flags & PKT_RX_L4_CKSUM_MASK) == PKT_RX_L4_CKSUM_BAD)
+		return 1;
+
+#endif
+	/* case 2: either ip or l4 or both cksum is unknown */
 	ret = 0;
 	l3h4 = rte_pktmbuf_mtod_offset(m, const struct ipv4_hdr *, m->l2_len);
 	l3h6 = rte_pktmbuf_mtod_offset(m, const struct ipv6_hdr *, m->l2_len);
 
+#if RTE_VERSION >= RTE_VERSION_NUM(18, 5, 0, 0)
+	if ((ol_flags & PKT_RX_IP_CKSUM_MASK) == PKT_RX_IP_CKSUM_UNKNOWN) {
+#else
 	if ((ol_flags & PKT_RX_IP_CKSUM_BAD) != 0) {
+#endif
 		csum = _ipv4x_cksum(l3h4, m->l3_len);
 		ret = (csum != UINT16_MAX);
 	}
 
+#if RTE_VERSION >= RTE_VERSION_NUM(18, 5, 0, 0)
+	if (ret == 0 && (ol_flags & PKT_RX_L4_CKSUM_MASK) ==
+			PKT_RX_L4_CKSUM_UNKNOWN) {
+#else
 	if (ret == 0 && (ol_flags & PKT_RX_L4_CKSUM_BAD) != 0) {
+#endif
 
 		/*
 		 * for IPv4 it is allowed to have zero UDP cksum,
