@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "182b306f_1e5888c6",
+        "filename": "lib/libtle_l4p/tcp_rxtx.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 495,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2019-04-14T21:26:55Z",
+      "side": 1,
+      "message": "good catch.\nAs a nit - we don\u0027t need else here.\njust\n\nif (plen + next_pkt_len \u003e len) {\n   len \u003d plen;\n    break;\n}\nplen + next_pkt_len;\nrte_pktmbuf_free(mi[i]);\n\nseems sufficient.",
+      "revId": "7d89e1857549a47e4f4d6194851696f252760646",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    }
+  ]
+}
