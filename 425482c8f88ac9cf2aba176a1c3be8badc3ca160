@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "311eaa87_84908a8c",
+        "filename": "lib/libtle_l4p/tcp_ofo.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 184,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2019-04-16T13:36:04Z",
+      "side": 1,
+      "message": "that one was introduced by previous patch.\nI am not sure about that changes in previous one are correct, but if they are - that oen could be just squashed with previous one (when the problem was introduced).",
+      "revId": "425482c8f88ac9cf2aba176a1c3be8badc3ca160",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    }
+  ]
+}
