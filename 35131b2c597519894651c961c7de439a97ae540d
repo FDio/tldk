@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "524eef57_4c065ae7",
+        "filename": "lib/libtle_l4p/tcp_ofo.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 175,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2019-04-16T17:19:42Z",
+      "side": 0,
+      "message": "actually probably original code could be updated in a slightly different manner to fix the problems.\nThough need to make both insert_new and insert_right to\ntake extra parameter - stop_seq, i.e. don\u0027t insert futher mbufs into db if sl-\u003eseq + plen \u003e stop_seq\n(i.e. don\u0027t insert mbufs that have overlaps with already mbufs in other db[]s).\nSomething like that:\n\n/* sqn when we have to stop to avoid\n *  overlap with next db mbufs\n */\nprev_seq \u003d sl-\u003eseq + sl-\u003e\n\nfor (i \u003d n; i-- !\u003d 0; ) {\n\tdb \u003d ofo-\u003edb + i;\n\tif (tcp_seq_leq(db-\u003esl.seq, sl-\u003eseq))\n\t\tbreak;\n        prev_seq \u003d db-\u003esl.seq;\n}\n \n/* new db required */\nif ((int32_t)i \u003c 0 || tcp_seq_lt(db-\u003esl.seq +\n        db-\u003esl.len,sl-\u003eseq))\n\n   /* need to change insert_new() to stop when\n    * seq reaches prev_seq */\n   return _ofo_insert_new(ofo, i + 1, sl, mb, num, \n       prev_seq);\n\n  /* new one is right adjacent, or overlap */\n\n  ro \u003d sl-\u003eseq - db-\u003esl.seq;\n  lo \u003d end - db-\u003esl.seq;\n\n  /* new one is completely overlapped by old one */\n  if (lo \u003c\u003d db-\u003esl.len) {\n    /* free all mbufs*/\n    return num;\n  }              \n\n  /* either overlap OR\n   *(adjacent AND some free space remains)\n   */\n  if (ro \u003c db-\u003esl.len || db-\u003enb_elem !\u003d db-\u003enb_max)\n      return _ofo_insert_right(ofo, i, sl, mb, num,\n         prev_seq);\n\n   /* adjacent, no free space in current block */\n   return _ofo_insert_new(ofo, i + 1, sl, mb, num,\n      prev_seq);\n\nWhat do you think?",
+      "revId": "35131b2c597519894651c961c7de439a97ae540d",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    }
+  ]
+}

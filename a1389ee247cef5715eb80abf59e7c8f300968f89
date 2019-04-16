@@ -1,0 +1,72 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "125251c3_0a7a3db0",
+        "filename": "lib/libtle_l4p/tcp_ofo.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 41,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2019-04-16T17:19:42Z",
+      "side": 1,
+      "message": "not sure why we do need to copy obj[] here...\nI deliberately split ifodb header and actual ob[], so we can just assign pointer to the obj[] to another db without copying the obj[] contents.",
+      "revId": "a1389ee247cef5715eb80abf59e7c8f300968f89",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "95b50161_b6c7b3e1",
+        "filename": "lib/libtle_l4p/tcp_ofo.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 134,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2019-04-16T17:19:42Z",
+      "side": 1,
+      "message": "good catch.",
+      "revId": "a1389ee247cef5715eb80abf59e7c8f300968f89",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "aebaf4a5_7eaf248d",
+        "filename": "lib/libtle_l4p/tcp_ofo.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 186,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2019-04-16T17:19:42Z",
+      "side": 1,
+      "message": "but it could happen that we have overlap in the middle:\nsli-\u003eseq \u003c nextdb-\u003esl.seq AND sl-\u003eseq + sl-\u003elen \u003e nextdb-\u003esl.seq + nextdb-\u003esl.len.\nAgain it could happen that mbuf[] will span over multiple db[] elems.",
+      "revId": "a1389ee247cef5715eb80abf59e7c8f300968f89",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "ea030d93_c10d68c8",
+        "filename": "lib/libtle_l4p/tcp_ofo.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 222,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2019-04-16T17:19:42Z",
+      "side": 1,
+      "message": "so you moved it here from rx_ofo_enqueue().\nI suppose the main reason is to avoid another search through ofo db[] again for the rest of packets?\nBut how can you guarantee that remaining mbufs wouldn\u0027t overlap with any of db[] on the right?\nProbably need to keep original loop in rx_ofo_enqueue().",
+      "revId": "a1389ee247cef5715eb80abf59e7c8f300968f89",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    }
+  ]
+}
