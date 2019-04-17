@@ -1,0 +1,44 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "8a54f5e8_371a7672",
+        "filename": "lib/libtle_l4p/misc.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 301,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2019-04-17T17:00:21Z",
+      "side": 1,
+      "message": "generic comment:\nto keep avoid polluting the code wiht #if RTE_VERSION macros, please try to have all code that depsnds on dpdk version in:\nlib/libtle_misc/tle_dpdk_wrapper.h\nthat would help to keep all such changes in one place and\nhopefully under control.",
+      "range": {
+        "startLine": 301,
+        "startChar": 37,
+        "endLine": 301,
+        "endChar": 38
+      },
+      "revId": "7d3706dec4cee37d57a682b34bbe21c5b212ba4c",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "1577242f_e51ce673",
+        "filename": "lib/libtle_l4p/misc.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 308,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2019-04-17T17:00:21Z",
+      "side": 1,
+      "message": "I don\u0027t think these changes would always work:\nin ctx.c, when undarlying device doesn\u0027t support cksum offloads we do:\ndev-\u003erx.ol_flags[TLE_V4] |\u003d PKT_RX_IP_CKSUM_BAD;\n...\ndev-\u003erx.ol_flags[TLE_V4] |\u003d PKT_RX_L4_CKSUM_BAD;\ndev-\u003erx.ol_flags[TLE_V6] |\u003d PKT_RX_L4_CKSUM_BAD;\n\nThen in udp_rxtx.c we copy these flags to all input mbufs:\npkt_info(...) \n{\n  ...\n  m-\u003eol_flags |\u003d dev-\u003erx.ol_flags[...];\n}\n\nAnd then in recv_pkt_process() we check the ol_flags\nand if _BAD_ is set, invoke check_pkt_csum().\nSo with these changes for devices that doesn\u0027t support rx cksum offloads for 18.05+ udp will stop working properly.\n\nI think the best way to deal with that would be to\nrearrange code a bit and hide specific flag values in tle_dpdk_wrapper.h, something like that:\nInisde dpdk_version.h:\n\n+ #if RTE_VERSION \u003e\u003d RTE_VERSION_NUM(18, 5, 0, 0)\n+ #define PKT_IP_CKSUM_UNKNOWN PKT_RX_IP_CKSUM_UNKNOWN\n+ #else\n+ #define PKT_IP_CKSUM_UNKNOWN PKT_RX_IP_CKSUM_BAD\n+ #endif\n\nAlso define macros:\nIS_CKSUM_GOOD(flags)\nIS_CKSUM_BAD(flags)\nIS_CKSUM_UNKNOWN(flags)\nthat also would differe depending on DPDK version\n\nThen in ctx.c we will:\ndev-\u003erx.ol_flags[...] |\u003d PKT_IP_CKSUM_UNKNOWN;\n\nAnd in (udp|tcp)_rxtx.c we can do something like:\n\nflags \u003d m-\u003eol_flags | dev-\u003erx.ol_flags[...];\nif (IS_CKSUM_BAD(flags) || (IS_CKSUM_UNKNOWN(flags) \u0026\u0026 check_pkt_csum(m,...) !\u003d 0) {/*bad packet*/}",
+      "revId": "7d3706dec4cee37d57a682b34bbe21c5b212ba4c",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    }
+  ]
+}
