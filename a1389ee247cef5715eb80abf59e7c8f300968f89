@@ -19,6 +19,24 @@
     },
     {
       "key": {
+        "uuid": "1764a80c_357bb702",
+        "filename": "lib/libtle_l4p/tcp_ofo.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 41,
+      "author": {
+        "id": 1759
+      },
+      "writtenOn": "2019-04-22T01:48:32Z",
+      "side": 1,
+      "message": "If we just assign pointer to obj[], then the pointers of src and dst would point to the same obj[]. And when we modifying obj[] of src, dst will also be modified. \nAt least, we should exchange the pointers of src and dst.",
+      "parentUuid": "125251c3_0a7a3db0",
+      "revId": "a1389ee247cef5715eb80abf59e7c8f300968f89",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "95b50161_b6c7b3e1",
         "filename": "lib/libtle_l4p/tcp_ofo.h",
         "patchSetId": 1
@@ -47,6 +65,24 @@
       "writtenOn": "2019-04-16T17:19:42Z",
       "side": 1,
       "message": "but it could happen that we have overlap in the middle:\nsli-\u003eseq \u003c nextdb-\u003esl.seq AND sl-\u003eseq + sl-\u003elen \u003e nextdb-\u003esl.seq + nextdb-\u003esl.len.\nAgain it could happen that mbuf[] will span over multiple db[] elems.",
+      "revId": "a1389ee247cef5715eb80abf59e7c8f300968f89",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "dd491db7_86d5d980",
+        "filename": "lib/libtle_l4p/tcp_ofo.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 186,
+      "author": {
+        "id": 1759
+      },
+      "writtenOn": "2019-04-22T01:48:32Z",
+      "side": 1,
+      "message": "I think you are right, and your suggestion seems good. The conditions of ofo are quite complicated and we\u0027ll consider this issue again.",
+      "parentUuid": "aebaf4a5_7eaf248d",
       "revId": "a1389ee247cef5715eb80abf59e7c8f300968f89",
       "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
       "unresolved": false
