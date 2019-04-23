@@ -37,6 +37,24 @@
     },
     {
       "key": {
+        "uuid": "b785905a_3228df9e",
+        "filename": "lib/libtle_l4p/tcp_ofo.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 41,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2019-04-23T11:11:04Z",
+      "side": 1,
+      "message": "yes, you right, missed that.\nwe do need either exchange \u0027obj\u0027 pointers or copy it\u0027s contents.\nprobably better then to name it \u0027move\u0027 then \u0027copy\u0027.\nAfter another thought - might be better to have in ofo\narray of pointers to ofodb.\nThen in such cases we\u0027ll just need to update pointers to ofodb in that array, while contents of ofodb elements will remain intact.\nAgain will probably cause less confusion.",
+      "parentUuid": "1764a80c_357bb702",
+      "revId": "a1389ee247cef5715eb80abf59e7c8f300968f89",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "95b50161_b6c7b3e1",
         "filename": "lib/libtle_l4p/tcp_ofo.h",
         "patchSetId": 1
