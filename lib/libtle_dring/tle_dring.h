@@ -107,8 +107,10 @@ __tle_dring_copy_objs(const void *dst[], const void * const src[], uint32_t num)
 	switch (num % 4) {
 	case 3:
 		dst[i + 2] = src[i + 2];
+		/* fallthrough */
 	case 2:
 		dst[i + 1] = src[i + 1];
+		/* fallthrough */
 	case 1:
 		dst[i] = src[i];
 	}
