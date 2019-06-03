@@ -35,6 +35,7 @@ struct tle_udp_stream_param {
 
 	struct tle_event *send_ev;          /**< send event to use. */
 	struct tle_stream_cb send_cb;   /**< send callback to use. */
+	uint64_t option;
 };
 
 /**
@@ -52,6 +53,25 @@ struct tle_udp_stream_param {
  */
 struct tle_stream *
 tle_udp_stream_open(struct tle_ctx *ctx,
+	const struct tle_udp_stream_param *prm);
+
+/**
+ * set an existed stream within given UDP context with new param.
+ * @param ts
+ *   stream to set with new param
+ * @param ctx
+ *   UDP context to set the stream within.
+ * @param prm
+ *   Parameters used to set the stream.
+ * @return
+ *   Pointer to UDP stream structure that can be used in future UDP API calls,
+ *   or NULL on error, with error code set in rte_errno.
+ *   Possible rte_errno errors include:
+ *   - EINVAL - invalid parameter passed to function
+ *   - ENOFILE - max limit of open streams reached for that context
+ */
+struct tle_stream *
+tle_udp_stream_set(struct tle_stream *ts, struct tle_ctx *ctx,
 	const struct tle_udp_stream_param *prm);
 
 /**
@@ -179,6 +199,24 @@ uint16_t tle_udp_stream_recv(struct tle_stream *s, struct rte_mbuf *pkt[],
  */
 uint16_t tle_udp_stream_send(struct tle_stream *s, struct rte_mbuf *pkt[],
 	uint16_t num, const struct sockaddr *dst_addr);
+
+/**
+ * updates configuration (associated events, callbacks, stream parameters)
+ * for the given streams.
+ * @param ts
+ *   An array of pointers to the streams to update.
+ * @param prm
+ *   An array of parameters to update for the given streams.
+ * @param num
+ *   Number of elements in the *ts* and *prm* arrays.
+ * @return
+ *   number of streams successfully updated.
+ *   In case of error, error code set in rte_errno.
+ *   Possible rte_errno errors include:
+ *   - EINVAL - invalid parameter passed to function
+ */
+uint32_t tle_udp_stream_update_cfg(struct tle_stream *ts[],
+	struct tle_udp_stream_param prm[], uint32_t num);
 
 #ifdef __cplusplus
 }

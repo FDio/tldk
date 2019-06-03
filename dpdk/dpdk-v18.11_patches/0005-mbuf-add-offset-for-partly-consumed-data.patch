@@ -1,0 +1,35 @@
+From 63dccf6d146552e2f46f27bae3cef07f4895b6aa Mon Sep 17 00:00:00 2001
+From: Jielong Zhou <jielong.zjl@antfin.com>
+Date: Wed, 17 Apr 2019 10:57:51 +0800
+Subject: [PATCH] mbuf: add offset for partly consumed data
+
+Signed-off-by: Jielong Zhou <jielong.zjl@antfin.com>
+---
+ lib/librte_mbuf/rte_mbuf.h | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/lib/librte_mbuf/rte_mbuf.h b/lib/librte_mbuf/rte_mbuf.h
+index b1972c6e7..6d950ab51 100644
+--- a/lib/librte_mbuf/rte_mbuf.h
++++ b/lib/librte_mbuf/rte_mbuf.h
+@@ -658,6 +658,8 @@ struct rte_mbuf {
+ 	struct rte_mbuf_ext_shared_info *shinfo;
+ 
+ 	struct rte_mbuf *next_pkt;
++	uint32_t una_offset;
++	uint16_t next_offset;
+ 
+ } __rte_cache_aligned;
+ 
+@@ -1301,6 +1303,8 @@ static inline void rte_pktmbuf_reset(struct rte_mbuf *m)
+ {
+ 	m->next = NULL;
+ 	m->next_pkt = NULL;
++	m->una_offset = 0;
++	m->next_offset = 0;
+ 	m->pkt_len = 0;
+ 	m->tx_offload = 0;
+ 	m->vlan_tci = 0;
+-- 
+2.19.0
+

@@ -16,11 +16,33 @@
 #ifndef _MISC_H_
 #define _MISC_H_
 
+#include <tle_stats.h>
 #include <tle_dpdk_wrapper.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+union typflg {
+	uint16_t raw;
+	struct {
+		uint8_t type;  /* TLE_V4/TLE_V6 */
+		uint8_t flags; /* TCP header flags */
+	};
+};
+
+union pkt_info {
+	rte_xmm_t raw;
+	struct {
+		union typflg tf;
+		uint16_t csf;  /* checksum flags */
+		union l4_ports port;
+		union {
+			union ipv4_addrs addr4;
+			const union ipv6_addrs *addr6;
+		};
+	};
+};
 
 static inline int
 xmm_cmp(const rte_xmm_t *da, const rte_xmm_t *sa)
@@ -287,25 +309,40 @@ _ipv4x_cksum(const void *iph, size_t len)
 }
 
 static inline int
-check_pkt_csum(const struct rte_mbuf *m, uint64_t ol_flags, uint32_t type,
-	uint32_t proto)
+check_pkt_csum(const struct rte_mbuf *m, uint32_t type, uint32_t proto)
 {
 	const struct ipv4_hdr *l3h4;
 	const struct ipv6_hdr *l3h6;
 	const struct udp_hdr *l4h;
 	int32_t ret;
 	uint16_t csum;
+	uint64_t ol_flags = m->ol_flags;
 
+	/* case 0: both ip and l4 cksum is verified or data is valid */
+	if ((ol_flags & PKT_RX_IP_CKSUM_GOOD) &&
+	    (ol_flags & PKT_RX_L4_CKSUM_GOOD))
+		return 0;
+
+	/* case 1: either ip or l4 cksum bad */
+	if ((ol_flags & PKT_RX_IP_CKSUM_MASK) == PKT_RX_IP_CKSUM_BAD)
+		return 1;
+
+	if ((ol_flags & PKT_RX_L4_CKSUM_MASK) == PKT_RX_L4_CKSUM_BAD)
+		return 1;
+
+	/* case 2: either ip or l4 or both cksum is unknown */
 	ret = 0;
 	l3h4 = rte_pktmbuf_mtod_offset(m, const struct ipv4_hdr *, m->l2_len);
 	l3h6 = rte_pktmbuf_mtod_offset(m, const struct ipv6_hdr *, m->l2_len);
 
-	if ((ol_flags & PKT_RX_IP_CKSUM_BAD) != 0) {
+	if ((ol_flags & PKT_RX_IP_CKSUM_MASK) == PKT_RX_IP_CKSUM_UNKNOWN &&
+			l3h4->hdr_checksum != 0) {
 		csum = _ipv4x_cksum(l3h4, m->l3_len);
 		ret = (csum != UINT16_MAX);
 	}
 
-	if (ret == 0 && (ol_flags & PKT_RX_L4_CKSUM_BAD) != 0) {
+	if (ret == 0 && (ol_flags & PKT_RX_L4_CKSUM_MASK) ==
+			PKT_RX_L4_CKSUM_UNKNOWN) {
 
 		/*
 		 * for IPv4 it is allowed to have zero UDP cksum,
@@ -334,6 +371,12 @@ check_pkt_csum(const struct rte_mbuf *m, uint64_t ol_flags, uint32_t type,
  */
 
 static inline int
+rwl_is_up(rte_atomic32_t *p)
+{
+	return (rte_atomic32_read(p) >= 0);
+}
+
+static inline int
 rwl_try_acquire(rte_atomic32_t *p)
 {
 	return rte_atomic32_add_return(p, 1);
@@ -359,7 +402,8 @@ rwl_acquire(rte_atomic32_t *p)
 static inline void
 rwl_down(rte_atomic32_t *p)
 {
-	 while (rte_atomic32_cmpset((volatile uint32_t *)p, 0, INT32_MIN) == 0)
+	while (rte_atomic32_read(p) != INT32_MIN &&
+			 rte_atomic32_cmpset((volatile uint32_t *)p, 0, INT32_MIN) == 0)
 		rte_pause();
 }
 
@@ -491,6 +535,122 @@ _iovec_to_mbsegs(struct iovec *iv, uint32_t seglen, struct rte_mbuf *mb[],
 	iv->iov_len -= tlen;
 
 	return i;
+}
+
+static inline void
+set_msg_timestamp(struct msghdr *msg, struct rte_mbuf* m)
+{
+	struct cmsghdr* cmsg = CMSG_FIRSTHDR(msg);
+	cmsg->cmsg_level = SOL_SOCKET;
+	cmsg->cmsg_type = SO_TIMESTAMP;
+	cmsg->cmsg_len = CMSG_LEN(sizeof(struct timeval));
+	msg->msg_controllen = cmsg->cmsg_len;
+	struct timeval *tv = (struct timeval*)CMSG_DATA(cmsg);
+	tv->tv_sec = m->timestamp >> 20;
+	tv->tv_usec = m->timestamp & 0xFFFFFUL;
+}
+
+/**
+ * Remove len bytes at the beginning of an mbuf.
+ *
+ * It's an enhancement version of rte_pktmbuf_abj which not support
+ * adjusting length greater than the length of the first segment.
+ *
+ * Returns a pointer to the new mbuf. If the
+ * length is greater than the total length of the mbuf, then the
+ * function will fail and return NULL, without modifying the mbuf.
+
+ * @param m
+ *   The packet mbuf.
+ * @param len
+ *   The amount of data to remove (in bytes).
+ * @return
+ *   A pointer to the new start of the data.
+ */
+static inline struct rte_mbuf *
+_rte_pktmbuf_adj(struct rte_mbuf *m, uint16_t len)
+{
+	struct rte_mbuf *next;
+	uint32_t plen = m->pkt_len;
+	uint16_t segs = m->nb_segs;
+
+	if (unlikely(len > plen))
+		return NULL;
+
+	while (len > m->data_len) {
+		next = m->next;
+		plen -= m->data_len;
+		len -= m->data_len;
+		segs--;
+		rte_pktmbuf_free_seg(m);
+		m = next;
+	}
+
+	if (len) {
+		m->data_len = (uint16_t)(m->data_len - len);
+		m->data_off = (uint16_t)(m->data_off + len);
+		plen -= len;
+	}
+
+	m->pkt_len = plen;
+	m->nb_segs = segs;
+	return m;
+}
+
+/**
+ * Remove len bytes of data at the end of the mbuf.
+ *
+ * It's an enhancement version of rte_pktmbuf_trim, which not support
+ * removing length greater than the length of the last segment.
+ *
+ * @param m
+ *   The packet mbuf.
+ * @param len
+ *   The amount of data to remove (in bytes).
+ * @return
+ *   - 0: On success.
+ *   - -1: On error.
+ */
+static inline int
+_rte_pktmbuf_trim(struct rte_mbuf *m, uint16_t len)
+{
+	struct rte_mbuf *next, *tmp, *last;
+	uint32_t plen = m->pkt_len;
+	uint32_t left;
+	uint16_t segs = m->nb_segs;
+
+	if (unlikely(len > plen))
+		return -1;
+
+	left = m->pkt_len - m->data_len;
+	next = m->next;
+	last = m;
+	/* find the last segment will remain after trim */
+	while (left > len) {
+		left -= next->data_len;
+		if (left <= len) {
+			last = next;
+		}
+		next = next->next;
+	}
+	if (left > 0) {
+		/* remove last segments */
+		last->next = NULL;
+		while (next != NULL) {
+			tmp = next->next;
+			segs--;
+			rte_pktmbuf_free_seg(next);
+			next = tmp;
+		}
+		m->pkt_len -= left;
+		m->nb_segs = segs;
+		len -= left;
+	}
+
+	/* trim the remained last segment */
+	last->data_len = (uint16_t)(last->data_len - len);
+	m->pkt_len  = (m->pkt_len - len);
+	return 0;
 }
 
 #ifdef __cplusplus

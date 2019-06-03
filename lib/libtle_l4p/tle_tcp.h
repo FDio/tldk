@@ -49,6 +49,7 @@ struct tle_tcp_stream_cfg {
 struct tle_tcp_stream_param {
 	struct tle_tcp_stream_addr addr;
 	struct tle_tcp_stream_cfg cfg;
+	uint64_t option;
 };
 
 /**
@@ -84,6 +85,25 @@ tle_tcp_stream_open(struct tle_ctx *ctx,
  *   - -EDEADLK - close was already invoked on that stream
  */
 int tle_tcp_stream_close(struct tle_stream *s);
+
+/**
+ * shutdown an open stream in SHUT_WR way.
+ * similar to tle_tcp_stream_close(), except:
+ *  - rx still works
+ *  - er still works
+ * @param s
+ *   Pointer to the stream to close.
+ * @return
+ *   zero on successful completion.
+ *   - -EINVAL - invalid parameter passed to function
+ *   - -EDEADLK - close was already invoked on that stream
+ */
+int tle_tcp_stream_shutdown(struct tle_stream *s, int how);
+
+/**
+ * Send rst on this stream.
+ */
+void tle_tcp_stream_kill(struct tle_stream *s);
 
 /**
  * close a group of open streams.
@@ -268,6 +288,15 @@ uint16_t tle_tcp_stream_recv(struct tle_stream *s, struct rte_mbuf *pkt[],
 	uint16_t num);
 
 /**
+ * Get how many bytes are received in recv window.
+ * @param ts
+ *   TCP stream to receive data from.
+ * @return
+ *   bytes of data inside recv window.
+ */
+uint16_t tle_tcp_stream_inq(struct tle_stream *s);
+
+/**
  * Reads iovcnt buffers from the for given TCP stream.
  * Note that the stream has to be in connected state.
  * Data ordering is preserved.
@@ -288,6 +317,31 @@ uint16_t tle_tcp_stream_recv(struct tle_stream *s, struct rte_mbuf *pkt[],
  */
 ssize_t tle_tcp_stream_readv(struct tle_stream *ts, const struct iovec *iov,
 	int iovcnt);
+
+/**
+ * Reads iovcnt buffers from the for given TCP stream
+ * and generate control message in msg.
+ * Note that the stream has to be in connected state.
+ * Data ordering is preserved.
+ * Buffers are processed in array order.
+ * This means that the function will comppletely fill iov[0]
+ * before proceeding to iov[1], and so on.
+ * If there is insufficient data, then not all buffers pointed to by iov
+ * may be filled.
+ * @param ts
+ *   TCP stream to receive data from.
+ * @param iov
+ *   Points to an array of iovec structures.
+ * @param iovcnt
+ *   Number of elements in the *iov* array.
+ * @param msg
+ *   If not NULL, generate control message into msg_control field of msg.
+ * @return
+ *   On success, number of bytes read in the stream receive buffer.
+ *   In case of error, returns -1 and error code will be set in rte_errno.
+ */
+ssize_t tle_tcp_stream_readv_msg(struct tle_stream *ts, const struct iovec *iov,
+	int iovcnt, struct msghdr *msg);
 
 /**
  * Consume and queue up to *num* packets, that will be sent eventually
@@ -419,6 +473,22 @@ uint16_t tle_tcp_tx_bulk(struct tle_dev *dev, struct rte_mbuf *pkt[],
  * @return
  */
 int tle_tcp_process(struct tle_ctx *ctx, uint32_t num);
+
+/**
+ * Get tcp info of a tcp stream.
+ * This function is not multi-thread safe.
+ * @param ts
+ *   TCP stream to get info from.
+ * @param info
+ *   Pointer to store info.
+ * @param optlen
+ *   Pointer to length of info.
+ * @return
+ *   zero on successful completion.
+ *   - ENOTCONN - connection is not connected yet.
+ */
+int
+tle_tcp_stream_get_info(const struct tle_stream * ts, void *info, socklen_t *optlen);
 
 #ifdef __cplusplus
 }

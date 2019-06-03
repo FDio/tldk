@@ -28,8 +28,13 @@
 #include "tcp_rxq.h"
 #include "tcp_txq.h"
 #include "tcp_tx_seg.h"
+#include "tcp_rxtx.h"
 
 #define	TCP_MAX_PKT_SEG	0x20
+
+/* must larger than l2_len(14)+l3_len(20)+l4_len(20)+tms_option(12) */
+#define RESERVE_HEADER_LEN 128
+#define WIN_NOTIFY_THRESH 64
 
 /*
  * checks if input TCP ports and IP addresses match given stream.
@@ -54,11 +59,17 @@ rx_check_stream(const struct tle_tcp_stream *s, const union pkt_info *pi)
 
 static inline struct tle_tcp_stream *
 rx_obtain_listen_stream(const struct tle_dev *dev, const union pkt_info *pi,
-	uint32_t type)
+	uint32_t type, uint8_t reuse)
 {
 	struct tle_tcp_stream *s;
 
-	s = (struct tle_tcp_stream *)dev->dp[type]->streams[pi->port.dst];
+	if (type == TLE_V4)
+		s = bhash_lookup4(dev->ctx->bhash[type],
+				  pi->addr4.dst, pi->port.dst, reuse);
+	else
+		s = bhash_lookup6(dev->ctx->bhash[type],
+				  pi->addr6->dst, pi->port.dst, reuse);
+
 	if (s == NULL || tcp_stream_acquire(s) < 0)
 		return NULL;
 
@@ -77,10 +88,10 @@ rx_obtain_stream(const struct tle_dev *dev, struct stbl *st,
 {
 	struct tle_tcp_stream *s;
 
-	s = stbl_find_data(st, pi);
+	s = TCP_STREAM(stbl_find_stream(st, pi));
 	if (s == NULL) {
-		if (pi->tf.flags == TCP_FLAG_ACK)
-			return rx_obtain_listen_stream(dev, pi, type);
+		if (pi->tf.flags & TCP_FLAG_ACK)
+			return rx_obtain_listen_stream(dev, pi, type, 1);
 		return NULL;
 	}
 
@@ -148,131 +159,6 @@ pkt_info_bulk_syneq(const union pkt_info pi[], uint32_t num)
 	}
 
 	return i;
-}
-
-static inline void
-stream_drb_free(struct tle_tcp_stream *s, struct tle_drb *drbs[],
-	uint32_t nb_drb)
-{
-	_rte_ring_enqueue_burst(s->tx.drb.r, (void **)drbs, nb_drb);
-}
-
-static inline uint32_t
-stream_drb_alloc(struct tle_tcp_stream *s, struct tle_drb *drbs[],
-	uint32_t nb_drb)
-{
-	return _rte_ring_dequeue_burst(s->tx.drb.r, (void **)drbs, nb_drb);
-}
-
-static inline uint32_t
-get_ip_pid(struct tle_dev *dev, uint32_t num, uint32_t type, uint32_t st)
-{
-	uint32_t pid;
-	rte_atomic32_t *pa;
-
-	pa = &dev->tx.packet_id[type];
-
-	if (st == 0) {
-		pid = rte_atomic32_add_return(pa, num);
-		return pid - num;
-	} else {
-		pid = rte_atomic32_read(pa);
-		rte_atomic32_set(pa, pid + num);
-		return pid;
-	}
-}
-
-static inline void
-fill_tcph(struct tcp_hdr *l4h, const struct tcb *tcb, union l4_ports port,
-	uint32_t seq, uint8_t hlen, uint8_t flags)
-{
-	uint16_t wnd;
-
-	l4h->src_port = port.dst;
-	l4h->dst_port = port.src;
-
-	wnd = (flags & TCP_FLAG_SYN) ?
-		RTE_MIN(tcb->rcv.wnd, (uint32_t)UINT16_MAX) :
-		tcb->rcv.wnd >> tcb->rcv.wscale;
-
-	/* ??? use sse shuffle to hton all remaining 16 bytes at once. ??? */
-	l4h->sent_seq = rte_cpu_to_be_32(seq);
-	l4h->recv_ack = rte_cpu_to_be_32(tcb->rcv.nxt);
-	l4h->data_off = hlen / TCP_DATA_ALIGN << TCP_DATA_OFFSET;
-	l4h->tcp_flags = flags;
-	l4h->rx_win = rte_cpu_to_be_16(wnd);
-	l4h->cksum = 0;
-	l4h->tcp_urp = 0;
-
-	if (flags & TCP_FLAG_SYN)
-		fill_syn_opts(l4h + 1, &tcb->so);
-	else if ((flags & TCP_FLAG_RST) == 0 && tcb->so.ts.raw != 0)
-		fill_tms_opts(l4h + 1, tcb->snd.ts, tcb->rcv.ts);
-}
-
-static inline int
-tcp_fill_mbuf(struct rte_mbuf *m, const struct tle_tcp_stream *s,
-	const struct tle_dest *dst, uint64_t ol_flags,
-	union l4_ports port, uint32_t seq, uint32_t flags,
-	uint32_t pid, uint32_t swcsm)
-{
-	uint32_t l4, len, plen;
-	struct tcp_hdr *l4h;
-	char *l2h;
-
-	len = dst->l2_len + dst->l3_len;
-	plen = m->pkt_len;
-
-	if (flags & TCP_FLAG_SYN)
-		l4 = sizeof(*l4h) + TCP_TX_OPT_LEN_MAX;
-	else if ((flags & TCP_FLAG_RST) == 0 && s->tcb.rcv.ts != 0)
-		l4 = sizeof(*l4h) + TCP_TX_OPT_LEN_TMS;
-	else
-		l4 = sizeof(*l4h);
-
-	/* adjust mbuf to put L2/L3/L4 headers into it. */
-	l2h = rte_pktmbuf_prepend(m, len + l4);
-	if (l2h == NULL)
-		return -EINVAL;
-
-	/* copy L2/L3 header */
-	rte_memcpy(l2h, dst->hdr, len);
-
-	/* setup TCP header & options */
-	l4h = (struct tcp_hdr *)(l2h + len);
-	fill_tcph(l4h, &s->tcb, port, seq, l4, flags);
-
-	/* setup mbuf TX offload related fields. */
-	m->tx_offload = _mbuf_tx_offload(dst->l2_len, dst->l3_len, l4, 0, 0, 0);
-	m->ol_flags |= ol_flags;
-
-	/* update proto specific fields. */
-
-	if (s->s.type == TLE_V4) {
-		struct ipv4_hdr *l3h;
-		l3h = (struct ipv4_hdr *)(l2h + dst->l2_len);
-		l3h->packet_id = rte_cpu_to_be_16(pid);
-		l3h->total_length = rte_cpu_to_be_16(plen + dst->l3_len + l4);
-
-		if ((ol_flags & PKT_TX_TCP_CKSUM) != 0)
-			l4h->cksum = _ipv4x_phdr_cksum(l3h, m->l3_len,
-				ol_flags);
-		else if (swcsm != 0)
-			l4h->cksum = _ipv4_udptcp_mbuf_cksum(m, len, l3h);
-
-		if ((ol_flags & PKT_TX_IP_CKSUM) == 0 && swcsm != 0)
-			l3h->hdr_checksum = _ipv4x_cksum(l3h, m->l3_len);
-	} else {
-		struct ipv6_hdr *l3h;
-		l3h = (struct ipv6_hdr *)(l2h + dst->l2_len);
-		l3h->payload_len = rte_cpu_to_be_16(plen + l4);
-		if ((ol_flags & PKT_TX_TCP_CKSUM) != 0)
-			l4h->cksum = rte_ipv6_phdr_cksum(l3h, ol_flags);
-		else if (swcsm != 0)
-			l4h->cksum = _ipv6_udptcp_mbuf_cksum(m, len, l3h);
-	}
-
-	return 0;
 }
 
 /*
@@ -355,11 +241,123 @@ tx_data_pkts(struct tle_tcp_stream *s, struct rte_mbuf *const m[], uint32_t num)
 	i = tle_dring_mp_enqueue(&dev->tx.dr, (const void * const*)m,
 		num, drb, &nb);
 
+	if (i > 0 && s->tx.need_da)
+		s->tx.need_da = 0;
+
 	/* free unused drbs. */
 	if (nb != 0)
 		stream_drb_free(s, drb + nbm - nb, nb);
 
 	return i;
+}
+
+/*
+ * case 0: pkt is not split yet, (indicate plen > sl->len)
+ * case 1: pkt is split, but left packet > sl->len
+ * case 2: pkt is split, but left packet <= sl->len
+ */
+static inline struct rte_mbuf *
+get_indirect_mbuf(struct tle_tcp_stream *s,
+		  struct rte_mbuf *m, uint32_t *p_plen,
+		  union seqlen *sl, uint32_t type,
+		  uint32_t mss)
+{
+	uint32_t hdr_len = PKT_L234_HLEN(m), plen, mlen;
+	struct rte_mbuf *f, *t;
+	uint16_t i, nb_segs;
+	void *hdr;
+
+	if (m->next_pkt) {
+		f = m->next_pkt;
+		plen = f->data_len - f->next_offset;
+		if (f == m)
+			plen -= hdr_len;
+	} else {
+		f = m;
+		plen = f->data_len - hdr_len;
+	}
+	mlen = 0;
+
+	TCP_LOG(DEBUG, "m(%p):pkt_len=%u,nb_segs=%u, sl->len = %u\n",
+		m, m->pkt_len, m->nb_segs, sl->len);
+
+	/* Seg split needed:
+	 * sometimes, cwnd will be reset to mss which is about 1400~1500 bytes
+	 * which could be smaller than one seg.
+	 *
+	 * Our solution is to send part of one seg, and record the sended data
+	 * offset in the seg.
+	 */
+	if (sl->len < plen) {
+		uint32_t payload_len = RTE_MIN(sl->len, s->tx.dst.mtu + m->l2_len - hdr_len);
+		mlen = plen - payload_len;
+		nb_segs = 1;
+		plen = payload_len;
+		m->next_pkt = f;
+	} else {
+		t = f->next;
+		nb_segs = 1;
+		while (t && plen + t->data_len < sl->len) {
+			plen += t->data_len;
+			t = t->next;
+			nb_segs++;
+		}
+
+		m->next_pkt = t;
+	}
+
+	struct rte_mbuf *pkts[1 + nb_segs];
+	if (rte_pktmbuf_alloc_bulk(s->tx.dst.head_mp, pkts, 1 + nb_segs) < 0) {
+		return NULL;
+	}
+
+	rte_pktmbuf_attach(pkts[1], f);
+	if (f->next_offset)
+		rte_pktmbuf_adj(pkts[1], f->next_offset);
+	if (f == m)
+		rte_pktmbuf_adj(pkts[1], hdr_len);
+
+	if (mlen > 0) {
+		rte_pktmbuf_trim(pkts[1], mlen);
+		f->next_offset += plen;
+	} else {
+		f->next_offset = 0;
+	}
+
+	for (i = 1, t = f->next; i < nb_segs; ++i) {
+		rte_pktmbuf_attach(pkts[i+1], t);
+		pkts[i]->next = pkts[i+1];
+		t = t->next;
+	}
+
+	/* prepare l2/l3/l4 header */
+	hdr = rte_pktmbuf_append(pkts[0], hdr_len);
+	rte_memcpy(hdr, rte_pktmbuf_mtod(m, void *), hdr_len);
+	pkts[0]->nb_segs = nb_segs + 1;
+	pkts[0]->pkt_len = plen + hdr_len;
+	pkts[0]->ol_flags = m->ol_flags;
+	pkts[0]->tx_offload = m->tx_offload;
+	if (type == TLE_V4) {
+		struct ipv4_hdr *l3h;
+
+		l3h = rte_pktmbuf_mtod_offset(pkts[0],
+				struct ipv4_hdr *, m->l2_len);
+		l3h->total_length =
+			rte_cpu_to_be_16(plen + m->l3_len + m->l4_len);
+	} else {
+		struct ipv6_hdr *l3h;
+
+		l3h = rte_pktmbuf_mtod_offset(pkts[0],
+				struct ipv6_hdr *, m->l2_len);
+		l3h->payload_len =
+			rte_cpu_to_be_16(plen + m->l4_len);
+	}
+	if (plen <= mss)
+		pkts[0]->ol_flags &= ~PKT_TX_TCP_SEG;
+	pkts[0]->next = pkts[1];
+
+	*p_plen = plen;
+	return pkts[0];
 }
 
 static inline uint32_t
@@ -383,11 +381,10 @@ tx_data_bulk(struct tle_tcp_stream *s, union seqlen *sl, struct rte_mbuf *mi[],
 	for (i = 0; i != num && sl->len != 0 && fail == 0; i++) {
 
 		mb = mi[i];
-		sz = RTE_MIN(sl->len, mss);
 		plen = PKT_L4_PLEN(mb);
 
 		/*fast path, no need to use indirect mbufs. */
-		if (plen <= sz) {
+		if (mb->next_pkt == NULL && plen <= sl->len) {
 
 			/* update pkt TCP header */
 			tcp_update_mbuf(mb, type, &s->tcb, sl->seq, pid + i);
@@ -397,12 +394,45 @@ tx_data_bulk(struct tle_tcp_stream *s, union seqlen *sl, struct rte_mbuf *mi[],
 			sl->len -= plen;
 			sl->seq += plen;
 			mo[k++] = mb;
+			if (sl->seq <= s->tcb.snd.rcvr)
+				TCP_INC_STATS(TCP_MIB_RETRANSSEGS);
 		/* remaining snd.wnd is less them MSS, send nothing */
-		} else if (sz < mss)
+		} else if (sl->len < mss) {
+			break;
+		/* some data to send already */
+		} else if (k != 0 || tn != 0) {
 			break;
 		/* packet indirection needed */
-		else
-			RTE_VERIFY(0);
+		} else {
+			struct rte_mbuf *out;
+
+			out = get_indirect_mbuf(s, mb, &plen, sl, type, mss);
+			if (out == NULL)
+				return 0;
+
+			/* update pkt TCP header */
+			tcp_update_mbuf(out, type, &s->tcb, sl->seq, pid + i);
+
+			/* no need to bump refcnt !!! */
+
+			if (tx_data_pkts(s, &out, 1) == 0) {
+				rte_pktmbuf_free(out);
+				return 0;
+			}
+
+			sl->len -= plen;
+			sl->seq += plen;
+
+			if (sl->seq <= s->tcb.snd.rcvr)
+				TCP_INC_STATS(TCP_MIB_RETRANSSEGS);
+
+			if (mb->next_pkt)
+				return 0;
+			else {
+				tn = 1;
+				continue;
+			}
+		}
 
 		if (k >= MAX_PKT_BURST) {
 			n = tx_data_pkts(s, mo, k);
@@ -466,7 +496,10 @@ tx_nxt_data(struct tle_tcp_stream *s, uint32_t tms)
 		tcp_txq_set_nxt_head(s, n);
 	} while (n == num);
 
-	s->tcb.snd.nxt += sl.seq - (uint32_t)s->tcb.snd.nxt;
+	if (sl.seq != (uint32_t)s->tcb.snd.nxt) {
+		s->tcb.snd.nxt += sl.seq - (uint32_t)s->tcb.snd.nxt;
+		s->tcb.snd.ack = s->tcb.rcv.nxt;
+	}
 	return tn;
 }
 
@@ -503,6 +536,7 @@ free_una_data(struct tle_tcp_stream *s, uint32_t len)
 	} while (plen < len);
 
 	s->tcb.snd.una += len;
+	s->tcb.snd.waitlen -= len;
 
 	/*
 	 * that could happen in case of retransmit,
@@ -519,7 +553,7 @@ calc_smss(uint16_t mss, const struct tle_dest *dst)
 {
 	uint16_t n;
 
-	n = dst->mtu - dst->l2_len - dst->l3_len - TCP_TX_HDR_DACK;
+	n = dst->mtu - dst->l3_len - sizeof(struct tcp_hdr);
 	mss = RTE_MIN(n, mss);
 	return mss;
 }
@@ -537,67 +571,24 @@ initial_cwnd(uint32_t smss, uint32_t icw)
 	return RTE_MIN(10 * smss, RTE_MAX(2 * smss, icw));
 }
 
-/*
- * queue standalone packet to he particular output device
- * It assumes that:
- * - L2/L3/L4 headers should be already set.
- * - packet fits into one segment.
- */
-static inline int
-send_pkt(struct tle_tcp_stream *s, struct tle_dev *dev, struct rte_mbuf *m)
+void
+tle_tcp_stream_kill(struct tle_stream *ts)
 {
-	uint32_t n, nb;
-	struct tle_drb *drb;
+	struct tle_tcp_stream *s;
 
-	if (stream_drb_alloc(s, &drb, 1) == 0)
-		return -ENOBUFS;
+	s = TCP_STREAM(ts);
+	if (ts == NULL || s->s.type >= TLE_VNUM)
+		return;
 
-	/* enqueue pkt for TX. */
-	nb = 1;
-	n = tle_dring_mp_enqueue(&dev->tx.dr, (const void * const*)&m, 1,
-		&drb, &nb);
+	if (s->tcb.state > TCP_ST_LISTEN)
+		send_rst(s, s->tcb.snd.nxt);
 
-	/* free unused drbs. */
-	if (nb != 0)
-		stream_drb_free(s, &drb, 1);
+	if (s->tcb.state == TCP_ST_ESTABLISHED)
+		TCP_DEC_STATS_ATOMIC(TCP_MIB_CURRESTAB);
 
-	return (n == 1) ? 0 : -ENOBUFS;
-}
-
-static inline int
-send_ctrl_pkt(struct tle_tcp_stream *s, struct rte_mbuf *m, uint32_t seq,
-	uint32_t flags)
-{
-	const struct tle_dest *dst;
-	uint32_t pid, type;
-	int32_t rc;
-
-	dst = &s->tx.dst;
-	type = s->s.type;
-	pid = get_ip_pid(dst->dev, 1, type, (s->flags & TLE_CTX_FLAG_ST) != 0);
-
-	rc = tcp_fill_mbuf(m, s, dst, 0, s->s.port, seq, flags, pid, 1);
-	if (rc == 0)
-		rc = send_pkt(s, dst->dev, m);
-
-	return rc;
-}
-
-static inline int
-send_rst(struct tle_tcp_stream *s, uint32_t seq)
-{
-	struct rte_mbuf *m;
-	int32_t rc;
-
-	m = rte_pktmbuf_alloc(s->tx.dst.head_mp);
-	if (m == NULL)
-		return -ENOMEM;
-
-	rc = send_ctrl_pkt(s, m, seq, TCP_FLAG_RST);
-	if (rc != 0)
-		rte_pktmbuf_free(m);
-
-	return rc;
+	s->tcb.state = TCP_ST_CLOSED;
+	rte_smp_wmb();
+	timer_stop(s);
 }
 
 static inline int
@@ -620,6 +611,7 @@ send_ack(struct tle_tcp_stream *s, uint32_t tms, uint32_t flags)
 		return rc;
 	}
 
+	s->tx.need_da = 0;
 	s->tcb.snd.ack = s->tcb.rcv.nxt;
 	return 0;
 }
@@ -633,19 +625,23 @@ sync_ack(struct tle_tcp_stream *s, const union pkt_info *pi,
 	int32_t rc;
 	uint32_t pid, seq, type;
 	struct tle_dev *dev;
-	const void *da;
+	const void *sa, *da;
 	struct tle_dest dst;
 	const struct tcp_hdr *th;
 
-	type = s->s.type;
+	type = pi->tf.type;
 
 	/* get destination information. */
-	if (type == TLE_V4)
+	if (type == TLE_V4) {
 		da = &pi->addr4.src;
-	else
+		sa = &pi->addr4.dst;
+	}
+	else {
 		da = &pi->addr6->src;
+		sa = &pi->addr6->dst;
+	}
 
-	rc = stream_get_dest(&s->s, da, &dst);
+	rc = stream_get_dest(type, &s->s, sa, da, &dst);
 	if (rc < 0)
 		return rc;
 
@@ -654,11 +650,16 @@ sync_ack(struct tle_tcp_stream *s, const union pkt_info *pi,
 	get_syn_opts(&s->tcb.so, (uintptr_t)(th + 1), m->l4_len - sizeof(*th));
 
 	s->tcb.rcv.nxt = si->seq + 1;
+	s->tcb.rcv.cpy = si->seq + 1;
 	seq = sync_gen_seq(pi, s->tcb.rcv.nxt, ts, s->tcb.so.mss,
 				s->s.ctx->prm.hash_alg,
 				&s->s.ctx->prm.secret_key);
-	s->tcb.so.ts.ecr = s->tcb.so.ts.val;
-	s->tcb.so.ts.val = sync_gen_ts(ts, s->tcb.so.wscale);
+	
+	if (s->tcb.so.ts.raw) {
+		s->tcb.so.ts.ecr = s->tcb.so.ts.val;
+		s->tcb.so.ts.val = sync_gen_ts(ts, s->tcb.so.wscale);
+	}	
+
 	s->tcb.so.wscale = (s->tcb.so.wscale == TCP_WSCALE_NONE) ?
 		TCP_WSCALE_NONE : TCP_WSCALE_DEFAULT;
 	s->tcb.so.mss = calc_smss(dst.mtu, &dst);
@@ -672,10 +673,12 @@ sync_ack(struct tle_tcp_stream *s, const union pkt_info *pi,
 	dev = dst.dev;
 	pid = get_ip_pid(dev, 1, type, (s->flags & TLE_CTX_FLAG_ST) != 0);
 
-	rc = tcp_fill_mbuf(m, s, &dst, 0, pi->port, seq,
-		TCP_FLAG_SYN | TCP_FLAG_ACK, pid, 1);
+	rc = tcp_fill_mbuf(m, s, &dst, TCP_OLFLAGS_CKSUM(dst.ol_flags),
+			   pi->port, seq, TCP_FLAG_SYN | TCP_FLAG_ACK, pid, 1);
 	if (rc == 0)
 		rc = send_pkt(s, dev, m);
+
+	TCP_INC_STATS(TCP_MIB_PASSIVEOPENS);
 
 	return rc;
 }
@@ -800,43 +803,24 @@ restore_syn_opt(union seg_info *si, union tsopt *to,
 	return 0;
 }
 
-static inline void
-stream_term(struct tle_tcp_stream *s)
-{
-	struct sdr *dr;
-
-	s->tcb.state = TCP_ST_CLOSED;
-	rte_smp_wmb();
-
-	timer_stop(s);
-
-	/* close() was already invoked, schedule final cleanup */
-	if ((s->tcb.uop & TCP_OP_CLOSE) != 0) {
-
-		dr = CTX_TCP_SDR(s->s.ctx);
-		STAILQ_INSERT_TAIL(&dr->be, &s->s, link);
-
-	/* notify user that stream need to be closed */
-	} else if (s->err.ev != NULL)
-		tle_event_raise(s->err.ev);
-	else if (s->err.cb.func != NULL)
-		s->err.cb.func(s->err.cb.data, &s->s);
-}
-
 static inline int
 stream_fill_dest(struct tle_tcp_stream *s)
 {
 	int32_t rc;
 	uint32_t type;
-	const void *da;
+	const void *sa, *da;
 
-        type = s->s.type;
-	if (type == TLE_V4)
+	type = s->s.type;
+	if (type == TLE_V4) {
+		sa = &s->s.ipv4.addr.dst;
 		da = &s->s.ipv4.addr.src;
-	else
+	}
+	else {
+		sa = &s->s.ipv6.addr.dst;
 		da = &s->s.ipv6.addr.src;
+	}
 
-	rc = stream_get_dest(&s->s, da, &s->tx.dst);
+	rc = stream_get_dest(type, &s->s, sa, da, &s->tx.dst);
 	return (rc < 0) ? rc : 0;
 }
 
@@ -851,19 +835,17 @@ accept_prep_stream(struct tle_tcp_stream *ps, struct stbl *st,
 	int32_t rc;
 	uint32_t rtt;
 
-	/* some TX still pending for that stream. */
-	if (TCP_STREAM_TX_PENDING(cs))
-		return -EAGAIN;
-
 	/* setup L4 ports and L3 addresses fields. */
 	cs->s.port.raw = pi->port.raw;
 	cs->s.pmsk.raw = UINT32_MAX;
 
 	if (pi->tf.type == TLE_V4) {
+		cs->s.type = TLE_V4;
 		cs->s.ipv4.addr = pi->addr4;
 		cs->s.ipv4.mask.src = INADDR_NONE;
 		cs->s.ipv4.mask.dst = INADDR_NONE;
 	} else if (pi->tf.type == TLE_V6) {
+		cs->s.type = TLE_V6;
 		cs->s.ipv6.addr = *pi->addr6;
 		rte_memcpy(&cs->s.ipv6.mask.src, &tle_ipv6_none,
 			sizeof(cs->s.ipv6.mask.src));
@@ -887,7 +869,7 @@ accept_prep_stream(struct tle_tcp_stream *ps, struct stbl *st,
 		cs->tcb.snd.rto = TCP_RTO_DEFAULT;
 
 	/* copy streams type & flags. */
-	cs->s.type = ps->s.type;
+	cs->s.type = pi->tf.type;
 	cs->flags = ps->flags;
 
 	/* retrive and cache destination information. */
@@ -897,16 +879,21 @@ accept_prep_stream(struct tle_tcp_stream *ps, struct stbl *st,
 
 	/* update snd.mss with SMSS value */
 	cs->tcb.snd.mss = calc_smss(cs->tcb.snd.mss, &cs->tx.dst);
+	if (cs->tcb.so.ts.raw != 0) {
+		cs->tcb.snd.mss -= TCP_TX_OPT_LEN_TMS;
+	}
 
 	/* setup congestion variables */
 	cs->tcb.snd.cwnd = initial_cwnd(cs->tcb.snd.mss, ps->tcb.snd.cwnd);
 	cs->tcb.snd.ssthresh = cs->tcb.snd.wnd;
 	cs->tcb.snd.rto_tw = ps->tcb.snd.rto_tw;
+	cs->tcb.snd.rto_fw = ps->tcb.snd.rto_fw;
 
 	cs->tcb.state = TCP_ST_ESTABLISHED;
+	TCP_INC_STATS_ATOMIC(TCP_MIB_CURRESTAB);
 
 	/* add stream to the table */
-	cs->ste = stbl_add_stream(st, pi, cs);
+	cs->ste = stbl_add_stream(st, &cs->s);
 	if (cs->ste == NULL)
 		return -ENOBUFS;
 
@@ -937,7 +924,7 @@ rx_ack_listen(struct tle_tcp_stream *s, struct stbl *st,
 
 	*csp = NULL;
 
-	if (pi->tf.flags != TCP_FLAG_ACK || rx_check_stream(s, pi) != 0)
+	if ((pi->tf.flags & TCP_FLAG_ACK) == 0|| rx_check_stream(s, pi) != 0)
 		return -EINVAL;
 
 	ctx = s->s.ctx;
@@ -964,7 +951,8 @@ rx_ack_listen(struct tle_tcp_stream *s, struct stbl *st,
 
 		/* cleanup on failure */
 		tcp_stream_down(cs);
-		stbl_del_stream(st, cs->ste, cs, 0);
+		TCP_DEC_STATS_ATOMIC(TCP_MIB_CURRESTAB);
+		stbl_del_stream(st, cs->ste, &cs->s);
 		cs->ste = NULL;
 	}
 
@@ -973,7 +961,7 @@ rx_ack_listen(struct tle_tcp_stream *s, struct stbl *st,
 }
 
 static inline int
-data_pkt_adjust(const struct tcb *tcb, struct rte_mbuf *mb, uint32_t hlen,
+data_pkt_adjust(const struct tcb *tcb, struct rte_mbuf **mb, uint32_t hlen,
 	uint32_t *seqn, uint32_t *plen)
 {
 	uint32_t len, n, seq;
@@ -981,7 +969,7 @@ data_pkt_adjust(const struct tcb *tcb, struct rte_mbuf *mb, uint32_t hlen,
 	seq = *seqn;
 	len = *plen;
 
-	rte_pktmbuf_adj(mb, hlen);
+	rte_pktmbuf_adj(*mb, hlen);
 	if (len == 0)
 		return -ENODATA;
 	/* cut off the start of the packet */
@@ -990,7 +978,7 @@ data_pkt_adjust(const struct tcb *tcb, struct rte_mbuf *mb, uint32_t hlen,
 		if (n >= len)
 			return -ENODATA;
 
-		rte_pktmbuf_adj(mb, n);
+		*mb = _rte_pktmbuf_adj(*mb, n);
 		*seqn = seq + n;
 		*plen = len - n;
 	}
@@ -1018,7 +1006,8 @@ rx_ackdata(struct tle_tcp_stream *s, uint32_t ack)
 				tle_event_raise(s->tx.ev);
 			else if (k == 0 && s->tx.cb.func != NULL)
 				s->tx.cb.func(s->tx.cb.data, &s->s);
-		}
+		} else
+			txs_enqueue(s->s.ctx, s);
 	}
 
 	return n;
@@ -1047,6 +1036,7 @@ rx_fin_state(struct tle_tcp_stream *s, struct resp_info *rsp)
 	state = s->tcb.state;
 
 	if (state == TCP_ST_ESTABLISHED) {
+		TCP_DEC_STATS_ATOMIC(TCP_MIB_CURRESTAB);
 		s->tcb.state = TCP_ST_CLOSE_WAIT;
 		/* raise err.ev & err.cb */
 		if (s->err.ev != NULL)
@@ -1055,6 +1045,11 @@ rx_fin_state(struct tle_tcp_stream *s, struct resp_info *rsp)
 			s->err.cb.func(s->err.cb.data, &s->s);
 	} else if (state == TCP_ST_FIN_WAIT_1 || state == TCP_ST_CLOSING) {
 		rsp->flags |= TCP_FLAG_ACK;
+
+		/* shutdown instead of close happens */
+		if (s->err.ev != NULL)
+			tle_event_raise(s->err.ev);
+
 		if (ackfin != 0)
 			stream_timewait(s, s->tcb.snd.rto_tw);
 		else
@@ -1089,15 +1084,17 @@ rx_fin(struct tle_tcp_stream *s, uint32_t state,
 
 	ts = rx_tms_opt(&s->tcb, mb);
 	ret = rx_check_seqack(&s->tcb, seq, si->ack, plen, ts);
-	if (ret != 0)
+	if (ret != 0) {
+		rsp->flags |= TCP_FLAG_ACK;
 		return ret;
+	}
 
 	if (state < TCP_ST_ESTABLISHED)
 		return -EINVAL;
 
 	if (plen != 0) {
 
-		ret = data_pkt_adjust(&s->tcb, mb, hlen, &seq, &plen);
+		ret = data_pkt_adjust(&s->tcb, &mb, hlen, &seq, &plen);
 		if (ret != 0)
 			return ret;
 		if (rx_data_enqueue(s, seq, plen, &mb, 1) != 1)
@@ -1108,9 +1105,10 @@ rx_fin(struct tle_tcp_stream *s, uint32_t state,
 	 * fast-path: all data & FIN was already sent out
 	 * and now is acknowledged.
 	 */
-	if (s->tcb.snd.fss == s->tcb.snd.nxt &&
-			si->ack == (uint32_t)s->tcb.snd.nxt) {
+	if (s->tcb.snd.fss >= s->tcb.snd.nxt &&
+			si->ack == (uint32_t)s->tcb.snd.fss) {
 		s->tcb.snd.una = s->tcb.snd.fss;
+		s->tcb.snd.nxt = s->tcb.snd.una;
 		empty_tq(s);
 	/* conventional ACK processiing */
 	} else
@@ -1148,8 +1146,25 @@ rx_rst(struct tle_tcp_stream *s, uint32_t state, uint32_t flags,
 	else
 		rc = check_seqn(&s->tcb, si->seq, 0);
 
-	if (rc == 0)
+	if (rc == 0) {
+		/* receive rst, connection is closed abnormal
+		 * and should return errno in later operations.
+		 */
+		switch (state) {
+		case TCP_ST_SYN_SENT:
+			TCP_INC_STATS(TCP_MIB_ATTEMPTFAILS);
+			s->tcb.err = ECONNREFUSED;
+			break;
+		case TCP_ST_CLOSE_WAIT:
+			s->tcb.err = EPIPE;
+			break;
+		case TCP_ST_CLOSED:
+			return rc;
+		default:
+			s->tcb.err = ECONNRESET;
+		}
 		stream_term(s);
+	}
 
 	return rc;
 }
@@ -1303,7 +1318,7 @@ rx_data_ack(struct tle_tcp_stream *s, struct dack_info *tack,
 
 		if (ret == 0) {
 			/* skip duplicate data, if any */
-			ret = data_pkt_adjust(&s->tcb, mb[i], hlen,
+			ret = data_pkt_adjust(&s->tcb, &mb[i], hlen,
 				&seq, &plen);
 		}
 
@@ -1336,7 +1351,6 @@ rx_data_ack(struct tle_tcp_stream *s, struct dack_info *tack,
 			/* account for segment received */
 			ack_info_update(tack, &si[j], ret != 0, plen, ts);
 
-			rte_pktmbuf_adj(mb[j], hlen);
 		}
 
 		n = j - i;
@@ -1501,6 +1515,7 @@ rx_ackfin(struct tle_tcp_stream *s)
 	uint32_t state;
 
 	s->tcb.snd.una = s->tcb.snd.fss;
+	s->tcb.snd.nxt = s->tcb.snd.una;
 	empty_tq(s);
 
 	state = s->tcb.state;
@@ -1509,6 +1524,13 @@ rx_ackfin(struct tle_tcp_stream *s)
 	else if (state == TCP_ST_FIN_WAIT_1) {
 		timer_stop(s);
 		s->tcb.state = TCP_ST_FIN_WAIT_2;
+		/* if stream is closed, should be released
+		* before timeout even without fin from peer
+		*/
+		if (s->tcb.uop & TCP_OP_CLOSE) {
+			s->tcb.snd.rto = s->tcb.snd.rto_fw;
+			timer_start(s);
+		}
 	} else if (state == TCP_ST_CLOSING) {
 		stream_timewait(s, s->tcb.snd.rto_tw);
 	}
@@ -1568,18 +1590,24 @@ rx_synack(struct tle_tcp_stream *s, uint32_t ts, uint32_t state,
 
 	s->tcb.snd.una = s->tcb.snd.nxt;
 	s->tcb.snd.mss = calc_smss(so.mss, &s->tx.dst);
+	if (s->tcb.so.ts.raw != 0) {
+		s->tcb.snd.mss -= TCP_TX_OPT_LEN_TMS;
+	}
 	s->tcb.snd.wnd = si->wnd << so.wscale;
 	s->tcb.snd.wu.wl1 = si->seq;
 	s->tcb.snd.wu.wl2 = si->ack;
 	s->tcb.snd.wscale = so.wscale;
+	s->tcb.snd.cork_ts = 0;
 
 	/* setup congestion variables */
 	s->tcb.snd.cwnd = initial_cwnd(s->tcb.snd.mss, s->tcb.snd.cwnd);
+
 	s->tcb.snd.ssthresh = s->tcb.snd.wnd;
 
 	s->tcb.rcv.ts = so.ts.val;
 	s->tcb.rcv.irs = si->seq;
 	s->tcb.rcv.nxt = si->seq + 1;
+	s->tcb.rcv.cpy = si->seq + 1;
 
 	/* if peer doesn't support WSCALE opt, recalculate RCV.WND */
 	s->tcb.rcv.wscale = (so.wscale == TCP_WSCALE_NONE) ?
@@ -1594,6 +1622,7 @@ rx_synack(struct tle_tcp_stream *s, uint32_t ts, uint32_t state,
 	timer_stop(s);
 	s->tcb.state = TCP_ST_ESTABLISHED;
 	rte_smp_wmb();
+	TCP_INC_STATS_ATOMIC(TCP_MIB_CURRESTAB);
 
 	if (s->tx.ev != NULL)
 		tle_event_raise(s->tx.ev);
@@ -1683,8 +1712,8 @@ rx_stream(struct tle_tcp_stream *s, uint32_t ts,
 		 * fast-path: all data & FIN was already sent out
 		 * and now is acknowledged.
 		 */
-		if (s->tcb.snd.fss == s->tcb.snd.nxt &&
-				tack.ack == (uint32_t)s->tcb.snd.nxt)
+		if (s->tcb.snd.fss >= s->tcb.snd.nxt &&
+				tack.ack == (uint32_t)s->tcb.snd.fss)
 			rx_ackfin(s);
 		else
 			rx_process_ack(s, ts, &tack);
@@ -1696,10 +1725,24 @@ rx_stream(struct tle_tcp_stream *s, uint32_t ts,
 		 * - received segment with INO data and no TX is scheduled
 		 *   for that stream.
 		 */
-		if (tack.segs.badseq != 0 || tack.segs.ofo != 0 ||
-				(tack.segs.data != 0 &&
-				rte_atomic32_read(&s->tx.arm) == 0))
+		if (tack.segs.badseq != 0 || tack.segs.ofo != 0)
 			rsp.flags |= TCP_FLAG_ACK;
+		else if (tack.segs.data != 0 &&
+			rte_atomic32_read(&s->tx.arm) == 0 &&
+			(s->s.option.tcpquickack ||
+				s->tcb.rcv.nxt - s->tcb.snd.ack > 8 * s->tcb.so.mss)) {
+			rsp.flags |= TCP_FLAG_ACK;
+			if (s->s.option.tcpquickack > 0)
+				s->s.option.tcpquickack--;
+		}
+		else if (tack.segs.data && rsp.flags == 0) {
+			if (!s->tx.need_da)
+				s->tx.need_da = 1;
+			if (!s->tx.in_daq) {
+				s->tx.in_daq = 1;
+				rte_ring_enqueue_bulk(CTX_TCP_DAQ(s->s.ctx), (void**)&s, 1, NULL);
+			}
+		}
 
 		rx_ofo_fin(s, &rsp);
 
@@ -1775,7 +1818,6 @@ rx_postsyn(struct tle_dev *dev, struct stbl *st, uint32_t type, uint32_t ts,
 	state = s->tcb.state;
 
 	if (state == TCP_ST_LISTEN) {
-
 		/* one connection per flow */
 		cs = NULL;
 		ret = -EINVAL;
@@ -1832,6 +1874,72 @@ rx_postsyn(struct tle_dev *dev, struct stbl *st, uint32_t type, uint32_t ts,
 	return num - k;
 }
 
+static inline void
+sync_refuse(struct tle_tcp_stream *s, struct tle_dev *dev,
+	const union pkt_info *pi, struct rte_mbuf *m)
+{
+	struct ether_hdr *eth_h;
+	struct ether_addr eth_addr;
+	struct ipv4_hdr *ip_h;
+	uint32_t ip_addr;
+	struct ipv6_hdr *ipv6_h;
+	struct in6_addr ipv6_addr;
+	struct tcp_hdr *th;
+	uint16_t port;
+
+	/* rst pkt should not contain options for syn */
+	rte_pktmbuf_trim(m, m->l4_len - sizeof(*th));
+
+	eth_h = rte_pktmbuf_mtod(m, struct ether_hdr*);
+	ether_addr_copy(&eth_h->s_addr, &eth_addr);
+	ether_addr_copy(&eth_h->d_addr, &eth_h->s_addr);
+	ether_addr_copy(&eth_addr, &eth_h->d_addr);
+
+	th = rte_pktmbuf_mtod_offset(m, struct tcp_hdr*,
+			m->l2_len + m->l3_len);
+	port = th->src_port;
+	th->src_port = th->dst_port;
+	th->dst_port = port;
+	th->tcp_flags = TCP_FLAG_RST | TCP_FLAG_ACK;
+	th->recv_ack = rte_cpu_to_be_32(rte_be_to_cpu_32(th->sent_seq) + 1);
+	th->sent_seq = 0;
+	th->data_off &= 0x0f;
+	th->data_off |= (sizeof(*th) / 4) << 4;
+	th->cksum = 0;
+
+	if (pi->tf.type == TLE_V4) {
+		ip_h = rte_pktmbuf_mtod_offset(m, struct ipv4_hdr*,
+				m->l2_len);
+		ip_addr = ip_h->src_addr;
+		ip_h->src_addr = ip_h->dst_addr;
+		ip_h->dst_addr = ip_addr;
+		ip_h->total_length = rte_cpu_to_be_16(
+				rte_be_to_cpu_16(ip_h->total_length) -
+				(m->l4_len - sizeof(*th)));
+		ip_h->hdr_checksum = 0;
+		th->cksum = rte_ipv4_udptcp_cksum(ip_h, th);
+		ip_h->hdr_checksum = rte_ipv4_cksum(ip_h);
+	} else {
+		ipv6_h = rte_pktmbuf_mtod_offset(m, struct ipv6_hdr*,
+				m->l2_len);
+		rte_memcpy(&ipv6_addr, ipv6_h->src_addr,
+				sizeof(struct in6_addr));
+		rte_memcpy(ipv6_h->src_addr, ipv6_h->dst_addr,
+				sizeof(struct in6_addr));
+		rte_memcpy(ipv6_h->dst_addr, &ipv6_addr,
+				sizeof(struct in6_addr));
+		ipv6_h->payload_len = rte_cpu_to_be_16(
+				rte_be_to_cpu_16(ipv6_h->payload_len) -
+				(m->l4_len - sizeof(*th)));
+		th->cksum = rte_ipv6_udptcp_cksum(ipv6_h, th);
+	}
+
+	if (m->pkt_len < ETHER_MIN_LEN)
+		rte_pktmbuf_append(m, ETHER_MIN_LEN - m->pkt_len);
+
+	if (send_pkt(s, dev, m) != 0)
+		rte_pktmbuf_free(m);
+}
 
 static inline uint32_t
 rx_syn(struct tle_dev *dev, uint32_t type, uint32_t ts,
@@ -1843,18 +1951,28 @@ rx_syn(struct tle_dev *dev, uint32_t type, uint32_t ts,
 	uint32_t i, k;
 	int32_t ret;
 
-	s = rx_obtain_listen_stream(dev, &pi[0], type);
+	s = rx_obtain_listen_stream(dev, &pi[0], type, 0);
 	if (s == NULL) {
-		for (i = 0; i != num; i++) {
-			rc[i] = ENOENT;
-			rp[i] = mb[i];
+		/* no socket listening this syn, send rst to refuse connect */
+		s = TCP_STREAM(get_stream(dev->ctx));
+		if (s != NULL) {
+			sync_refuse(s, dev, &pi[0], mb[0]);
+			put_stream(dev->ctx, &s->s, 0);
+			i = 1;
+		} else {
+			i = 0;
 		}
-		return 0;
+		k = 0;
+		for (; i != num; i++) {
+			rc[k] = ENOENT;
+			rp[k] = mb[i];
+			k++;
+		}
+		return num - k;
 	}
 
 	k = 0;
 	for (i = 0; i != num; i++) {
-
 		/* check that this remote is allowed to connect */
 		if (rx_check_stream(s, &pi[i]) != 0)
 			ret = -ENOENT;
@@ -1879,51 +1997,34 @@ tle_tcp_rx_bulk(struct tle_dev *dev, struct rte_mbuf *pkt[],
 {
 	struct stbl *st;
 	struct tle_ctx *ctx;
-	uint32_t i, j, k, mt, n, t, ts;
-	uint64_t csf;
+	uint32_t i, j, k, n, t;
+	uint64_t ts;
 	union pkt_info pi[num];
 	union seg_info si[num];
-	union {
-		uint8_t t[TLE_VNUM];
-		uint32_t raw;
-	} stu;
+
+	TCP_ADD_STATS(TCP_MIB_INSEGS, num);
 
 	ctx = dev->ctx;
 	ts = tcp_get_tms(ctx->cycles_ms_shift);
 	st = CTX_TCP_STLB(ctx);
-	mt = ((ctx->prm.flags & TLE_CTX_FLAG_ST) == 0);
-
-	stu.raw = 0;
 
 	/* extract packet info and check the L3/L4 csums */
 	for (i = 0; i != num; i++) {
 
 		get_pkt_info(pkt[i], &pi[i], &si[i]);
-
 		t = pi[i].tf.type;
-		csf = dev->rx.ol_flags[t] &
-			(PKT_RX_IP_CKSUM_BAD | PKT_RX_L4_CKSUM_BAD);
-
-		/* check csums in SW */
-		if (pi[i].csf == 0 && csf != 0 && check_pkt_csum(pkt[i], csf,
-				pi[i].tf.type, IPPROTO_TCP) != 0)
-			pi[i].csf = csf;
-
-		stu.t[t] = mt;
+		pi[i].csf = check_pkt_csum(pkt[i], t, IPPROTO_TCP);
 	}
-
-	if (stu.t[TLE_V4] != 0)
-		stbl_lock(st, TLE_V4);
-	if (stu.t[TLE_V6] != 0)
-		stbl_lock(st, TLE_V6);
 
 	k = 0;
 	for (i = 0; i != num; i += j) {
-
 		t = pi[i].tf.type;
 
 		/*basic checks for incoming packet */
-		if (t >= TLE_VNUM || pi[i].csf != 0 || dev->dp[t] == NULL) {
+		if (t >= TLE_VNUM || pi[i].csf != 0) {
+			TCP_INC_STATS(TCP_MIB_INERRS);
+			if (t < TLE_VNUM)
+				TCP_INC_STATS(TCP_MIB_CSUMERRORS);
 			rc[k] = EINVAL;
 			rp[k] = pkt[i];
 			j = 1;
@@ -1942,11 +2043,6 @@ tle_tcp_rx_bulk(struct tle_dev *dev, struct rte_mbuf *pkt[],
 		}
 	}
 
-	if (stu.t[TLE_V4] != 0)
-		stbl_unlock(st, TLE_V4);
-	if (stu.t[TLE_V6] != 0)
-		stbl_unlock(st, TLE_V6);
-
 	return num - k;
 }
 
@@ -1958,21 +2054,42 @@ tle_tcp_stream_accept(struct tle_stream *ts, struct tle_stream *rs[],
 	struct tle_tcp_stream *s;
 
 	s = TCP_STREAM(ts);
-	n = _rte_ring_dequeue_burst(s->rx.q, (void **)rs, num);
-	if (n == 0)
-		return 0;
 
-	/*
-	 * if we still have packets to read,
-	 * then rearm stream RX event.
-	 */
-	if (n == num && rte_ring_count(s->rx.q) != 0) {
-		if (tcp_stream_try_acquire(s) > 0 && s->rx.ev != NULL)
-			tle_event_raise(s->rx.ev);
-		tcp_stream_release(s);
+	if (s == NULL) {
+		rte_errno = EINVAL;
+		return 0;
 	}
 
-	return n;
+	if (tcp_stream_try_acquire(s) > 0) {
+		if (s->tcb.state != TCP_ST_LISTEN) {
+			tcp_stream_release(s);
+			rte_errno = EINVAL;
+			return 0;
+		}
+
+		n = _rte_ring_dequeue_burst(s->rx.q, (void **)rs, num);
+		if (n == 0)
+		{
+			tcp_stream_release(s);
+			rte_errno = EAGAIN;
+			return 0;
+		}
+
+		/*
+		 * if we still have packets to read,
+		 * then rearm stream RX event.
+		 */
+		if (n == num && rte_ring_count(s->rx.q) != 0) {
+			if (s->rx.ev != NULL)
+				tle_event_raise(s->rx.ev);
+		}
+		tcp_stream_release(s);
+		return n;
+	} else {
+		tcp_stream_release(s);
+		rte_errno = EINVAL;
+		return 0;
+	}
 }
 
 uint16_t
@@ -2000,6 +2117,7 @@ tle_tcp_tx_bulk(struct tle_dev *dev, struct rte_mbuf *pkt[], uint16_t num)
 		stream_drb_free(s, drb + i, j - i);
 	}
 
+	TCP_ADD_STATS(TCP_MIB_OUTSEGS, n);
 	return n;
 }
 
@@ -2029,7 +2147,7 @@ stream_fill_addr(struct tle_tcp_stream *s, const struct sockaddr *addr)
 	/* setup L4 src ports and src address fields. */
 	if (s->s.type == TLE_V4) {
 		in4 = (const struct sockaddr_in *)addr;
-		if (in4->sin_addr.s_addr == INADDR_ANY || in4->sin_port == 0)
+		if (in4->sin_addr.s_addr == INADDR_ANY)
 			return -EINVAL;
 
 		s->s.port.src = in4->sin_port;
@@ -2039,9 +2157,8 @@ stream_fill_addr(struct tle_tcp_stream *s, const struct sockaddr *addr)
 
 	} else if (s->s.type == TLE_V6) {
 		in6 = (const struct sockaddr_in6 *)addr;
-		if (memcmp(&in6->sin6_addr, &tle_ipv6_any,
-				sizeof(tle_ipv6_any)) == 0 ||
-				in6->sin6_port == 0)
+
+		if (IN6_IS_ADDR_UNSPECIFIED(&in6->sin6_addr))
 			return -EINVAL;
 
 		s->s.port.src = in6->sin6_port;
@@ -2063,8 +2180,7 @@ stream_fill_addr(struct tle_tcp_stream *s, const struct sockaddr *addr)
 	if (s->s.type == TLE_V4) {
 		if (s->s.ipv4.addr.dst == INADDR_ANY)
 			s->s.ipv4.addr.dst = prm->local_addr4.s_addr;
-	} else if (memcmp(&s->s.ipv6.addr.dst, &tle_ipv6_any,
-			sizeof(tle_ipv6_any)) == 0)
+	} else if (IN6_IS_ADDR_UNSPECIFIED(&s->s.ipv6.addr.dst))
 		memcpy(&s->s.ipv6.addr.dst, &prm->local_addr6,
 			sizeof(s->s.ipv6.addr.dst));
 
@@ -2075,7 +2191,8 @@ static inline int
 tx_syn(struct tle_tcp_stream *s, const struct sockaddr *addr)
 {
 	int32_t rc;
-	uint32_t tms, seq;
+	uint32_t seq;
+	uint64_t tms;
 	union pkt_info pi;
 	struct stbl *st;
 	struct stbl_entry *se;
@@ -2112,7 +2229,7 @@ tx_syn(struct tle_tcp_stream *s, const struct sockaddr *addr)
 
 	/* add the stream in stream table */
 	st = CTX_TCP_STLB(s->s.ctx);
-	se = stbl_add_stream_lock(st, s);
+	se = stbl_add_stream(st, &s->s);
 	if (se == NULL)
 		return -ENOBUFS;
 	s->ste = se;
@@ -2120,6 +2237,7 @@ tx_syn(struct tle_tcp_stream *s, const struct sockaddr *addr)
 	/* put stream into the to-send queue */
 	txs_enqueue(s->s.ctx, s);
 
+	TCP_INC_STATS(TCP_MIB_ACTIVEOPENS);
 	return 0;
 }
 
@@ -2165,13 +2283,31 @@ tle_tcp_stream_connect(struct tle_stream *ts, const struct sockaddr *addr)
 uint16_t
 tle_tcp_stream_recv(struct tle_stream *ts, struct rte_mbuf *pkt[], uint16_t num)
 {
-	uint32_t n;
+	uint32_t n, i;
 	struct tle_tcp_stream *s;
 
-	s = TCP_STREAM(ts);
-	n = _rte_ring_mcs_dequeue_burst(s->rx.q, (void **)pkt, num);
-	if (n == 0)
+	if (ts == NULL) {
+		rte_errno = ENOTCONN;
 		return 0;
+	}
+
+	s = TCP_STREAM(ts);
+
+	n = _rte_ring_mcs_dequeue_burst(s->rx.q, (void **)pkt, num);
+	if (n == 0) {
+		if (s->tcb.err != 0) {
+			rte_errno = s->tcb.err;
+		} else {
+			rte_errno = EAGAIN;
+		}
+		return 0;
+	}
+
+	for (i = 0; i < n; ++i)
+		s->tcb.rcv.cpy += rte_pktmbuf_pkt_len(pkt[i]);
+
+	/* update receive window with left recv buffer*/
+	s->tcb.rcv.wnd = calc_rx_wnd(s, s->tcb.rcv.wscale);
 
 	/*
 	 * if we still have packets to read,
@@ -2183,12 +2319,40 @@ tle_tcp_stream_recv(struct tle_stream *ts, struct rte_mbuf *pkt[], uint16_t num)
 		tcp_stream_release(s);
 	}
 
+	/* if have some free space in rx queue, send ack to notify peer */
+	if (rte_ring_free_count(s->rx.q) == WIN_NOTIFY_THRESH) {
+		txs_enqueue(s->s.ctx, s);
+	}
+
 	return n;
+}
+
+uint16_t
+tle_tcp_stream_inq(struct tle_stream *ts)
+{
+	struct tle_tcp_stream *s;
+
+	s = TCP_STREAM(ts);
+	return s->tcb.rcv.nxt - s->tcb.rcv.cpy;
 }
 
 ssize_t
 tle_tcp_stream_readv(struct tle_stream *ts, const struct iovec *iov,
 	int iovcnt)
+{
+	if (ts == NULL) {
+		rte_errno = ENOTCONN;
+		return -1;
+	}
+
+	return tle_tcp_stream_readv_msg(ts, iov, iovcnt, NULL);
+}
+
+extern uint32_t timestamp_needed;
+
+ssize_t
+tle_tcp_stream_readv_msg(struct tle_stream *ts, const struct iovec *iov,
+	int iovcnt, struct msghdr *msg)
 {
 	int32_t i;
 	uint32_t mn, n, tn;
@@ -2196,13 +2360,47 @@ tle_tcp_stream_readv(struct tle_stream *ts, const struct iovec *iov,
 	struct tle_tcp_stream *s;
 	struct iovec iv;
 	struct rxq_objs mo[2];
+	struct sockaddr_in* addr;
+	struct sockaddr_in6* addr6;
 
 	s = TCP_STREAM(ts);
 
 	/* get group of packets */
 	mn = tcp_rxq_get_objs(s, mo);
-	if (mn == 0)
-		return 0;
+	if (mn == 0) {
+		if (s->tcb.err != 0)
+			rte_errno = s->tcb.err;
+		else
+			rte_errno = EAGAIN;
+		return -1;
+	}
+
+	if (!timestamp_needed)
+		ts->timestamp = mo[0].mb[0]->timestamp;
+
+	if (msg != NULL && msg->msg_control != NULL) {
+		if (timestamp_needed)
+			set_msg_timestamp(msg, mo[0].mb[0]);
+		else
+			msg->msg_controllen = 0;
+	}
+
+	if (msg != NULL && msg->msg_name != NULL) {
+		if (s->s.type == TLE_V4) {
+			addr = (struct sockaddr_in*)msg->msg_name;
+			addr->sin_family = AF_INET;
+			addr->sin_addr.s_addr = s->s.ipv4.addr.src;
+			addr->sin_port = s->s.port.src;
+			msg->msg_namelen = sizeof(struct sockaddr_in);
+		} else {
+			addr6 = (struct sockaddr_in6*)msg->msg_name;
+			addr6->sin6_family = AF_INET6;
+			rte_memcpy(&addr6->sin6_addr, &s->s.ipv6.addr.src,
+					sizeof(struct sockaddr_in6));
+			addr6->sin6_port = s->s.port.src;
+			msg->msg_namelen = sizeof(struct sockaddr_in6);
+		}
+	}
 
 	sz = 0;
 	n = 0;
@@ -2234,6 +2432,8 @@ tle_tcp_stream_readv(struct tle_stream *ts, const struct iovec *iov,
 	}
 
 	tcp_rxq_consume(s, tn);
+	/* update receive window with left recv buffer*/
+	s->tcb.rcv.wnd = calc_rx_wnd(s, s->tcb.rcv.wscale);
 
 	/*
 	 * if we still have packets to read,
@@ -2243,6 +2443,14 @@ tle_tcp_stream_readv(struct tle_stream *ts, const struct iovec *iov,
 		if (tcp_stream_try_acquire(s) > 0 && s->rx.ev != NULL)
 			tle_event_raise(s->rx.ev);
 		tcp_stream_release(s);
+	}
+
+	s->tcb.rcv.cpy += sz;
+
+	/* if have some free space in rx queue, send ack to notify peer */
+	n = rte_ring_free_count(s->rx.q);
+	if (n - tn < WIN_NOTIFY_THRESH && n >= WIN_NOTIFY_THRESH) {
+		txs_enqueue(s->s.ctx, s);
 	}
 
 	return sz;
@@ -2268,48 +2476,35 @@ tx_segments(struct tle_tcp_stream *s, uint64_t ol_flags,
 	if (i == num) {
 		/* queue packets for further transmission. */
 		rc = _rte_ring_enqueue_bulk(s->tx.q, (void **)segs, num);
-		if (rc != 0)
+		if (rc != 0) {
+			rc = -EAGAIN;
 			free_mbufs(segs, num);
+		}
 	}
 
 	return rc;
 }
 
-uint16_t
-tle_tcp_stream_send(struct tle_stream *ts, struct rte_mbuf *pkt[], uint16_t num)
+static inline uint16_t
+stream_send(struct tle_tcp_stream *s, struct rte_mbuf *pkt[],
+	    uint16_t num, uint16_t mss, uint64_t ol_flags)
 {
-	uint32_t i, j, k, mss, n, state;
+	uint16_t i, j, k;
 	int32_t rc;
-	uint64_t ol_flags;
-	struct tle_tcp_stream *s;
+	uint32_t n, free_slots;
 	struct rte_mbuf *segs[TCP_MAX_PKT_SEG];
-
-	s = TCP_STREAM(ts);
-
-	/* mark stream as not closable. */
-	if (tcp_stream_acquire(s) < 0) {
-		rte_errno = EAGAIN;
-		return 0;
-	}
-
-	state = s->tcb.state;
-	if (state != TCP_ST_ESTABLISHED && state != TCP_ST_CLOSE_WAIT) {
-		rte_errno = ENOTCONN;
-		tcp_stream_release(s);
-		return 0;
-	}
-
-	mss = s->tcb.snd.mss;
-	ol_flags = s->tx.dst.ol_flags;
+	int32_t pkt_len;
 
 	k = 0;
 	rc = 0;
+	pkt_len = 0;
 	while (k != num) {
 		/* prepare and check for TX */
 		for (i = k; i != num; i++) {
 			if (pkt[i]->pkt_len > mss ||
 					pkt[i]->nb_segs > TCP_MAX_PKT_SEG)
 				break;
+			pkt_len += pkt[i]->pkt_len;
 			rc = tcp_fill_mbuf(pkt[i], s, &s->tx.dst, ol_flags,
 				s->s.port, 0, TCP_FLAG_ACK, 0, 0);
 			if (rc != 0)
@@ -2333,6 +2528,7 @@ tle_tcp_stream_send(struct tle_stream *ts, struct rte_mbuf *pkt[], uint16_t num)
 						pkt[j]->l3_len +
 						pkt[j]->l4_len);
 					pkt[j]->ol_flags &= ol_flags;
+					pkt_len -= pkt[j]->pkt_len;
 				}
 				break;
 			}
@@ -2344,8 +2540,10 @@ tle_tcp_stream_send(struct tle_stream *ts, struct rte_mbuf *pkt[], uint16_t num)
 
 		/* segment large packet and enqueue for sending */
 		} else if (i != num) {
+			free_slots = rte_ring_free_count(s->tx.q);
+			free_slots = RTE_MIN(free_slots, RTE_DIM(segs));
 			/* segment the packet. */
-			rc = tcp_segmentation(pkt[i], segs, RTE_DIM(segs),
+			rc = tcp_segmentation(pkt[i], segs, free_slots,
 				&s->tx.dst, mss);
 			if (rc < 0) {
 				rte_errno = -rc;
@@ -2356,19 +2554,166 @@ tle_tcp_stream_send(struct tle_stream *ts, struct rte_mbuf *pkt[], uint16_t num)
 			if (rc == 0) {
 				/* free the large mbuf */
 				rte_pktmbuf_free(pkt[i]);
+				pkt_len += pkt[i]->pkt_len;
 				/* set the mbuf as consumed */
 				k++;
-			} else
+			} else {
 				/* no space left in tx queue */
+				RTE_VERIFY(0);
 				break;
+			}
 		}
 	}
+
+	s->tcb.snd.waitlen += pkt_len;
+	return k;
+}
+
+static inline uint16_t
+stream_send_tso(struct tle_tcp_stream *s, struct rte_mbuf *pkt[],
+		uint16_t num, uint16_t mss, uint64_t ol_flags)
+{
+	uint16_t i, k, nb_segs;
+	int32_t rc, pkt_len;
+	uint64_t ol_flags1;
+	struct rte_mbuf *pre_tail;
+
+	k = 0;
+	rc = 0;
+	while (k != num) {
+		/* Make sure there is at least one slot available */
+		if (rte_ring_free_count(s->tx.q) == 0)
+			break;
+
+		/* prepare and check for TX */
+		nb_segs = 0;
+		pkt_len = 0;
+		pre_tail = NULL;
+		for (i = k; i != num; i++) {
+			if (pkt[i]->nb_segs != 1)
+				rte_panic("chained mbuf: %p\n", pkt[i]);
+			/* We shall consider cwnd and snd wnd when limit len */
+			if (nb_segs + pkt[i]->nb_segs <= TCP_MAX_PKT_SEG &&
+			    pkt_len + pkt[i]->pkt_len <= 65535 - RESERVE_HEADER_LEN) {
+				nb_segs += pkt[i]->nb_segs;
+				pkt_len += pkt[i]->pkt_len;
+				if (pre_tail)
+					pre_tail->next = pkt[i];
+				pre_tail = rte_pktmbuf_lastseg(pkt[i]);
+			} else {
+				/* enqueue this one now */
+				break;
+			}
+		}
+
+		if (unlikely(i == k)) {
+			/* pkt[k] is a too big packet, now we fall back to
+			 * non-tso send; we can optimize it later by
+			 * splitting the mbuf.
+			 */
+			if (stream_send(s, &pkt[k], 1, mss, ol_flags) == 1) {
+				k++;
+				continue;
+			} else
+				break;
+		}
+
+		pkt[k]->nb_segs = nb_segs;
+		pkt[k]->pkt_len = pkt_len;
+
+		ol_flags1 = ol_flags;
+		if (pkt_len > mss)
+			ol_flags1 |= PKT_TX_TCP_SEG;
+
+		rc = tcp_fill_mbuf(pkt[k], s, &s->tx.dst, ol_flags1,
+				   s->s.port, 0, TCP_FLAG_ACK, 0, 0);
+		if (rc != 0) /* hard to recover */
+			rte_panic("failed to fill mbuf: %p\n", pkt[k]);
+
+		/* correct mss */
+		pkt[k]->tso_segsz = mss;
+
+		s->tcb.snd.waitlen += pkt_len;
+		/* We already make sure there is at least one slot */
+		if (_rte_ring_enqueue_burst(s->tx.q, (void **)pkt + k, 1) < 1)
+			RTE_VERIFY(0);
+
+		k = i;
+	}
+
+	return k;
+}
+
+uint16_t
+tle_tcp_stream_send(struct tle_stream *ts, struct rte_mbuf *pkt[], uint16_t num)
+{
+	uint16_t k, mss, state;
+	uint64_t ol_flags;
+	struct tle_tcp_stream *s;
+
+	if (ts == NULL) {
+		rte_errno = EPIPE;
+		return 0;
+	}
+
+	s = TCP_STREAM(ts);
+
+	if (s->tcb.err != 0) {
+		rte_errno = s->tcb.err;
+		return 0;
+	}
+
+	/* mark stream as not closable. */
+	if (tcp_stream_acquire(s) < 0) {
+		rte_errno = EAGAIN;
+		return 0;
+	}
+
+	state = s->tcb.state;
+	switch (state) {
+	case TCP_ST_ESTABLISHED:
+	case TCP_ST_CLOSE_WAIT:
+		break;
+	case TCP_ST_FIN_WAIT_1:
+	case TCP_ST_FIN_WAIT_2:
+	case TCP_ST_CLOSING:
+	case TCP_ST_LAST_ACK:
+		rte_errno = EPIPE;
+		tcp_stream_release(s);
+		return 0;
+	default:
+		rte_errno = ENOTCONN;
+		tcp_stream_release(s);
+		return 0;
+	}
+
+	mss = s->tcb.snd.mss;
+
+	ol_flags = s->tx.dst.ol_flags;
+
+	/* Some reference number on the case:
+	 *   "<netperf with uss> - tap - <kernel stack> - <netserver>"
+	 *  ~2Gbps with tso disabled;
+	 *  ~16Gbps with tso enabled.
+	 */
+	if (rte_ring_free_count(s->tx.q) == 0) {
+		/* Block send may try without waiting for tx event (raised by acked
+		 * data), so here we will still put this stream for further process
+		 */
+		txs_enqueue(s->s.ctx, s);
+		rte_errno = EAGAIN;
+		k = 0;
+	} else if (s->tx.dst.dev->prm.tx_offload & DEV_TX_OFFLOAD_TCP_TSO)
+		k = stream_send_tso(s, pkt, num, mss, ol_flags);
+	else
+		k = stream_send(s, pkt, num, mss, ol_flags);
 
 	/* notify BE about more data to send */
 	if (k != 0)
 		txs_enqueue(s->s.ctx, s);
+
 	/* if possible, re-arm stream write event. */
-	if (rte_ring_free_count(s->tx.q) != 0 && s->tx.ev != NULL)
+	if (rte_ring_free_count(s->tx.q) && s->tx.ev != NULL && k == num)
 		tle_event_raise(s->tx.ev);
 
 	tcp_stream_release(s);
@@ -2387,8 +2732,19 @@ tle_tcp_stream_writev(struct tle_stream *ts, struct rte_mempool *mp,
 	struct tle_tcp_stream *s;
 	struct iovec iv;
 	struct rte_mbuf *mb[2 * MAX_PKT_BURST];
+	uint16_t mss;
+
+	if (ts == NULL) {
+		rte_errno = EPIPE;
+		return -1;
+	}
 
 	s = TCP_STREAM(ts);
+
+	if (s->tcb.err != 0) {
+		rte_errno = s->tcb.err;
+		return -1;
+	}
 
 	/* mark stream as not closable. */
 	if (tcp_stream_acquire(s) < 0) {
@@ -2397,7 +2753,18 @@ tle_tcp_stream_writev(struct tle_stream *ts, struct rte_mempool *mp,
 	}
 
 	state = s->tcb.state;
-	if (state != TCP_ST_ESTABLISHED && state != TCP_ST_CLOSE_WAIT) {
+	switch (state) {
+	case TCP_ST_ESTABLISHED:
+	case TCP_ST_CLOSE_WAIT:
+		break;
+	case TCP_ST_FIN_WAIT_1:
+	case TCP_ST_FIN_WAIT_2:
+	case TCP_ST_CLOSING:
+	case TCP_ST_LAST_ACK:
+		rte_errno = EPIPE;
+		tcp_stream_release(s);
+		return -1;
+	default:
 		rte_errno = ENOTCONN;
 		tcp_stream_release(s);
 		return -1;
@@ -2408,11 +2775,24 @@ tle_tcp_stream_writev(struct tle_stream *ts, struct rte_mempool *mp,
 	for (i = 0; i != iovcnt; i++)
 		tsz += iov[i].iov_len;
 
+	if (tsz == 0) {
+		tcp_stream_release(s);
+		return 0;
+	}
+
 	slen = rte_pktmbuf_data_room_size(mp);
-	slen = RTE_MIN(slen, s->tcb.snd.mss);
+	mss = s->tcb.snd.mss;
+
+	slen = RTE_MIN(slen, mss);
 
 	num = (tsz + slen - 1) / slen;
 	n = rte_ring_free_count(s->tx.q);
+
+	if (n == 0) {
+		tcp_stream_release(s);
+		return 0;
+	}
+
 	num = RTE_MIN(num, n);
 	n = RTE_MIN(num, RTE_DIM(mb));
 
@@ -2456,7 +2836,6 @@ tle_tcp_stream_writev(struct tle_stream *ts, struct rte_mempool *mp,
 		k = 0;
 
 	if (k != j) {
-
 		/* free pkts that were not enqueued */
 		free_mbufs(mb + k, j - k);
 
@@ -2471,14 +2850,16 @@ tle_tcp_stream_writev(struct tle_stream *ts, struct rte_mempool *mp,
 		}
 	}
 
-        if (k != 0) {
-
+	if (k != 0) {
 		/* notify BE about more data to send */
 		txs_enqueue(s->s.ctx, s);
 
 		/* if possible, re-arm stream write event. */
 		if (rte_ring_free_count(s->tx.q) != 0 && s->tx.ev != NULL)
 			tle_event_raise(s->tx.ev);
+	} else {
+		rte_errno = EAGAIN;
+		sz = -1;
 	}
 
 	tcp_stream_release(s);
@@ -2489,6 +2870,7 @@ tle_tcp_stream_writev(struct tle_stream *ts, struct rte_mempool *mp,
 static inline void
 tx_data_fin(struct tle_tcp_stream *s, uint32_t tms, uint32_t state)
 {
+	uint64_t nxt = s->tcb.snd.nxt;
 	/* try to send some data */
 	tx_nxt_data(s, tms);
 
@@ -2499,6 +2881,9 @@ tx_data_fin(struct tle_tcp_stream *s, uint32_t tms, uint32_t state)
 			s->tcb.snd.fss != s->tcb.snd.nxt) {
 		s->tcb.snd.fss = ++s->tcb.snd.nxt;
 		send_ack(s, tms, TCP_FLAG_FIN | TCP_FLAG_ACK);
+	} else if (s->tcb.snd.nxt == nxt) {
+		/* no pkt is sended, send an ack to notify window */
+		send_ack(s, tms, TCP_FLAG_ACK);
 	}
 }
 
@@ -2549,7 +2934,6 @@ rto_stream(struct tle_tcp_stream *s, uint32_t tms)
 	if (s->tcb.snd.nb_retx < s->tcb.snd.nb_retm) {
 
 		if (state >= TCP_ST_ESTABLISHED && state <= TCP_ST_LAST_ACK) {
-
 			/* update SND.CWD and SND.SSTHRESH */
 			rto_cwnd_update(&s->tcb);
 
@@ -2579,9 +2963,7 @@ rto_stream(struct tle_tcp_stream *s, uint32_t tms)
 				s->tcb.snd.cwnd = s->tcb.snd.mss;
 
 			send_ack(s, tms, TCP_FLAG_SYN);
-
-		} else if (state == TCP_ST_TIME_WAIT) {
-			stream_term(s);
+			TCP_INC_STATS(TCP_MIB_RETRANSSEGS);
 		}
 
 		/* RFC6298:5.5 back off the timer */
@@ -2590,24 +2972,65 @@ rto_stream(struct tle_tcp_stream *s, uint32_t tms)
 		timer_restart(s);
 
 	} else {
-		send_rst(s, s->tcb.snd.una);
+		if (state == TCP_ST_SYN_SENT) {
+			if (stream_fill_dest(s) != 0 ||
+			    is_broadcast_ether_addr((struct ether_addr *)s->tx.dst.hdr))
+				s->tcb.err = EHOSTUNREACH;
+			else
+				/* TODO: do we send rst on this */
+				s->tcb.err = ENOTCONN;
+		} else
+			send_rst(s, s->tcb.snd.una);
 		stream_term(s);
 	}
 }
 
+#define DELAY_ACK_CHECK_INTERVAL 50
+
 int
 tle_tcp_process(struct tle_ctx *ctx, uint32_t num)
 {
-	uint32_t i, k, tms;
+	uint32_t i, k;
+	uint64_t tms;
 	struct sdr *dr;
 	struct tle_timer_wheel *tw;
 	struct tle_stream *p;
 	struct tle_tcp_stream *s, *rs[num];
+	struct rte_ring* r;
+
+	/* process streams with delayed ack */
+	tms = tcp_get_tms(ctx->cycles_ms_shift);
+	if (tms - CTX_TCP_STREAMS(ctx)->da_ts > DELAY_ACK_CHECK_INTERVAL) {
+		r = CTX_TCP_DAQ(ctx);
+		if (rte_ring_count(r) > 0) {
+			while (true) {
+				k = rte_ring_dequeue_burst(r, (void **)rs, num, NULL);
+				for (i = 0; i < k; i++) {
+					s = rs[i];
+					if (rte_atomic32_read(&s->tx.arm) == 0 &&
+							s->tx.need_da) {
+						if(tcp_stream_try_acquire(s) > 0) {
+							s->tx.in_daq = 0;
+							s->s.option.tcpquickack = 8;
+							send_ack(s, tms, TCP_FLAG_ACK);
+						}
+						else
+							rte_ring_enqueue_burst(r, (void**)&s, 1, NULL);
+						tcp_stream_release(s);
+					} else {
+						s->tx.in_daq = 0;
+					}
+				}
+				if (k < num)
+					break;
+			}
+		}
+		CTX_TCP_STREAMS(ctx)->da_ts = tms;
+	}
 
 	/* process streams with RTO exipred */
 
 	tw = CTX_TCP_TMWHL(ctx);
-	tms = tcp_get_tms(ctx->cycles_ms_shift);
 	tle_timer_expire(tw, tms);
 
 	k = tle_timer_get_expired_bulk(tw, (void **)rs, RTE_DIM(rs));
@@ -2616,9 +3039,24 @@ tle_tcp_process(struct tle_ctx *ctx, uint32_t num)
 
 		s = rs[i];
 		s->timer.handle = NULL;
-		if (tcp_stream_try_acquire(s) > 0)
-			rto_stream(s, tms);
-		tcp_stream_release(s);
+		while (s->tcb.state == TCP_ST_TIME_WAIT) {
+			if (tcp_stream_acquire(s) > 0) {
+				stream_term(s);
+				tcp_stream_release(s);
+				break;
+			}
+		}
+
+		if (s->tcb.state == TCP_ST_FIN_WAIT_2) {
+			if (tcp_stream_try_acquire(s) > 0)
+				stream_term(s);
+			tcp_stream_release(s);
+		}
+		else if (s->tcb.state != TCP_ST_CLOSED) {
+			if (tcp_stream_try_acquire(s) > 0)
+				rto_stream(s, tms);
+			tcp_stream_release(s);
+		}
 	}
 
 	/* process streams from to-send queue */
@@ -2626,20 +3064,39 @@ tle_tcp_process(struct tle_ctx *ctx, uint32_t num)
 	k = txs_dequeue_bulk(ctx, rs, RTE_DIM(rs));
 
 	for (i = 0; i != k; i++) {
-
 		s = rs[i];
-		rte_atomic32_set(&s->tx.arm, 0);
 
-		if (tcp_stream_try_acquire(s) > 0)
-			tx_stream(s, tms);
-		else
-			txs_enqueue(s->s.ctx, s);
+		if (tcp_stream_try_acquire(s) > 0) {
+			if (rte_atomic32_read(&s->tx.arm) > 0) {
+				rte_atomic32_set(&s->tx.arm, 0);
+
+				if (s->s.option.tcpcork) {
+					if (s->tcb.snd.cork_ts == 0)
+						s->tcb.snd.cork_ts = (uint32_t)tms;
+					if (s->tcb.state < TCP_ST_CLOSE_WAIT &&
+							s->tcb.snd.waitlen < s->tcb.snd.mss &&
+							(uint32_t)tms - s->tcb.snd.cork_ts < 200) {
+							txs_enqueue(s->s.ctx, s);
+							tcp_stream_release(s);
+							continue;
+					} else {
+						s->tcb.snd.cork_ts = 0;
+					}
+				}
+
+				tx_stream(s, tms);
+			}
+		} else {
+			if (rte_atomic32_read(&s->tx.arm) > 0)
+				txs_enqueue(s->s.ctx, s);
+		}
 		tcp_stream_release(s);
 	}
 
 	/* collect streams to close from the death row */
 
 	dr = CTX_TCP_SDR(ctx);
+	rte_spinlock_lock(&dr->lock);
 	for (k = 0, p = STAILQ_FIRST(&dr->be);
 			k != num && p != NULL;
 			k++, p = STAILQ_NEXT(p, link))
@@ -2649,6 +3106,7 @@ tle_tcp_process(struct tle_ctx *ctx, uint32_t num)
 		STAILQ_INIT(&dr->be);
 	else
 		STAILQ_FIRST(&dr->be) = p;
+	rte_spinlock_unlock(&dr->lock);
 
 	/* cleanup closed streams */
 	for (i = 0; i != k; i++) {
