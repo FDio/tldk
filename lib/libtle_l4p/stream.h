@@ -22,6 +22,25 @@
 extern "C" {
 #endif
 
+union stream_option {
+	struct {
+		uint32_t reuseaddr: 1;
+		uint32_t reuseport: 1;
+		uint32_t keepalive: 1;
+		uint32_t ipv6only: 1;
+		uint32_t oobinline: 1;
+		uint32_t tcpcork: 1;
+		uint32_t tcpquickack: 4;
+		uint32_t tcpnodelay: 1;
+		uint32_t mulloop: 1;
+		uint32_t reserve: 12;
+		uint32_t multtl: 8;
+		uint16_t keepidle;
+		uint16_t keepintvl;
+	};
+	uint64_t raw;
+};
+
 /*
  * Common structure that must be present as first field in all partcular
  * L4 (UDP/TCP, etc.) stream implementations.
@@ -32,6 +51,10 @@ struct tle_stream {
 	struct tle_ctx *ctx;
 
 	uint8_t type;	       /* TLE_V4 or TLE_V6 */
+	uint8_t padding;
+	uint16_t reuseport_seed;
+	union stream_option option;
+	unsigned long timestamp;
 
 	/* Stream address information. */
 	union l4_ports port;
@@ -53,15 +76,25 @@ static inline uint32_t
 get_streams(struct tle_ctx *ctx, struct tle_stream *s[], uint32_t num)
 {
 	struct tle_stream *p;
-	uint32_t i, n;
+	uint32_t i, n, inc;
 
 	rte_spinlock_lock(&ctx->streams.lock);
 
-	n = RTE_MIN(ctx->streams.nb_free, num);
-	for (i = 0, p = STAILQ_FIRST(&ctx->streams.free);
-			i != n;
-			i++, p = STAILQ_NEXT(p, link))
+	n = ctx->streams.nb_free;
+	if (n < num) {
+		inc = tle_stream_ops[ctx->prm.proto].more_streams(ctx);
+		ctx->streams.nb_free += inc;
+		ctx->streams.nb_cur += inc;
+		n = ctx->streams.nb_free;
+	}
+	n = RTE_MIN(n, num);
+
+	for (i = 0, p = STAILQ_FIRST(&ctx->streams.free); i != n; ) {
 		s[i] = p;
+		p = STAILQ_NEXT(p, link);
+		s[i]->link.stqe_next = NULL;
+		i++;
+	}
 
 	if (p == NULL)
 		/* we retrieved all free entries */
@@ -80,9 +113,6 @@ get_stream(struct tle_ctx *ctx)
 	struct tle_stream *s;
 
 	s = NULL;
-	if (ctx->streams.nb_free == 0)
-		return s;
-
 	get_streams(ctx, &s, 1);
 	return s;
 }
@@ -120,8 +150,8 @@ drb_nb_elem(const struct tle_ctx *ctx)
 }
 
 static inline int32_t
-stream_get_dest(struct tle_stream *s, const void *dst_addr,
-	struct tle_dest *dst)
+stream_get_dest(uint8_t type, struct tle_stream *s, const void *src_addr,
+	const void *dst_addr, struct tle_dest *dst)
 {
 	int32_t rc;
 	const struct in_addr *d4;
@@ -133,11 +163,13 @@ stream_get_dest(struct tle_stream *s, const void *dst_addr,
 
 	/* it is here just to keep gcc happy. */
 	d4 = NULL;
+	/* it is here just to keep gcc happy. */
+	d6 = NULL;
 
-	if (s->type == TLE_V4) {
+	if (type == TLE_V4) {
 		d4 = dst_addr;
 		rc = ctx->prm.lookup4(ctx->prm.lookup4_data, d4, dst);
-	} else if (s->type == TLE_V6) {
+	} else if (type == TLE_V6) {
 		d6 = dst_addr;
 		rc = ctx->prm.lookup6(ctx->prm.lookup6_data, d6, dst);
 	} else
@@ -147,18 +179,25 @@ stream_get_dest(struct tle_stream *s, const void *dst_addr,
 		return -ENOENT;
 
 	dev = dst->dev;
-	dst->ol_flags = dev->tx.ol_flags[s->type];
+	dst->ol_flags = dev->tx.ol_flags[type];
 
-	if (s->type == TLE_V4) {
+	if (type == TLE_V4) {
 		struct ipv4_hdr *l3h;
 		l3h = (struct ipv4_hdr *)(dst->hdr + dst->l2_len);
-		l3h->src_addr = dev->prm.local_addr4.s_addr;
+		if (((const struct in_addr*)src_addr)->s_addr != INADDR_ANY)
+			l3h->src_addr = ((const struct in_addr*)src_addr)->s_addr;
+		else
+			l3h->src_addr = dev->prm.local_addr4.s_addr;
 		l3h->dst_addr = d4->s_addr;
 	} else {
 		struct ipv6_hdr *l3h;
 		l3h = (struct ipv6_hdr *)(dst->hdr + dst->l2_len);
-		rte_memcpy(l3h->src_addr, &dev->prm.local_addr6,
-			sizeof(l3h->src_addr));
+		if (!IN6_IS_ADDR_UNSPECIFIED(src_addr))
+			rte_memcpy(l3h->src_addr, src_addr,
+					sizeof(l3h->src_addr));
+		else
+			rte_memcpy(l3h->src_addr, &dev->prm.local_addr6,
+					sizeof(l3h->src_addr));
 		rte_memcpy(l3h->dst_addr, d6, sizeof(l3h->dst_addr));
 	}
 

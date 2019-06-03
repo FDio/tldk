@@ -112,6 +112,8 @@ struct tle_ctx_param {
 	int32_t socket_id;         /**< socket ID to allocate memory for. */
 	uint32_t proto;            /**< L4 proto to handle. */
 	uint32_t max_streams;      /**< max number of streams in context. */
+	uint32_t min_streams;      /**< min number of streams at init. */
+	uint32_t delta_streams;    /**< delta of streams of each allocation. */
 	uint32_t max_stream_rbufs; /**< max recv mbufs per stream. */
 	uint32_t max_stream_sbufs; /**< max send mbufs per stream. */
 	uint32_t send_bulk_size;   /**< expected # of packets per send call. */
@@ -144,6 +146,8 @@ struct tle_ctx_param {
  * use default TIMEWAIT timeout value.
  */
 #define	TLE_TCP_TIMEWAIT_DEFAULT	UINT32_MAX
+
+#define TLE_TCP_FINWAIT_TIMEOUT                60000
 
 /**
  * create L4 processing context.

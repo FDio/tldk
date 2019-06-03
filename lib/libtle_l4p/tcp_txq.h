@@ -69,8 +69,36 @@ static inline void
 tcp_txq_rst_nxt_head(struct tle_tcp_stream *s)
 {
 	struct rte_ring *r;
+	struct rte_mbuf *m, *next;
+	uint32_t offset, data_len;
 
 	r = s->tx.q;
+
+	/* if cons.head is not the mbuf to send next, clean offset info */
+	if (r->cons.head >= r->cons.tail && r->cons.head < r->prod.tail) {
+		m = (struct rte_mbuf*)(_rte_ring_get_data(r)[r->cons.head & r->mask]);
+		if (m->next_pkt != NULL) {
+			m->next_pkt->next_offset = 0;
+			m->next_pkt = NULL;
+		}
+	}
+	/* set offset to unacknowledged position and send from it */
+	if (r->cons.tail < r->prod.tail) {
+		m = (struct rte_mbuf*)(_rte_ring_get_data(r)[r->cons.tail & r->mask]);
+		if (m->una_offset > 0) {
+			offset = m->una_offset;
+			next = m;
+			data_len = m->data_len - PKT_L234_HLEN(m);
+			while (offset > data_len) {
+				offset -= data_len;
+				next = next->next;
+				data_len = next->data_len;
+			}
+			m->next_pkt = next;
+			next->next_offset = offset;
+		}
+	}
+
 	r->cons.head = r->cons.tail;
 }
 
@@ -99,7 +127,8 @@ txs_enqueue(struct tle_ctx *ctx, struct tle_tcp_stream *s)
 	struct rte_ring *r;
 	uint32_t n;
 
-	if (rte_atomic32_add_return(&s->tx.arm, 1) == 1) {
+	rte_atomic32_inc(&s->tx.arm);
+	if (rte_atomic32_cmpset((volatile uint32_t*)&s->tx.in_tsq, 0, 1)) {
 		r = CTX_TCP_TSQ(ctx);
 		n = _rte_ring_enqueue_burst(r, (void * const *)&s, 1);
 		RTE_VERIFY(n == 1);
@@ -110,9 +139,14 @@ static inline uint32_t
 txs_dequeue_bulk(struct tle_ctx *ctx, struct tle_tcp_stream *s[], uint32_t num)
 {
 	struct rte_ring *r;
+	uint32_t n, i;
 
 	r = CTX_TCP_TSQ(ctx);
-	return _rte_ring_dequeue_burst(r, (void **)s, num);
+	n = _rte_ring_dequeue_burst(r, (void **)s, num);
+	for (i = 0; i < n; i++) {
+		rte_atomic32_clear(&s[i]->tx.in_tsq);
+	}
+	return n;
 }
 
 #ifdef __cplusplus

@@ -29,6 +29,7 @@
 
 #include <string.h>
 #include <sys/queue.h>
+#include <rte_spinlock.h>
 #include <rte_cycles.h>
 #include <rte_errno.h>
 #include <tle_timer.h>
@@ -59,6 +60,7 @@ struct tle_timer_elmt {
 
 struct tle_timer_list {
 	uint32_t num;
+	rte_spinlock_t lock;
 	LIST_HEAD(, tle_timer_elmt) head;
 };
 
@@ -134,6 +136,32 @@ put_timer(struct tle_timer_list *list, struct tle_timer_elmt *e)
 	list->num++;
 }
 
+static inline struct tle_timer_elmt *
+get_free_timer(struct tle_timer_wheel *tw)
+{
+	unsigned i, n;
+	struct tle_timer_elmt *e;
+
+	rte_spinlock_lock(&tw->free.lock);
+	e = LIST_FIRST(&tw->free.head);
+	if (e == NULL) {
+		n = 128;
+		n = RTE_MIN(n, tw->prm.max_timer - tw->free.num);
+		for (i = 0; i < n; i++) {
+			e = rte_zmalloc_socket(NULL, sizeof(*e),
+					sizeof(e), tw->prm.socket_id);
+			if (e != NULL)
+				put_timer(&tw->free, e);
+			else
+				rte_panic("Failed to allocate timer");
+		}
+	}
+
+	e = get_timer(&tw->free);
+	rte_spinlock_unlock(&tw->free.lock);
+	return e;
+}
+
 static inline void
 rem_timer(struct tle_timer_list *list, struct tle_timer_elmt *e)
 {
@@ -149,8 +177,6 @@ tle_timer_create(struct tle_timer_wheel_args *prm, uint64_t now)
 	uint32_t i, j;
 	size_t sz;
 	struct tle_timer_wheel *tw;
-	struct tle_timer_elmt *e;
-	struct tle_timer_elmt *timers;
 
 	if (prm == NULL) {
 		rte_errno = -EINVAL;
@@ -169,7 +195,7 @@ tle_timer_create(struct tle_timer_wheel_args *prm, uint64_t now)
 		return NULL;
 	}
 
-	sz = sizeof(*tw) + prm->max_timer * sizeof(struct tle_timer_elmt);
+	sz = sizeof(*tw);
 
 	/* allocate memory */
 	tw = rte_zmalloc_socket(NULL, sz, RTE_CACHE_LINE_SIZE,
@@ -182,16 +208,10 @@ tle_timer_create(struct tle_timer_wheel_args *prm, uint64_t now)
 
 	tw->last_run_time = now;
 	tw->prm = *prm;
-	timers = (struct tle_timer_elmt *)(tw + 1);
 
 	/* initialize the lists */
 	LIST_INIT(&tw->free.head);
 	LIST_INIT(&tw->expired.head);
-
-	for (i = 0; i < prm->max_timer; i++) {
-		e = timers + i;
-		put_timer(&tw->free, e);
-	}
 
 	for (i = 0; i < TW_N_RINGS; i++)
 		for (j = 0; j < TW_SLOTS_PER_RING; j++)
@@ -223,11 +243,6 @@ tle_timer_start(struct tle_timer_wheel *tw, void *obj, uint64_t interval)
 		return NULL;
 	}
 
-	if (tw->free.num == 0) {
-		rte_errno = ENOMEM;
-		return NULL;
-	}
-
 	nb_tick = interval / tw->prm.tick_size;
 
 	fast_ring_index = nb_tick & TW_RING_MASK;
@@ -248,10 +263,12 @@ tle_timer_start(struct tle_timer_wheel *tw, void *obj, uint64_t interval)
 		slow_ring_index %= TW_SLOTS_PER_RING;
 		ts = &tw->w[TW_RING_SLOW][slow_ring_index];
 
-		e = get_timer(&tw->free);
+		e = get_free_timer(tw);
 		e->obj = obj;
 		e->fast_index = fast_ring_index;
+		rte_spinlock_lock(&ts->lock);
 		put_timer(ts, e);
+		rte_spinlock_unlock(&ts->lock);
 
 		/* Return the user timer-cancellation handle */
 		return (void *)e;
@@ -260,9 +277,11 @@ tle_timer_start(struct tle_timer_wheel *tw, void *obj, uint64_t interval)
 	/* Timer expires less than 51.2 seconds from now */
 	ts = &tw->w[TW_RING_FAST][fast_ring_index];
 
-	e = get_timer(&tw->free);
+	e = get_free_timer(tw);
 	e->obj = obj;
+	rte_spinlock_lock(&ts->lock);
 	put_timer(ts, e);
+	rte_spinlock_unlock(&ts->lock);
 
 	/* Give the user a handle to cancel the timer */
 	return (void *)e;
@@ -277,8 +296,25 @@ void tle_timer_stop(struct tle_timer_wheel *tw, void *timer)
 	/* Cancel the timer */
 	e = (struct tle_timer_elmt *)timer;
 	ts = e->list;
-	rem_timer(ts, e);
-	put_timer(&tw->free, e);
+	while (ts != &tw->free) {
+		if (ts == NULL) {
+			rte_pause();
+			ts = e->list;
+			continue;
+		}
+		rte_spinlock_lock(&ts->lock);
+		if (ts != e->list) {
+			rte_spinlock_unlock(&ts->lock);
+			ts = e->list;
+			continue;
+		}
+		rem_timer(ts, e);
+		rte_spinlock_unlock(&ts->lock);
+		rte_spinlock_lock(&tw->free.lock);
+		put_timer(&tw->free, e);
+		rte_spinlock_unlock(&tw->free.lock);
+		break;
+	}
 }
 
 /** run the timer wheel. Call in every tick_size cycles
@@ -321,25 +357,33 @@ void tle_timer_expire(struct tle_timer_wheel *tw, uint64_t now)
 			ts = &tw->w[TW_RING_SLOW][slow_wheel_index];
 
 			/* Deal slow-ring elements into the fast ring. */
+			rte_spinlock_lock(&ts->lock);
 			while (ts->num != 0) {
 				e = get_timer(ts);
 				demoted_index = e->fast_index;
 				ts2 = &tw->w[TW_RING_FAST][demoted_index];
+				rte_spinlock_lock(&ts2->lock);
 				put_timer(ts2, e);
+				rte_spinlock_unlock(&ts2->lock);
 			};
 			LIST_INIT(&ts->head);
+			rte_spinlock_unlock(&ts->lock);
 		}
 
 		/* Handle the fast ring */
 		ts = &tw->w[TW_RING_FAST][fast_wheel_index];
 
 		/* Clear the fast-ring slot and move timers in expired list*/
+		rte_spinlock_lock(&ts->lock);
 		n = get_timers(ts, re, RTE_DIM(re));
+		rte_spinlock_lock(&tw->expired.lock);
 		while (n != 0) {
 			put_timers(&tw->expired, re, n);
 			n = get_timers(ts, re, RTE_DIM(re));
 		};
+		rte_spinlock_unlock(&tw->expired.lock);
 		LIST_INIT(&ts->head);
+		rte_spinlock_unlock(&ts->lock);
 
 		tw->current_index[TW_RING_FAST]++;
 		tw->current_tick++;
@@ -353,12 +397,16 @@ tle_timer_get_expired_bulk(struct tle_timer_wheel *tw, void *rt[], uint32_t num)
 	uint32_t i, n;
 	struct tle_timer_elmt *e[MAX_TIMER_BURST];
 
+	rte_spinlock_lock(&tw->expired.lock);
 	n = get_timers(&tw->expired, e, num);
+	rte_spinlock_unlock(&tw->expired.lock);
 
 	for (i = 0; i != n; i++)
 		rt[i] = e[i]->obj;
 
+	rte_spinlock_lock(&tw->free.lock);
 	put_timers(&tw->free, e, n);
+	rte_spinlock_unlock(&tw->free.lock);
 
 	return n;
 }

@@ -98,7 +98,7 @@ tle_pbm_find_range(struct tle_pbm *pbm, uint32_t start_blk, uint32_t end_blk)
 					(v & 1) != 0; v >>= 1, p++)
 				;
 
-			pbm->blk = i;
+			pbm->blk = i + 1;
 			break;
 		}
 	}

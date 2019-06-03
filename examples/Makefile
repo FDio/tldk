@@ -21,6 +21,17 @@ endif
 
 include $(RTE_SDK)/mk/rte.vars.mk
 
-DIRS-y += l4fwd
+#DIRS-y += l4fwd
+DIRS-y += client
+DIRS-y += server
+DIRS-y += poll
+DIRS-y += udp_echo
+DIRS-y += udp_server
+DIRS-y += udp_client
+DIRS-y += tcp_echo
+DIRS-y += tcp_client
+DIRS-y += mt_tcp
+DIRS-y += dynamic_streams
+DIRS-y += tcp_echo_reuseport
 
 include $(TLDK_ROOT)/mk/tle.subdir.mk

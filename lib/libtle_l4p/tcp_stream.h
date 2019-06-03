@@ -52,10 +52,12 @@ enum {
 };
 
 struct tcb {
+	int err;
 	volatile uint16_t state;
 	volatile uint16_t uop; /* operations by user performed */
 	struct {
 		uint32_t nxt;
+		uint32_t cpy; /* head of yet unread data */
 		uint32_t irs; /* initial received sequence */
 		uint32_t wnd;
 		uint32_t ts;
@@ -83,7 +85,10 @@ struct tcb {
 		uint32_t ssthresh; /* slow start threshold */
 		uint32_t rto;      /* retransmission timeout */
 		uint32_t rto_tw;   /* TIME_WAIT retransmission timeout */
+		uint32_t rto_fw;   /* FIN_WAIT_2 waiting timeout */
 		uint32_t iss;      /* initial send sequence */
+		uint32_t waitlen;  /* total length of unacknowledged pkt */
+		uint32_t cork_ts;
 		uint16_t mss;
 		uint8_t  wscale;
 		uint8_t nb_retx; /* number of retransmission */
@@ -119,7 +124,10 @@ struct tle_tcp_stream {
 	} rx __rte_cache_aligned;
 
 	struct {
-		rte_atomic32_t arm;  /* when > 0 stream is in to-send queue */
+		rte_atomic32_t arm;  /* when > 0 stream need to send pkt */
+		rte_atomic32_t in_tsq;  /* when > 0 stream is in to-send queue */
+		uint8_t in_daq;  /* when > 0 stream is in delay-ack queue */
+		uint8_t need_da; /* when > 0 stream need to send delay-ack */
 		struct {
 			uint32_t nb_elem;  /* number of objects per drb. */
 			uint32_t nb_max;   /* number of drbs per stream. */
@@ -154,14 +162,16 @@ struct tcp_streams {
 	struct stbl st;
 	struct tle_timer_wheel *tmr; /* timer wheel */
 	struct rte_ring *tsq;        /* to-send streams queue */
+	uint64_t da_ts;              /* last time executing delay-ack */
+	struct rte_ring *daq;        /* delay-ack streams queue */
 	struct sdr dr;               /* death row for zombie streams */
-	struct tle_tcp_stream s[];   /* array of allocated streams. */
 };
 
 #define CTX_TCP_STREAMS(ctx)	((struct tcp_streams *)(ctx)->streams.buf)
 #define CTX_TCP_STLB(ctx)	(&CTX_TCP_STREAMS(ctx)->st)
 #define CTX_TCP_TMWHL(ctx)	(CTX_TCP_STREAMS(ctx)->tmr)
 #define CTX_TCP_TSQ(ctx)	(CTX_TCP_STREAMS(ctx)->tsq)
+#define CTX_TCP_DAQ(ctx)	(CTX_TCP_STREAMS(ctx)->daq)
 #define CTX_TCP_SDR(ctx)	(&CTX_TCP_STREAMS(ctx)->dr)
 
 #ifdef __cplusplus

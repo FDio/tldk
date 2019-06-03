@@ -22,6 +22,7 @@
 
 #include "tcp_stream.h"
 #include "tcp_ofo.h"
+#include "tcp_timer.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -97,10 +98,10 @@ calc_rx_wnd(const struct tle_tcp_stream *s, uint32_t scale)
 
 	/* peer doesn't support WSCALE option, wnd size is limited to 64K */
 	if (scale == TCP_WSCALE_NONE) {
-		wnd = _rte_ring_get_mask(s->rx.q) << TCP_WSCALE_DEFAULT;
+		wnd = rte_ring_free_count(s->rx.q) << TCP_WSCALE_DEFAULT;
 		return RTE_MIN(wnd, (uint32_t)UINT16_MAX);
 	} else
-		return  _rte_ring_get_mask(s->rx.q) << scale;
+		return rte_ring_free_count(s->rx.q) << scale;
 }
 
 /* empty stream's send queue */
@@ -148,8 +149,11 @@ tcp_stream_reset(struct tle_ctx *ctx, struct tle_tcp_stream *s)
 
 	st = CTX_TCP_STLB(ctx);
 
+	/* stop rto timer */
+	timer_stop(s);
 	/* reset TX armed */
 	rte_atomic32_set(&s->tx.arm, 0);
+	s->tx.need_da = 0;
 
 	/* reset TCB */
 	uop = s->tcb.uop & ~TCP_OP_CLOSE;
@@ -167,8 +171,7 @@ tcp_stream_reset(struct tle_ctx *ctx, struct tle_tcp_stream *s)
 
 	if (s->ste != NULL) {
 		/* remove entry from RX streams table */
-		stbl_del_stream(st, s->ste, s,
-			(s->flags & TLE_CTX_FLAG_ST) == 0);
+		stbl_del_stream(st, s->ste, &s->s);
 		s->ste = NULL;
 		empty_rq(s);
 	}
@@ -182,6 +185,37 @@ tcp_stream_reset(struct tle_ctx *ctx, struct tle_tcp_stream *s)
 	 * then put this stream to the tail of free list.
 	 */
 	put_stream(ctx, &s->s, TCP_STREAM_TX_FINISHED(s));
+}
+
+static inline void
+stream_term(struct tle_tcp_stream *s)
+{
+	struct sdr *dr;
+
+	s->tcb.state = TCP_ST_CLOSED;
+	rte_smp_wmb();
+
+	timer_stop(s);
+
+	/* close() was already invoked, schedule final cleanup */
+	if ((s->tcb.uop & TCP_OP_CLOSE) != 0) {
+		if (s->ste != NULL) {
+			/* remove entry from RX streams table */
+			stbl_del_stream(CTX_TCP_STLB(s->s.ctx), s->ste, &s->s);
+			s->ste = NULL;
+			empty_rq(s);
+		}
+
+		dr = CTX_TCP_SDR(s->s.ctx);
+		rte_spinlock_lock(&dr->lock);
+		STAILQ_INSERT_TAIL(&dr->be, &s->s, link);
+		rte_spinlock_unlock(&dr->lock);
+
+	/* notify user that stream need to be closed */
+	} else if (s->err.ev != NULL)
+		tle_event_raise(s->err.ev);
+	else if (s->err.cb.func != NULL)
+		s->err.cb.func(s->err.cb.data, &s->s);
 }
 
 #ifdef __cplusplus
