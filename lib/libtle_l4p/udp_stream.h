@@ -24,6 +24,7 @@
 #include "osdep.h"
 #include "ctx.h"
 #include "stream.h"
+#include "stream_table.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -41,6 +42,7 @@ union udph {
 struct tle_udp_stream {
 
 	struct tle_stream s;
+	struct stbl_entry *ste;     /* entry in streams table. */
 
 	struct {
 		struct rte_ring *q;
@@ -62,6 +64,13 @@ struct tle_udp_stream {
 
 	struct tle_udp_stream_param prm;
 } __rte_cache_aligned;
+
+struct udp_streams {
+	struct stbl st;
+};
+
+#define CTX_UDP_STREAMS(ctx)	((struct udp_streams *)(ctx)->streams.buf)
+#define CTX_UDP_STLB(ctx)	(&CTX_UDP_STREAMS(ctx)->st)
 
 #define UDP_STREAM(p)	\
 ((struct tle_udp_stream *)((uintptr_t)(p) - offsetof(struct tle_udp_stream, s)))

@@ -25,16 +25,14 @@ tle_evq_create(const struct tle_evq_param *prm)
 {
 	struct tle_evq *evq;
 	size_t sz;
-	uint32_t i;
 
 	if (prm == NULL) {
 		rte_errno = EINVAL;
 		return NULL;
 	}
 
-	sz = sizeof(*evq) + sizeof(evq->events[0]) * prm->max_events;
-	evq =  rte_zmalloc_socket(NULL, sz, RTE_CACHE_LINE_SIZE,
-		prm->socket_id);
+	sz = sizeof(*evq);
+	evq = rte_zmalloc_socket(NULL, sz, RTE_CACHE_LINE_SIZE, prm->socket_id);
 	if (evq == NULL) {
 		UDP_LOG(ERR, "allocation of %zu bytes for "
 			"new tle_evq(%u) on socket %d failed\n",
@@ -43,16 +41,6 @@ tle_evq_create(const struct tle_evq_param *prm)
 	}
 
 	TAILQ_INIT(&evq->armed);
-	TAILQ_INIT(&evq->free);
-
-	for (i = 0; i != prm->max_events; i++) {
-		evq->events[i].head = evq;
-		TAILQ_INSERT_TAIL(&evq->free, evq->events + i, ql);
-	}
-
-	evq->nb_events = i;
-	evq->nb_free = i;
-
 	return evq;
 }
 
@@ -65,40 +53,32 @@ tle_evq_destroy(struct tle_evq *evq)
 struct tle_event *
 tle_event_alloc(struct tle_evq *evq, const void *data)
 {
-	struct tle_event *h;
+	struct tle_event *h = NULL;
 
 	if (evq == NULL) {
 		rte_errno = EINVAL;
 		return NULL;
 	}
 
-	rte_spinlock_lock(&evq->lock);
-	h = TAILQ_FIRST(&evq->free);
-	if (h != NULL) {
-		TAILQ_REMOVE(&evq->free, h, ql);
-		evq->nb_free--;
-		h->data = data;
-	} else
+	h = rte_malloc(NULL, sizeof(*h), sizeof(h));
+	if (h == NULL) {
 		rte_errno = ENOMEM;
-	rte_spinlock_unlock(&evq->lock);
+	} else {
+		h->head = evq;
+		h->data = data;
+	}
 	return h;
 }
 
 void
 tle_event_free(struct tle_event *ev)
 {
-	struct tle_evq *q;
-
 	if (ev == NULL) {
 		rte_errno = EINVAL;
 		return;
 	}
 
-	q = ev->head;
-	rte_spinlock_lock(&q->lock);
 	ev->data = NULL;
 	ev->state = TLE_SEV_IDLE;
-	TAILQ_INSERT_HEAD(&q->free, ev, ql);
-	q->nb_free++;
-	rte_spinlock_unlock(&q->lock);
+	rte_free(ev);
 }

@@ -1,0 +1,109 @@
+From 2eca8e47b535ef62430e073c6103352cfbb5c697 Mon Sep 17 00:00:00 2001
+From: Jianfeng Tan <henry.tjf@antfin.com>
+Date: Wed, 26 Dec 2018 14:40:07 +0000
+Subject: mbuf: add dynamic mbuf mempool support
+
+Signed-off-by: Jianfeng Tan <henry.tjf@antfin.com>
+---
+ lib/librte_mbuf/rte_mbuf.c           | 51 ++++++++++++++++++++++++++++
+ lib/librte_mbuf/rte_mbuf.h           |  5 +++
+ lib/librte_mbuf/rte_mbuf_version.map |  8 ++++-
+ 3 files changed, 63 insertions(+), 1 deletion(-)
+
+diff --git a/lib/librte_mbuf/rte_mbuf.c b/lib/librte_mbuf/rte_mbuf.c
+index 9790b4fb1..b70abd88c 100644
+--- a/lib/librte_mbuf/rte_mbuf.c
++++ b/lib/librte_mbuf/rte_mbuf.c
+@@ -167,6 +167,57 @@ rte_pktmbuf_pool_create(const char *name, unsigned int n,
+ 			data_room_size, socket_id, NULL);
+ }
+ 
++struct rte_mempool *
++rte_pktmbuf_dynamic_pool_create(const char *name, unsigned int n,
++	unsigned int cache_size, uint16_t priv_size,
++	uint16_t data_room_size, int socket_id, int dynamic_size)
++{
++	struct rte_mempool *mp;
++	struct rte_pktmbuf_pool_private mbp_priv;
++	const char *mp_ops_name;
++	unsigned elt_size;
++	int ret;
++
++	if (RTE_ALIGN(priv_size, RTE_MBUF_PRIV_ALIGN) != priv_size) {
++		RTE_LOG(ERR, MBUF, "mbuf priv_size=%u is not aligned\n",
++			priv_size);
++		rte_errno = EINVAL;
++		return NULL;
++	}
++	elt_size = sizeof(struct rte_mbuf) + (unsigned)priv_size +
++		(unsigned)data_room_size;
++	mbp_priv.mbuf_data_room_size = data_room_size;
++	mbp_priv.mbuf_priv_size = priv_size;
++
++	mp = rte_mempool_create_empty(name, n, elt_size, cache_size,
++		 sizeof(struct rte_pktmbuf_pool_private),
++		 socket_id, MEMPOOL_F_DYNAMIC);
++	if (mp == NULL)
++		return NULL;
++
++	mp_ops_name = rte_mbuf_best_mempool_ops();
++	ret = rte_mempool_set_ops_byname(mp, mp_ops_name, NULL);
++	if (ret != 0) {
++		RTE_LOG(ERR, MBUF, "error setting mempool handler\n");
++		rte_mempool_free(mp);
++		rte_errno = -ret;
++		return NULL;
++	}
++	rte_pktmbuf_pool_init(mp, &mbp_priv);
++
++	rte_mempool_set_dynamic_size(mp, dynamic_size);
++	rte_mempool_set_dynamic_cb(mp, rte_pktmbuf_init);
++
++	ret = rte_mempool_populate_default(mp);
++	if (ret < 0) {
++		rte_mempool_free(mp);
++		rte_errno = -ret;
++		return NULL;
++	}
++
++	return mp;
++}
++
+ /* do some sanity checks on a mbuf: panic if it fails */
+ void
+ rte_mbuf_sanity_check(const struct rte_mbuf *m, int is_header)
+diff --git a/lib/librte_mbuf/rte_mbuf.h b/lib/librte_mbuf/rte_mbuf.h
+index 3dbc6695e..5a2d81605 100644
+--- a/lib/librte_mbuf/rte_mbuf.h
++++ b/lib/librte_mbuf/rte_mbuf.h
+@@ -1183,6 +1183,11 @@ rte_pktmbuf_pool_create(const char *name, unsigned n,
+ 	unsigned cache_size, uint16_t priv_size, uint16_t data_room_size,
+ 	int socket_id);
+ 
++struct rte_mempool *
++rte_pktmbuf_dynamic_pool_create(const char *name, unsigned int n,
++	unsigned int cache_size, uint16_t priv_size,
++	uint16_t data_room_size, int socket_id, int dynamic_size);
++
+ /**
+  * Create a mbuf pool with a given mempool ops name
+  *
+diff --git a/lib/librte_mbuf/rte_mbuf_version.map b/lib/librte_mbuf/rte_mbuf_version.map
+index cae68db8d..d6d25af95 100644
+--- a/lib/librte_mbuf/rte_mbuf_version.map
++++ b/lib/librte_mbuf/rte_mbuf_version.map
+@@ -44,4 +44,10 @@ DPDK_18.08 {
+ 	rte_mbuf_set_user_mempool_ops;
+ 	rte_mbuf_user_mempool_ops;
+ 	rte_pktmbuf_pool_create_by_ops;
+-} DPDK_16.11;
++} DPDK_18.11;
++
++DPDK_18.11 {
++	global:
++
++	rte_pktmbuf_dynamic_pool_create;
++} DPDK_18.12;
+-- 
+2.17.1
+

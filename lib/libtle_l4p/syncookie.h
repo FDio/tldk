@@ -182,9 +182,12 @@ sync_fill_tcb(struct tcb *tcb, const union seg_info *si, const union tsopt *to)
 {
 	uint32_t ack, mss, seq, wscale;
 
+	tcb->err = 0;
+
 	seq = si->seq;
 
 	tcb->rcv.nxt = seq;
+	tcb->rcv.cpy = seq;
 	tcb->rcv.irs = seq - 1;
 	tcb->snd.wu.wl1 = seq;
 
@@ -202,6 +205,7 @@ sync_fill_tcb(struct tcb *tcb, const union seg_info *si, const union tsopt *to)
 	tcb->so.mss = mss;
 
 	tcb->snd.ts = to->ecr;
+	tcb->snd.cork_ts = 0;
 	tcb->rcv.ts = to->val;
 	tcb->so.ts.raw = to->raw;
 

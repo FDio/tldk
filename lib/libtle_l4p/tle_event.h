@@ -47,12 +47,8 @@ struct tle_event {
 
 struct tle_evq {
 	rte_spinlock_t lock;
-	uint32_t nb_events;
-	uint32_t nb_armed;
-	uint32_t nb_free;
 	TAILQ_HEAD(, tle_event) armed;
-	TAILQ_HEAD(, tle_event) free;
-	struct tle_event events[0];
+	uint32_t nb_armed;
 };
 
 /**
@@ -275,6 +271,29 @@ tle_evq_get(struct tle_evq *evq, const void *evd[], uint32_t num)
 	return n;
 }
 
+static inline int32_t
+tle_evq_get_and_idle(struct tle_evq *evq, const void *evd[], uint32_t num)
+{
+	uint32_t i, n;
+	struct tle_event *ev;
+
+	if (evq->nb_armed == 0)
+		return 0;
+
+	rte_compiler_barrier();
+
+	rte_spinlock_lock(&evq->lock);
+	n = RTE_MIN(num, evq->nb_armed);
+	for (i = 0; i != n; i++) {
+		ev = TAILQ_FIRST(&evq->armed);
+		ev->state = TLE_SEV_IDLE;
+		TAILQ_REMOVE(&evq->armed, ev, ql);
+		evd[i] = ev->data;
+	}
+	evq->nb_armed -= n;
+	rte_spinlock_unlock(&evq->lock);
+	return n;
+}
 
 #ifdef __cplusplus
 }

@@ -17,6 +17,7 @@
 #define _TCP_RXQ_H_
 
 #include "tcp_ofo.h"
+#include "tcp_ctl.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -31,14 +32,9 @@ static inline uint32_t
 rx_ofo_enqueue(struct tle_tcp_stream *s, union seqlen *sl,
 	struct rte_mbuf *mb[], uint32_t num)
 {
-	uint32_t i, n;
+	uint32_t n;
 
-	n = 0;
-	do {
-		i = _ofo_step(s->rx.ofo, sl, mb + n, num - n);
-		n += i;
-	} while (i != 0 && n != num);
-
+	n = _ofo_step(s->rx.ofo, sl, mb, num);
 	_ofo_compact(s->rx.ofo);
 	return n;
 }
@@ -46,13 +42,15 @@ rx_ofo_enqueue(struct tle_tcp_stream *s, union seqlen *sl,
 static inline uint32_t
 rx_ofo_reduce(struct tle_tcp_stream *s)
 {
-	uint32_t i, n, end, seq;
+	uint32_t i, n, seq;
 	struct ofo *ofo;
 	struct ofodb *db;
-	union seqlen sl;
 
 	seq = s->tcb.rcv.nxt;
 	ofo = s->rx.ofo;
+
+	if (ofo->nb_elem == 0)
+		return 0;
 
 	n = 0;
 	for (i = 0; i != ofo->nb_elem; i++) {
@@ -63,19 +61,16 @@ rx_ofo_reduce(struct tle_tcp_stream *s)
 		if (tcp_seq_lt(seq, db->sl.seq))
 			break;
 
-		end = db->sl.seq + db->sl.len;
-
 		/* this db is fully overlapped */
-		if (tcp_seq_leq(end, seq))
+		if (tcp_seq_leq(db->sl.seq + db->sl.len, seq))
 			_ofodb_free(db);
 		else
-			n += _ofodb_enqueue(s->rx.q, db, &sl);
-
-		seq = sl.seq + sl.len;
+			n += _ofodb_enqueue(s->rx.q, db, &seq);
 	}
 
 	s->tcb.rcv.nxt = seq;
 	_ofo_remove(ofo, 0, i);
+
 	return n;
 }
 
@@ -135,6 +130,8 @@ rx_data_enqueue(struct tle_tcp_stream *s, uint32_t seq, uint32_t len,
 	}
 
 	n = rte_ring_count(s->rx.q);
+	/* update receive window with left recv buffer*/
+	s->tcb.rcv.wnd = calc_rx_wnd(s, s->tcb.rcv.wscale);
 	if (r != n) {
 		/* raise RX event */
 		if (s->rx.ev != NULL)
