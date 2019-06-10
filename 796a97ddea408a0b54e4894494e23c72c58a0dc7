@@ -1,0 +1,89 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "37916642_f73cf932",
+        "filename": "dpdk/dpdk-v18.11_patches/0001-mempool-prioritize-constructor.patch",
+        "patchSetId": 1
+      },
+      "lineNbr": 17,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2019-06-10T17:14:32Z",
+      "side": 1,
+      "message": "could you explain a bit why do you need it?\nAlso there is  RTE_INIT_PRIO() macro that seems to do similar stuff.",
+      "revId": "796a97ddea408a0b54e4894494e23c72c58a0dc7",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "67f19935_18634d0b",
+        "filename": "dpdk/dpdk-v18.11_patches/0002-eal-prioritize-constructor.patch",
+        "patchSetId": 1
+      },
+      "lineNbr": 19,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2019-06-10T17:14:32Z",
+      "side": 1,
+      "message": "same q - why do we need it?",
+      "revId": "796a97ddea408a0b54e4894494e23c72c58a0dc7",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "7d79f1c9_a62fe84a",
+        "filename": "dpdk/dpdk-v18.11_patches/0004-net-virtio-user-add-rss-update-for-virtio-user.patch",
+        "patchSetId": 1
+      },
+      "lineNbr": 22,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2019-06-10T17:14:32Z",
+      "side": 1,
+      "message": "not terribly familiar with dpdk virtio pmd...\nsome explanation why do we need it would be great.",
+      "revId": "796a97ddea408a0b54e4894494e23c72c58a0dc7",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "7858ed43_009ba2ad",
+        "filename": "dpdk/dpdk-v18.11_patches/0005-mbuf-add-offset-for-partly-consumed-data.patch",
+        "patchSetId": 1
+      },
+      "lineNbr": 17,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2019-06-10T17:14:32Z",
+      "side": 1,
+      "message": "not sure this additions to the rte_mbuf is a good idea.\nAs you probably know yourself - such patch will most likely be rejected by dpdk community.\nSo we\u0027ll have to support our own version of rte_mbuf - last thing I want to do.\nIf you really think we need these fileds per packet, then the proper way is to create our own tldk mbuf\nthat would contain rte_mbuf plus some extra metadata (via rte_mbuf priv_size).\nThough I still don\u0027t see why we need that info per packet?\nWhy we can\u0027t store thi sextra info just in tcb?",
+      "revId": "796a97ddea408a0b54e4894494e23c72c58a0dc7",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "16b4af84_2fa79542",
+        "filename": "dpdk/dpdk-v18.11_patches/0007-eal-don-t-start-the-interrupt-mp-thread.patch",
+        "patchSetId": 1
+      },
+      "lineNbr": 16,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2019-06-10T17:14:32Z",
+      "side": 1,
+      "message": "need to:\n- explain purpose of these changes\n- do it properly (if there is a real need) or drop: no if 0, etc.\nThere is a well defined dpdk coding guide I am sure you are familar with,\nplease try to follow it.",
+      "revId": "796a97ddea408a0b54e4894494e23c72c58a0dc7",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    }
+  ]
+}
