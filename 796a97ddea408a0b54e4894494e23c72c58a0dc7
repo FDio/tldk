@@ -19,6 +19,24 @@
     },
     {
       "key": {
+        "uuid": "1a7e968d_ab26853a",
+        "filename": "dpdk/dpdk-v18.11_patches/0001-mempool-prioritize-constructor.patch",
+        "patchSetId": 1
+      },
+      "lineNbr": 17,
+      "author": {
+        "id": 1754
+      },
+      "writtenOn": "2019-06-11T07:54:52Z",
+      "side": 1,
+      "message": "The reason to prioritize this init function is that, in PRELOAD mode, we have an init functin in glue library, called glue_init(), we need to make sure all the DPDK and TLDK constructors get called before glue_init(). RTE_INIT, however, uses a very low priority (65535).\n\nAnd yes, we can use RTE_INIT_PRIO here.\n\nI did not try to lower the prioritize of glue_init(), maybe that also works.",
+      "parentUuid": "37916642_f73cf932",
+      "revId": "796a97ddea408a0b54e4894494e23c72c58a0dc7",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "67f19935_18634d0b",
         "filename": "dpdk/dpdk-v18.11_patches/0002-eal-prioritize-constructor.patch",
         "patchSetId": 1
@@ -30,6 +48,24 @@
       "writtenOn": "2019-06-10T17:14:32Z",
       "side": 1,
       "message": "same q - why do we need it?",
+      "revId": "796a97ddea408a0b54e4894494e23c72c58a0dc7",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "e91b4fb7_44adecd3",
+        "filename": "dpdk/dpdk-v18.11_patches/0002-eal-prioritize-constructor.patch",
+        "patchSetId": 1
+      },
+      "lineNbr": 19,
+      "author": {
+        "id": 1754
+      },
+      "writtenOn": "2019-06-11T07:54:52Z",
+      "side": 1,
+      "message": "See reply of previous q.",
+      "parentUuid": "67f19935_18634d0b",
       "revId": "796a97ddea408a0b54e4894494e23c72c58a0dc7",
       "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
       "unresolved": true
@@ -53,6 +89,24 @@
     },
     {
       "key": {
+        "uuid": "22e5a6f6_e4716304",
+        "filename": "dpdk/dpdk-v18.11_patches/0004-net-virtio-user-add-rss-update-for-virtio-user.patch",
+        "patchSetId": 1
+      },
+      "lineNbr": 22,
+      "author": {
+        "id": 1754
+      },
+      "writtenOn": "2019-06-11T07:54:52Z",
+      "side": 1,
+      "message": "In multi-thread mode, we need RSS feature of NIC. virtio does not implement this ops, we are trying to set up rss here by talking with vhost backend. It\u0027s still a semi-finished function.",
+      "parentUuid": "7d79f1c9_a62fe84a",
+      "revId": "796a97ddea408a0b54e4894494e23c72c58a0dc7",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "7858ed43_009ba2ad",
         "filename": "dpdk/dpdk-v18.11_patches/0005-mbuf-add-offset-for-partly-consumed-data.patch",
         "patchSetId": 1
@@ -70,6 +124,24 @@
     },
     {
       "key": {
+        "uuid": "e82d783f_6eff3681",
+        "filename": "dpdk/dpdk-v18.11_patches/0005-mbuf-add-offset-for-partly-consumed-data.patch",
+        "patchSetId": 1
+      },
+      "lineNbr": 17,
+      "author": {
+        "id": 1754
+      },
+      "writtenOn": "2019-06-11T07:54:52Z",
+      "side": 1,
+      "message": "We added three fields. Those are used for paritial packet send and partial packet ack. tcb shall be the way to go. We will do the change.\n\nFor next_pkt field, we need this in another place, chaining packets waiting for ARP reply to fill dst mac address. Do you have suggestions on that?",
+      "parentUuid": "7858ed43_009ba2ad",
+      "revId": "796a97ddea408a0b54e4894494e23c72c58a0dc7",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "16b4af84_2fa79542",
         "filename": "dpdk/dpdk-v18.11_patches/0007-eal-don-t-start-the-interrupt-mp-thread.patch",
         "patchSetId": 1
@@ -81,6 +153,24 @@
       "writtenOn": "2019-06-10T17:14:32Z",
       "side": 1,
       "message": "need to:\n- explain purpose of these changes\n- do it properly (if there is a real need) or drop: no if 0, etc.\nThere is a well defined dpdk coding guide I am sure you are familar with,\nplease try to follow it.",
+      "revId": "796a97ddea408a0b54e4894494e23c72c58a0dc7",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "15e1a26c_fa550b34",
+        "filename": "dpdk/dpdk-v18.11_patches/0007-eal-don-t-start-the-interrupt-mp-thread.patch",
+        "patchSetId": 1
+      },
+      "lineNbr": 16,
+      "author": {
+        "id": 1754
+      },
+      "writtenOn": "2019-06-11T07:54:52Z",
+      "side": 1,
+      "message": "Sorry to make this difficult to understand. We do have commit log to explain this, but I stripped them when putting this out.\n\nThis patch is just for some internal scenario that extra threads are not wanted. It does not apply for generaic case. We\u0027ll drop this patch.",
+      "parentUuid": "16b4af84_2fa79542",
       "revId": "796a97ddea408a0b54e4894494e23c72c58a0dc7",
       "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
       "unresolved": true
