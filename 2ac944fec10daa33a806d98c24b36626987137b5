@@ -19,6 +19,24 @@
     },
     {
       "key": {
+        "uuid": "4e0430ec_128c734d",
+        "filename": "Makefile",
+        "patchSetId": 2
+      },
+      "lineNbr": 25,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2019-06-12T15:26:50Z",
+      "side": 1,
+      "message": "Apart from that it  creates libtldk.a in TLDK root dir.\nThat\u0027s way too messy.",
+      "parentUuid": "a760cd77_43a1f377",
+      "revId": "2ac944fec10daa33a806d98c24b36626987137b5",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "ba44c8d2_d8dae5dd",
         "filename": "lib/libtle_l4p/tcp_tx_seg.h",
         "patchSetId": 2
