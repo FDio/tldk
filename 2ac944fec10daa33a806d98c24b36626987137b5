@@ -37,6 +37,24 @@
     },
     {
       "key": {
+        "uuid": "fdd5758e_a8528d53",
+        "filename": "Makefile",
+        "patchSetId": 2
+      },
+      "lineNbr": 25,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2019-06-12T15:29:20Z",
+      "side": 1,
+      "message": "and make all fails on ubuntu 18.04 with:\n-- repack libtldk.a ---\nlibrte_mempool_stack.a\nlibrte_ethdev.a\nlibrte_kvargs.a\nlibrte_pci.a\nlibrte_hash.a\nlibrte_pdump.a\nlibrte_bus_vdev.a\nlibrte_bus_pci.a\nlibrte_mbuf.a\nlibrte_pmd_virtio.a\nlibrte_pmd_ring.a\nlibrte_eal.a\nlibrte_ip_frag.a\nlibrte_timer.a\nlibrte_metrics.a\nlibrte_gro.a\nlibrte_net.a\nlibrte_mempool.a\nlibrte_mempool_ring.a\nlibrte_cmdline.a\nlibrte_ring.a\nlibtle_l4p.a\nlibtle_misc.a\nlibtle_timer.a\nlibtle_glue.a\nlibtle_dring.a\nar: `u\u0027 modifier ignored since `D\u0027 is the default (see `U\u0027)\n/usr/bin/ld: /local/kananye1/tldk.fdio.1906u1/x86_64-native-linuxapp-gcc/lib/libtle_glue.a(init.o): relocation R_X86_64_PC32 against symbol `glue_init1\u0027 can not be used when making a shared object; recompile with -fPIC\n/usr/bin/ld: final link failed: Bad value\ncollect2: error: ld returned 1 exit status\nMakefile:64: recipe for target \u0027libtldk.so\u0027 failed\nmake: *** [libtldk.so] Error 1",
+      "parentUuid": "4e0430ec_128c734d",
+      "revId": "2ac944fec10daa33a806d98c24b36626987137b5",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "ba44c8d2_d8dae5dd",
         "filename": "lib/libtle_l4p/tcp_tx_seg.h",
         "patchSetId": 2
