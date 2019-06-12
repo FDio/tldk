@@ -109,6 +109,24 @@
     },
     {
       "key": {
+        "uuid": "9f176ffb_02a199ee",
+        "filename": "Makefile",
+        "patchSetId": 2
+      },
+      "lineNbr": 25,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2019-06-12T16:22:13Z",
+      "side": 1,
+      "message": "The first question is - what you guys trying to do here and why?",
+      "parentUuid": "d2f1fa36_bb85b6e9",
+      "revId": "2ac944fec10daa33a806d98c24b36626987137b5",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "c122d659_14de0795",
         "filename": "lib/libtle_l4p/stream_table.c",
         "patchSetId": 2
@@ -120,6 +138,23 @@
       "writtenOn": "2019-06-12T16:17:17Z",
       "side": 1,
       "message": "that flag was instroduced only in 18.11\nwith all previous versions of dpdk it would fail.",
+      "revId": "2ac944fec10daa33a806d98c24b36626987137b5",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "3771cba3_18739b9e",
+        "filename": "lib/libtle_l4p/tcp_rxtx.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 2351,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2019-06-12T16:22:13Z",
+      "side": 1,
+      "message": "as I can see it is defined it libtle_glue...\nSo you create implicit dependecy between libs here.\nSuch construction looks bogus to me.",
       "revId": "2ac944fec10daa33a806d98c24b36626987137b5",
       "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
       "unresolved": true
