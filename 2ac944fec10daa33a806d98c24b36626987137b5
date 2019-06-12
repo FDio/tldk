@@ -55,6 +55,60 @@
     },
     {
       "key": {
+        "uuid": "d2f1fa36_bb85b6e9",
+        "filename": "Makefile",
+        "patchSetId": 2
+      },
+      "lineNbr": 25,
+      "author": {
+        "id": 1754
+      },
+      "writtenOn": "2019-06-12T15:34:54Z",
+      "side": 1,
+      "message": "Yes, we\u0027d better put the libtldk.a into $TARGET/lib",
+      "parentUuid": "4e0430ec_128c734d",
+      "revId": "2ac944fec10daa33a806d98c24b36626987137b5",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "20560c77_e9c165c8",
+        "filename": "Makefile",
+        "patchSetId": 2
+      },
+      "lineNbr": 25,
+      "author": {
+        "id": 1754
+      },
+      "writtenOn": "2019-06-12T15:34:54Z",
+      "side": 1,
+      "message": "try this:\nmake EXTRA_CFLAGS\u003d\"-fPIC\" all\n\nIf you agree, we can put this flag into mk.",
+      "parentUuid": "fdd5758e_a8528d53",
+      "revId": "2ac944fec10daa33a806d98c24b36626987137b5",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "7d957a90_5ff4d23e",
+        "filename": "Makefile",
+        "patchSetId": 2
+      },
+      "lineNbr": 25,
+      "author": {
+        "id": 1754
+      },
+      "writtenOn": "2019-06-12T15:34:54Z",
+      "side": 1,
+      "message": "It always checks .download.ok, .patch.ok, ..., but not always really do the download, patch, rebuild.",
+      "parentUuid": "a760cd77_43a1f377",
+      "revId": "2ac944fec10daa33a806d98c24b36626987137b5",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "ba44c8d2_d8dae5dd",
         "filename": "lib/libtle_l4p/tcp_tx_seg.h",
         "patchSetId": 2
