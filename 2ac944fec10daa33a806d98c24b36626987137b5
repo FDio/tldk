@@ -16,6 +16,24 @@
       "revId": "2ac944fec10daa33a806d98c24b36626987137b5",
       "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "c4ca7a1f_e07a36ff",
+        "filename": "lib/libtle_l4p/tcp_tx_seg.h",
+        "patchSetId": 2
+      },
+      "lineNbr": 38,
+      "author": {
+        "id": 1754
+      },
+      "writtenOn": "2019-06-12T07:38:21Z",
+      "side": 1,
+      "message": "Refer to man 2 send, send failure due to full send buffer shall return EAGAIN, instead of ENOSPC.",
+      "parentUuid": "ba44c8d2_d8dae5dd",
+      "revId": "2ac944fec10daa33a806d98c24b36626987137b5",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
     }
   ]
 }
