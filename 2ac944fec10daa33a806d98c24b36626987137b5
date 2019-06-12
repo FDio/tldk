@@ -52,6 +52,24 @@
       "revId": "2ac944fec10daa33a806d98c24b36626987137b5",
       "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "f0e821f9_77d4a9d9",
+        "filename": "lib/libtle_l4p/tcp_tx_seg.h",
+        "patchSetId": 2
+      },
+      "lineNbr": 38,
+      "author": {
+        "id": 1759
+      },
+      "writtenOn": "2019-06-12T12:33:09Z",
+      "side": 1,
+      "message": "Here has been modified to support tso.\nLike:\n\tfree_slots \u003d rte_ring_free_count(s-\u003etx.q);\n\tfree_slots \u003d RTE_MIN(free_slots, RTE_DIM(segs));\n\trc \u003d tcp_segmentation(pkt[i], segs, free_slots,\n\t\t\t\u0026s-\u003etx.dst, mss);\n\nSo the reason of failure here is lack of space in send buffer. Therefore EAGAIN is returned.",
+      "parentUuid": "5092906c_78e5cfb6",
+      "revId": "2ac944fec10daa33a806d98c24b36626987137b5",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
     }
   ]
 }
