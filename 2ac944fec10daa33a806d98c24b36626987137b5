@@ -34,6 +34,24 @@
       "revId": "2ac944fec10daa33a806d98c24b36626987137b5",
       "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "5092906c_78e5cfb6",
+        "filename": "lib/libtle_l4p/tcp_tx_seg.h",
+        "patchSetId": 2
+      },
+      "lineNbr": 38,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2019-06-12T09:42:31Z",
+      "side": 1,
+      "message": "man -s 2 send\n...\n EAGAIN or EWOULDBLOCK\n              The  socket  is  marked  nonblocking and the requested operation\n              would block.  POSIX.1-2001 allows either error  to  be  returned\n              for  this case, and does not require these constants to have the\n              same value, so a portable application should check for both posâ\n              sibilities.\n\n       EAGAIN (Internet  domain  datagram  sockets)  The socket referred to by\n              sockfd had not previously been bound to  an  address  and,  upon\n              attempting  to  bind  it to an ephemeral port, it was determined\n              that all port numbers in the ephemeral port range are  currently\n              in        use.         See        the        discussion       of\n              /proc/sys/net/ipv4/ip_local_port_range in ip(7).\n\n\nDoesn\u0027t look to me like that refer to our situation.\nIn fact this is not the send buffer, this is our internal limitaion:\ntle_tcp_stream_send(...)\n{\n   struct rte_mbuf *segs[TCP_MAX_PKT_SEG];\n    ...\n     rc \u003d tcp_segmentation(pkt[i], segs, RTE_DIM(segs),\n                                \u0026s-\u003etx.dst, mss);\n\nSo not sure what is an appropriate value in that case, might be EMSGSIZE.",
+      "parentUuid": "c4ca7a1f_e07a36ff",
+      "revId": "2ac944fec10daa33a806d98c24b36626987137b5",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
     }
   ]
 }
