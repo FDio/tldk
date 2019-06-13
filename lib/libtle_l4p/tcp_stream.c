@@ -506,6 +506,12 @@ tle_tcp_stream_listen(struct tle_stream *ts)
 	if (ts == NULL || s->s.type >= TLE_VNUM)
 		return -EINVAL;
 
+	/* app may listen for multiple times to change backlog,
+	 * we will just return success for such cases.
+	 */
+	if (s->tcb.state == TCP_ST_LISTEN)
+		return 0;
+
 	/* mark stream as not closable. */
 	if (tcp_stream_try_acquire(s) > 0) {
 		rc = rte_atomic16_cmpset(&s->tcb.state, TCP_ST_CLOSED,
