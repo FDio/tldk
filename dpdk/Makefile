@@ -161,9 +161,7 @@ $(B)/.config.ok: $(B)/.patch.ok $(B)/custom-config
 .PHONY: config
 config: $(B)/.config.ok
 
-$(B)/.build.ok: $(DPDK_SOURCE_FILES)
-	@if [ ! -e $(B)/.config.ok ] ; then echo 'Please run "make config" \
-		first' && false ; fi
+$(B)/.build.ok: $(DPDK_SOURCE_FILES) $(B)/.config.ok
 	@make $(DPDK_MAKE_ARGS) install
 	@cp $(I)/.config $(B)/.config
 	@touch $@
