@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "ba286b56_2f82f1de",
+        "filename": "lib/libtle_l4p/stream.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 128,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2019-06-13T16:59:36Z",
+      "side": 1,
+      "message": "better I think to put it uder line:\nd4 \u003d NULL;\nbelow.\nAs I understand this is the same issue.",
+      "revId": "99fad0fb689caf5d91ef19e8790275a65b196c6a",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    }
+  ]
+}
