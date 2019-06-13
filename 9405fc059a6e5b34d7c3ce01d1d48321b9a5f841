@@ -1,0 +1,38 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "02c5a37c_76baf9f5",
+        "filename": "dpdk/Makefile",
+        "patchSetId": 2
+      },
+      "lineNbr": 125,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2019-06-13T15:23:38Z",
+      "side": 1,
+      "message": "As I remember we do need pcap for UT.",
+      "revId": "9405fc059a6e5b34d7c3ce01d1d48321b9a5f841",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "f0f8cda8_d0508e29",
+        "filename": "dpdk/Makefile",
+        "patchSetId": 2
+      },
+      "lineNbr": 139,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2019-06-13T15:23:38Z",
+      "side": 1,
+      "message": "I think disabling all PMDs is way too aggressive.\nI personally udually run tldk with physical devs (xgbe, i40e).\nIn fact the only reason why automatic download and build of dpdk was added into tldk Makefile, is for CI testing.\nFor other situations preferred way always was - used download/configure/build DPDK on it\u0027s own, or even use dpdk*\ndistribution packages and just provides to us RTE_SDK and RTE_TARGET.\nSo my thought was to remove all these dpdk build specifics\nand download and build default dpdk configuration.\nIf you like to have CI build for your specific dpdk config we probably can add it directly into CI script:\nhttps://gerrit.fd.io/r/ci-management\n./jjb/tldk/",
+      "revId": "9405fc059a6e5b34d7c3ce01d1d48321b9a5f841",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    }
+  ]
+}
