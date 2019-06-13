@@ -127,6 +127,24 @@
     },
     {
       "key": {
+        "uuid": "c7d0340a_d8cc8b18",
+        "filename": "Makefile",
+        "patchSetId": 2
+      },
+      "lineNbr": 25,
+      "author": {
+        "id": 1754
+      },
+      "writtenOn": "2019-06-13T03:13:35Z",
+      "side": 1,
+      "message": "We add this compile dependency as we want changes in DPDK will be automatically recompiled, with one compile command.",
+      "parentUuid": "9f176ffb_02a199ee",
+      "revId": "2ac944fec10daa33a806d98c24b36626987137b5",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "837fb528_0a504e0b",
         "filename": "lib/libtle_l4p/event.c",
         "patchSetId": 2
@@ -138,6 +156,24 @@
       "writtenOn": "2019-06-12T18:07:27Z",
       "side": 1,
       "message": "that seems way too expensive.\nAs I remember each socket needs 3 events, so up to 3 malloc calls.\nthat could happen at the datapath.\nAt least need someting similar with delta, as for streams.\nThough I think better would be return ENOMEM to the upper layer and let it decide\ndoes it want to allocate another chunk or not.",
+      "revId": "2ac944fec10daa33a806d98c24b36626987137b5",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "61cc1d5e_f7e7f66c",
+        "filename": "lib/libtle_l4p/event.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 63,
+      "author": {
+        "id": 1754
+      },
+      "writtenOn": "2019-06-13T03:13:35Z",
+      "side": 1,
+      "message": "Totally agreed. Last week, I\u0027ve change this. Put events in struct sock. And when we open a socket, set the event\u0027s head to ctx\u0027s evq.",
+      "parentUuid": "837fb528_0a504e0b",
       "revId": "2ac944fec10daa33a806d98c24b36626987137b5",
       "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
       "unresolved": true
@@ -178,6 +214,24 @@
     },
     {
       "key": {
+        "uuid": "46031f6b_24e99356",
+        "filename": "lib/libtle_l4p/stream_table.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 39,
+      "author": {
+        "id": 1754
+      },
+      "writtenOn": "2019-06-13T03:13:35Z",
+      "side": 1,
+      "message": "That\u0027s not an indispensable change. For bind hash, we just need good enough entries. Will revert this change.\n\nPut this aside, would you consider set a lowest DPDK version bar there? One thing is to avoid the multi-version adapter; another thing, some new features indeed require newer version, like DPDK dynamic memory (v18.05?).",
+      "parentUuid": "c122d659_14de0795",
+      "revId": "2ac944fec10daa33a806d98c24b36626987137b5",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "3771cba3_18739b9e",
         "filename": "lib/libtle_l4p/tcp_rxtx.c",
         "patchSetId": 2
@@ -195,6 +249,24 @@
     },
     {
       "key": {
+        "uuid": "1791e136_7497f9e1",
+        "filename": "lib/libtle_l4p/tcp_rxtx.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 2351,
+      "author": {
+        "id": 1754
+      },
+      "writtenOn": "2019-06-13T03:13:35Z",
+      "side": 1,
+      "message": "Agreed. Let\u0027s move this to l4p. And exposed as an API for glue to use.",
+      "parentUuid": "3771cba3_18739b9e",
+      "revId": "2ac944fec10daa33a806d98c24b36626987137b5",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "82adc948_7defbfc5",
         "filename": "lib/libtle_l4p/tcp_rxtx.c",
         "patchSetId": 2
@@ -206,6 +278,24 @@
       "writtenOn": "2019-06-12T18:07:27Z",
       "side": 1,
       "message": "why to crash if tx send buffer is full?",
+      "revId": "2ac944fec10daa33a806d98c24b36626987137b5",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "ce80bbdf_19049e75",
+        "filename": "lib/libtle_l4p/tcp_rxtx.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 2562,
+      "author": {
+        "id": 1754
+      },
+      "writtenOn": "2019-06-13T03:13:35Z",
+      "side": 1,
+      "message": "We\u0027ve reserved enough slots in the ring above, we shall not fail here.",
+      "parentUuid": "82adc948_7defbfc5",
       "revId": "2ac944fec10daa33a806d98c24b36626987137b5",
       "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
       "unresolved": true
@@ -240,6 +330,24 @@
       "writtenOn": "2019-06-12T18:07:27Z",
       "side": 1,
       "message": "so for each dynamic stream we have one rte_zmalloc() , 3 snprintf() and few other calls. \nSeems quite expensive for the data-path.\nAll that with grabbed ctx-\u003estreams.lock, so all other open/close/accept for that ctx\nwill be blocked too.\nWhat we probably need - analog to mempool that could grow/shrink dynamically \nby predefined chunks.\nThen we could use it for both streams and events.\nAlso might be better to leave the decision when to alloc/free extra chunk to the upper layer.",
+      "revId": "2ac944fec10daa33a806d98c24b36626987137b5",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "10297aae_243c89cb",
+        "filename": "lib/libtle_l4p/tcp_stream.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 196,
+      "author": {
+        "id": 1754
+      },
+      "writtenOn": "2019-06-13T03:13:35Z",
+      "side": 1,
+      "message": "Agreed, actually, I once consider this. The reason I did not do this is that the size of each stream could change, for example ring size. We did not think very clear about that.",
+      "parentUuid": "c35d95fb_7f184ffa",
       "revId": "2ac944fec10daa33a806d98c24b36626987137b5",
       "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
       "unresolved": true
@@ -352,6 +460,24 @@
     },
     {
       "key": {
+        "uuid": "ebe225ec_0147b129",
+        "filename": "lib/libtle_l4p/tle_event.h",
+        "patchSetId": 2
+      },
+      "lineNbr": 275,
+      "author": {
+        "id": 1754
+      },
+      "writtenOn": "2019-06-13T03:13:35Z",
+      "side": 1,
+      "message": "Actually we don\u0027t need this any more. We forget to delete this.",
+      "parentUuid": "f36a1f29_074d571a",
+      "revId": "2ac944fec10daa33a806d98c24b36626987137b5",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "a4c594a7_32d5908e",
         "filename": "lib/libtle_l4p/tle_stats.h",
         "patchSetId": 2
@@ -369,6 +495,24 @@
     },
     {
       "key": {
+        "uuid": "52781a30_fe11a618",
+        "filename": "lib/libtle_l4p/tle_stats.h",
+        "patchSetId": 2
+      },
+      "lineNbr": 90,
+      "author": {
+        "id": 1754
+      },
+      "writtenOn": "2019-06-13T03:13:35Z",
+      "side": 1,
+      "message": "config/build time is easy, we can use macro. For dynamic way, we shall avoid introduce conditions; not sure if we can have mechanism like linux static key in userspace.",
+      "parentUuid": "a4c594a7_32d5908e",
+      "revId": "2ac944fec10daa33a806d98c24b36626987137b5",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "ac577160_dc89606c",
         "filename": "lib/libtle_l4p/tle_stats.h",
         "patchSetId": 2
@@ -380,6 +524,24 @@
       "writtenOn": "2019-06-12T18:07:27Z",
       "side": 1,
       "message": "if you using TLS variable, why do you need atomic updates?",
+      "revId": "2ac944fec10daa33a806d98c24b36626987137b5",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "1ed47e68_1d4b4de1",
+        "filename": "lib/libtle_l4p/tle_stats.h",
+        "patchSetId": 2
+      },
+      "lineNbr": 93,
+      "author": {
+        "id": 1754
+      },
+      "writtenOn": "2019-06-13T03:13:35Z",
+      "side": 1,
+      "message": "That\u0027s a TLS pointer, not a struct to store the results. The reason is that, 1) some frontend threads come and go dynamically, we have no mechanism to collect stats in exited threads; 2) even the frontend threads. So we just use the default snmp to store stats, where atomic shall be used. For backends, we definetely use per-thread snmp to store.",
+      "parentUuid": "ac577160_dc89606c",
       "revId": "2ac944fec10daa33a806d98c24b36626987137b5",
       "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
       "unresolved": true
