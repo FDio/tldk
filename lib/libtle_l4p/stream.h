@@ -125,7 +125,7 @@ stream_get_dest(struct tle_stream *s, const void *dst_addr,
 {
 	int32_t rc;
 	const struct in_addr *d4;
-	const struct in6_addr *d6;
+	const struct in6_addr *d6 = NULL;
 	struct tle_ctx *ctx;
 	struct tle_dev *dev;
 
