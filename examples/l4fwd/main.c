@@ -15,6 +15,8 @@
 
 #include <time.h>
 
+#include <rte_version.h>
+
 #include "netbe.h"
 #include "parse.h"
 
@@ -67,10 +69,17 @@ static struct rte_mempool *frag_mpool[RTE_MAX_NUMA_NODES + 1];
 static char proto_name[3][10] = {"udp", "tcp", ""};
 
 static const struct rte_eth_conf port_conf_default = {
+#if RTE_VERSION >= RTE_VERSION_NUM(18, 8, 0, 0)
+	.rxmode = {
+		.offloads = DEV_RX_OFFLOAD_VLAN_STRIP,
+	},
+#else
 	.rxmode = {
 		.hw_vlan_strip = 1,
 		.jumbo_frame = 0,
 	},
+#endif /* RTE_VERSION >= RTE_VERSION_NUM(18, 8, 0, 0) */
+
 };
 
 struct tx_content tx_content = {
