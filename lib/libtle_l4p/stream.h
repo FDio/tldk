@@ -133,6 +133,7 @@ stream_get_dest(struct tle_stream *s, const void *dst_addr,
 
 	/* it is here just to keep gcc happy. */
 	d4 = NULL;
+	d6 = NULL;
 
 	if (s->type == TLE_V4) {
 		d4 = dst_addr;
