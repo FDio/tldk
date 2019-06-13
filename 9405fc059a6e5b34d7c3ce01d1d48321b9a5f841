@@ -33,6 +33,24 @@
       "revId": "9405fc059a6e5b34d7c3ce01d1d48321b9a5f841",
       "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "633d4dcd_42872f19",
+        "filename": "dpdk/Makefile",
+        "patchSetId": 2
+      },
+      "lineNbr": 139,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2019-06-13T15:40:11Z",
+      "side": 1,
+      "message": "BTW, CI build failed because of removed parts:\n11:02:21 \u003d\u003d Build app\n11:02:22 \u003d\u003d Build app/proc_info\n11:02:22 \u003d\u003d Build app/pdump\n11:02:22   CC main.o\n11:02:22   CC main.o\n11:02:23 /w/workspace/tldk-verify-master-ubuntu1604/dpdk/_build/dpdk/app/proc_info/main.c:60:25: fatal error: rte_metrics.h: No such file or directory\n11:02:23 compilation terminated.\n11:02:23 /w/workspace/tldk-verify-master-ubuntu1604/dpdk/_build/dpdk/mk/internal/rte.compile-pre.mk:138: recipe for target \u0027main.o\u0027 failed\n11:02:23 make[7]: *** [main.o] Error 1\n11:02:23 /w/workspace/tldk-verify-master-ubuntu1604/dpdk/_build/dpdk/mk/rte.subdir.mk:63: recipe for target \u0027proc_info\u0027 failed\n11:02:23 make[6]: *** [proc_info] Error 2",
+      "parentUuid": "f0f8cda8_d0508e29",
+      "revId": "9405fc059a6e5b34d7c3ce01d1d48321b9a5f841",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
     }
   ]
 }
