@@ -99,13 +99,20 @@ $(B)/custom-config: $(B)/.patch.ok Makefile
 		$(DPDK_SOURCE)/config/defconfig_$(DPDK_TARGET) $@
 	$(call set,RTE_MACHINE,$(DPDK_MACHINE))
 	@# modify options
-	$(call set,RTE_MAX_LCORE,256)
+	$(call set,RTE_LIBRTE_IP_FRAG_MAX_FRAG,48)
+	$(call set,RTE_MAX_MEM_MB,1024)
+	$(call set,RTE_MAX_NUMA_NODES,2)
+	$(call set,RTE_MAX_ETHPORTS,4)
+	$(call set,RTE_MAX_VFIO_GROUPS,4)
+	$(call set,RTE_MAX_VFIO_CONTAINERS,4)
+	$(call set,RTE_MAX_QUEUES_PER_PORT,16)
+	$(call set,RTE_MAX_LCORE,16)
 	$(call set,RTE_PKTMBUF_HEADROOM,$(DPDK_PKTMBUF_HEADROOM))
 	$(call set,RTE_LIBEAL_USE_HPET,y)
-	$(call set,RTE_BUILD_COMBINE_LIBS,y)
+	$(call set,RTE_BUILD_COMBINE_LIBS,n)
 	$(call set,RTE_LIBRTE_I40E_16BYTE_RX_DESC,y)
 	$(call set,RTE_LIBRTE_I40E_ITR_INTERVAL,16)
-	$(call set,RTE_LIBRTE_PMD_PCAP,y)
+	$(call set,RTE_LIBRTE_LPM,y) # needed by l4fwd
 	@# enable debug init for device drivers
 	$(call set,RTE_LIBRTE_I40E_DEBUG_INIT,$(DPDK_DEBUG))
 	$(call set,RTE_LIBRTE_IXGBE_DEBUG_INIT,$(DPDK_DEBUG))
@@ -117,7 +124,6 @@ $(B)/custom-config: $(B)/.patch.ok Makefile
 	@# not needed
 	$(call set,RTE_LIBRTE_TIMER,n)
 	$(call set,RTE_LIBRTE_CFGFILE,n)
-	$(call set,RTE_LIBRTE_LPM,y)
 	$(call set,RTE_LIBRTE_ACL,n)
 	$(call set,RTE_LIBRTE_POWER,n)
 	$(call set,RTE_LIBRTE_DISTRIBUTOR,n)
