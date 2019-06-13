@@ -14,7 +14,7 @@
 # Scripts require non-POSIX parts of bash
 SHELL := /bin/bash
 
-DPDK_VERSION ?= v17.11
+DPDK_VERSION          ?= v18.11
 DPDK_BUILD_DIR        ?= $(CURDIR)/_build
 DPDK_INSTALL_DIR      ?= $(DPDK_BUILD_DIR)/dpdk/$(RTE_TARGET)
 DPDK_PKTMBUF_HEADROOM ?= 128

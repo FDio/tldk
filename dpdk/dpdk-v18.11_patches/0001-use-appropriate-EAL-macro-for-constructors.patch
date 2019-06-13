@@ -1,0 +1,37 @@
+From 55878866eb2b6d4e00ff5624259a92f13e10b481 Mon Sep 17 00:00:00 2001
+From: Jerin Jacob <jerinj@marvell.com>
+Date: Mon, 18 Mar 2019 04:15:56 +0000
+Subject: [PATCH] use appropriate EAL macro for constructors
+
+Use eal's RTE_INIT abstraction for defining constructors.
+
+Signed-off-by: Jerin Jacob <jerinj@marvell.com>
+Reviewed-by: David Marchand <david.marchand@redhat.com>
+---
+ app/test-bbdev/main.h            | 3 +--
+ app/test/resource.h              | 2 +-
+ app/test/test.h                  | 3 +--
+ lib/librte_mempool/rte_mempool.h | 7 +++----
+ 4 files changed, 6 insertions(+), 9 deletions(-)
+
+diff --git a/lib/librte_mempool/rte_mempool.h b/lib/librte_mempool/rte_mempool.h
+index 7c9cd9a2f..fd19470d7 100644
+--- a/lib/librte_mempool/rte_mempool.h
++++ b/lib/librte_mempool/rte_mempool.h
+@@ -832,10 +832,9 @@ int rte_mempool_register_ops(const struct rte_mempool_ops *ops);
+  * Note that the rte_mempool_register_ops fails silently here when
+  * more than RTE_MEMPOOL_MAX_OPS_IDX is registered.
+  */
+-#define MEMPOOL_REGISTER_OPS(ops)					\
+-	void mp_hdlr_init_##ops(void);					\
+-	void __attribute__((constructor, used)) mp_hdlr_init_##ops(void)\
+-	{								\
++#define MEMPOOL_REGISTER_OPS(ops)				\
++	RTE_INIT(mp_hdlr_init_##ops)				\
++	{							\
+ 		rte_mempool_register_ops(&ops);			\
+ 	}
+ 
+-- 
+2.17.1
+
