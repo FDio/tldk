@@ -14,7 +14,7 @@
 # Scripts require non-POSIX parts of bash
 SHELL := /bin/bash
 
-DPDK_VERSION ?= v17.11
+DPDK_VERSION          ?= v18.11
 DPDK_BUILD_DIR        ?= $(CURDIR)/_build
 DPDK_INSTALL_DIR      ?= $(DPDK_BUILD_DIR)/dpdk/$(RTE_TARGET)
 DPDK_PKTMBUF_HEADROOM ?= 128
@@ -122,15 +122,10 @@ $(B)/custom-config: $(B)/.patch.ok Makefile
 	$(call set,RTE_LIBRTE_PMD_BOND,y)
 	$(call set,RTE_LIBRTE_IP_FRAG,y)
 	@# not needed
-	$(call set,RTE_LIBRTE_TIMER,n)
 	$(call set,RTE_LIBRTE_CFGFILE,n)
-	$(call set,RTE_LIBRTE_ACL,n)
 	$(call set,RTE_LIBRTE_POWER,n)
 	$(call set,RTE_LIBRTE_DISTRIBUTOR,n)
 	$(call set,RTE_LIBRTE_REORDER,n)
-	$(call set,RTE_LIBRTE_PORT,n)
-	$(call set,RTE_LIBRTE_TABLE,n)
-	$(call set,RTE_LIBRTE_PIPELINE,n)
 	$(call set,RTE_LIBRTE_FLOW_CLASSIFY,n)
 	$(call set,RTE_LIBRTE_PMD_CRYPTO_SCHEDULER,n)
 	$(call set,RTE_KNI_KMOD,n)
