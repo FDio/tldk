@@ -195,7 +195,7 @@ struct test_str {
 	vector<stream_g> gen_streams;
 };
 
-const char *vdevargs[] = {VDEV_NAME",rx_pcap=" RX_PCAP",tx_pcap=" TX_PCAP};
+const char *vdevargs = "rx_pcap=" RX_PCAP ",tx_pcap=" TX_PCAP;
 
 class test_tle_udp_gen_base : public testing::TestWithParam<test_str> {
 public:
@@ -307,14 +307,15 @@ public:
 	map<string, tle_dev *> routes4;
 	map<string, tle_dev *> routes6;
 	test_str tp;
-	void *cb;
+	const void *cb;
 };
 
 int
 test_tle_udp_gen_base::setup_devices(dpdk_port_t *portid)
 {
 	/* attach + configure + start pmd device */
-	if (rte_eth_dev_attach(vdevargs[0], portid) != 0)
+	if (rte_eal_hotplug_add("vdev", VDEV_NAME, vdevargs) < 0 ||
+			rte_eth_dev_get_port_by_name(VDEV_NAME, portid) != 0)
 		return -1;
 	cb = rte_eth_add_rx_callback(*portid, 0,
 		typen_rx_callback, nullptr);
@@ -332,7 +333,7 @@ test_tle_udp_gen_base::cleanup_devices(dpdk_port_t portid)
 
 	rte_eth_dev_stop(portid);
 	rte_eth_dev_close(portid);
-	rte_eth_dev_detach(portid, name);
+	rte_eal_hotplug_remove("vdev", VDEV_NAME);
 
 	return 0;
 }

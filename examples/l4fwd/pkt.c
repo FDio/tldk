@@ -946,7 +946,7 @@ setup_rx_cb(const struct netbe_port *uprt, struct netbe_lcore *lc,
 {
 	int32_t rc;
 	uint32_t i, n, smask;
-	void *cb;
+	const void *cb;
 	const struct ptype2cb *ptype2cb;
 
 	static const struct ptype2cb tcp_ptype2cb[] = {
