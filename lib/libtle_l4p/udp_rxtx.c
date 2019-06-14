@@ -275,28 +275,16 @@ tle_udp_tx_bulk(struct tle_dev *dev, struct rte_mbuf *pkt[], uint16_t num)
 static inline uint32_t
 recv_pkt_process(struct rte_mbuf *m[], uint32_t num, uint32_t type)
 {
-	uint32_t i, k;
-	uint64_t f, flg[num], ofl[num];
+	uint32_t i, k, offset;
 
-	for (i = 0; i != num; i++) {
-		flg[i] = m[i]->ol_flags;
-		ofl[i] = m[i]->tx_offload;
-	}
-
-	k = 0;
-	for (i = 0; i != num; i++) {
-
-		f = flg[i] & (PKT_RX_IP_CKSUM_BAD | PKT_RX_L4_CKSUM_BAD);
-
-		/* drop packets with invalid cksum(s). */
-		if (f != 0 && check_pkt_csum(m[i], m[i]->ol_flags, type,
-				IPPROTO_UDP) != 0) {
+	for (i = 0, k = 0; i != num; i++) {
+		if (check_pkt_csum(m[i], type, IPPROTO_UDP) != 0) {
 			rte_pktmbuf_free(m[i]);
 			m[i] = NULL;
 			k++;
 		} else {
-			m[i]->ol_flags ^= f;
-			rte_pktmbuf_adj(m[i], _tx_offload_l4_offset(ofl[i]));
+			offset = _tx_offload_l4_offset(m[i]->tx_offload);
+			rte_pktmbuf_adj(m[i], offset);
 		}
 	}
 
