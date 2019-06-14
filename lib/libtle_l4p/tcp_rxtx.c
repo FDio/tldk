@@ -1554,9 +1554,15 @@ rx_synack(struct tle_tcp_stream *s, uint32_t ts, uint32_t state,
 	if (state != TCP_ST_SYN_SENT)
 		return -EINVAL;
 
-	/* invalid SEG.SEQ */
+	/*
+	 * RFC 793 3.9: in the SYN-SENT state
+	 * If SEG.ACK =< ISS, or SEG.ACK > SND.NXT, send a reset
+	 * <SEQ=SEG.ACK><CTL=RST>
+	 * and discard the segment.
+	 * The connection remains in the same state.
+	 */
 	if (si->ack != (uint32_t)s->tcb.snd.nxt) {
-		rsp->flags = TCP_FLAG_RST;
+		send_rst(s, si->ack);
 		return 0;
 	}
 
@@ -1711,10 +1717,7 @@ rx_stream(struct tle_tcp_stream *s, uint32_t ts,
 		i = 0;
 
 	/* we have a response packet to send. */
-	if (rsp.flags == TCP_FLAG_RST) {
-		send_rst(s, si[i].ack);
-		stream_term(s);
-	} else if (rsp.flags != 0) {
+	if (rsp.flags != 0) {
 		send_ack(s, ts, rsp.flags);
 
 		/* start the timer for FIN packet */
@@ -2590,7 +2593,7 @@ rto_stream(struct tle_tcp_stream *s, uint32_t tms)
 		timer_restart(s);
 
 	} else {
-		send_rst(s, s->tcb.snd.una);
+		send_rst(s, s->tcb.snd.nxt);
 		stream_term(s);
 	}
 }
