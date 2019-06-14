@@ -1712,7 +1712,7 @@ rx_stream(struct tle_tcp_stream *s, uint32_t ts,
 
 	/* we have a response packet to send. */
 	if (rsp.flags == TCP_FLAG_RST) {
-		send_rst(s, si[i].ack);
+		send_rst(s, s->tcb.snd.nxt);
 		stream_term(s);
 	} else if (rsp.flags != 0) {
 		send_ack(s, ts, rsp.flags);
@@ -2590,7 +2590,7 @@ rto_stream(struct tle_tcp_stream *s, uint32_t tms)
 		timer_restart(s);
 
 	} else {
-		send_rst(s, s->tcb.snd.una);
+		send_rst(s, s->tcb.snd.nxt);
 		stream_term(s);
 	}
 }
