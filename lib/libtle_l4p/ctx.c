@@ -239,20 +239,6 @@ tle_add_dev(struct tle_ctx *ctx, const struct tle_dev_param *dev_prm)
 		return NULL;
 	}
 
-	/* setup RX data. */
-	if (dev_prm->local_addr4.s_addr != INADDR_ANY &&
-			(dev_prm->rx_offload & DEV_RX_OFFLOAD_IPV4_CKSUM) == 0)
-		dev->rx.ol_flags[TLE_V4] |= PKT_RX_IP_CKSUM_BAD;
-
-	if (((dev_prm->rx_offload & DEV_RX_OFFLOAD_UDP_CKSUM) == 0 &&
-			ctx->prm.proto == TLE_PROTO_UDP) ||
-			((dev_prm->rx_offload &
-			DEV_RX_OFFLOAD_TCP_CKSUM) == 0 &&
-			ctx->prm.proto == TLE_PROTO_TCP)) {
-		dev->rx.ol_flags[TLE_V4] |= PKT_RX_L4_CKSUM_BAD;
-		dev->rx.ol_flags[TLE_V6] |= PKT_RX_L4_CKSUM_BAD;
-	}
-
 	/* setup TX data. */
 	df = ((ctx->prm.flags & TLE_CTX_FLAG_ST) == 0) ? 0 :
 		RING_F_SP_ENQ | RING_F_SC_DEQ;

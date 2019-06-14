@@ -1883,7 +1883,6 @@ tle_tcp_rx_bulk(struct tle_dev *dev, struct rte_mbuf *pkt[],
 	struct stbl *st;
 	struct tle_ctx *ctx;
 	uint32_t i, j, k, mt, n, t, ts;
-	uint64_t csf;
 	union pkt_info pi[num];
 	union seg_info si[num];
 	union {
@@ -1904,14 +1903,7 @@ tle_tcp_rx_bulk(struct tle_dev *dev, struct rte_mbuf *pkt[],
 		get_pkt_info(pkt[i], &pi[i], &si[i]);
 
 		t = pi[i].tf.type;
-		csf = dev->rx.ol_flags[t] &
-			(PKT_RX_IP_CKSUM_BAD | PKT_RX_L4_CKSUM_BAD);
-
-		/* check csums in SW */
-		if (pi[i].csf == 0 && csf != 0 && check_pkt_csum(pkt[i], csf,
-				pi[i].tf.type, IPPROTO_TCP) != 0)
-			pi[i].csf = csf;
-
+		pi[i].csf = check_pkt_csum(pkt[i], pi[i].csf, t, IPPROTO_TCP);
 		stu.t[t] = mt;
 	}
 
