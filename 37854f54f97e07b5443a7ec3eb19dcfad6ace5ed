@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "944e885b_6366ec50",
+        "filename": "dpdk/Makefile",
+        "patchSetId": 3
+      },
+      "lineNbr": 108,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2019-06-14T12:21:30Z",
+      "side": 0,
+      "message": "as I said before, current UT uses pcap, so we need it enabled.\nBTW, I think that\u0027s the reason of CI failure:\n05:01:39 EAL: Unable to find a bus for the device \u0027net_pcap0\u0027\n05:01:39 /tmp/jenkins5618441207085006280.sh: line 39: 24691 Segmentation fault      (core dumped) sudo $WORKSPACE/x86_64-native-linuxapp-gcc/app/gtest-rfc --lcores\u003d0 -n 2",
+      "revId": "37854f54f97e07b5443a7ec3eb19dcfad6ace5ed",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    }
+  ]
+}

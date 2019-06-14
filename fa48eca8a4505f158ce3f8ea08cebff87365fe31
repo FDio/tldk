@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "f2f90aee_580fa510",
+        "filename": "dpdk/Makefile",
+        "patchSetId": 3
+      },
+      "lineNbr": 105,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2019-06-14T12:21:30Z",
+      "side": 1,
+      "message": "I still think that\u0027s quite aggressive limitaitons:\nI personally run tldk on more then 16 cores, with more then 1GB of memory on 6 ports.",
+      "revId": "fa48eca8a4505f158ce3f8ea08cebff87365fe31",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    }
+  ]
+}
