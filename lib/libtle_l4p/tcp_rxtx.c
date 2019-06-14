@@ -1834,6 +1834,66 @@ rx_postsyn(struct tle_dev *dev, struct stbl *st, uint32_t type, uint32_t ts,
 	return num - k;
 }
 
+static inline void
+sync_refuse(struct tle_tcp_stream *s, struct tle_dev *dev,
+	const union pkt_info *pi, struct rte_mbuf *m)
+{
+	struct ether_hdr *eth_h;
+	struct ether_addr eth_addr;
+	struct ipv4_hdr *ip_h;
+	uint32_t ip_addr;
+	struct ipv6_hdr *ip6_h;
+	struct in6_addr ip6_addr;
+	struct tcp_hdr *th;
+	uint16_t port;
+
+	/* rst pkt should not contain options from syn */
+	rte_pktmbuf_trim(m, m->l4_len - sizeof(*th));
+
+	eth_h = rte_pktmbuf_mtod(m, struct ether_hdr *);
+	ether_addr_copy(&eth_h->s_addr, &eth_addr);
+	ether_addr_copy(&eth_h->d_addr, &eth_h->s_addr);
+	ether_addr_copy(&eth_addr, &eth_h->d_addr);
+
+	th = rte_pktmbuf_mtod_offset(m, struct tcp_hdr *, m->l2_len + m->l3_len);
+	port = th->src_port;
+	th->src_port = th->dst_port;
+	th->dst_port = port;
+	th->tcp_flags = TCP_FLAG_RST | TCP_FLAG_ACK;
+	th->recv_ack = rte_cpu_to_be_32(rte_be_to_cpu_32(th->sent_seq) + 1);
+	th->sent_seq = 0;
+	th->data_off &= 0x0f;
+	th->data_off |= (sizeof(*th) / 4) << 4;
+	th->cksum = 0;
+
+	if (pi->tf.type == TLE_V4) {
+		ip_h = rte_pktmbuf_mtod_offset(m, struct ipv4_hdr *, m->l2_len);
+		ip_addr = ip_h->src_addr;
+		ip_h->src_addr = ip_h->dst_addr;
+		ip_h->dst_addr = ip_addr;
+		ip_h->total_length = rte_cpu_to_be_16(
+				rte_be_to_cpu_16(ip_h->total_length) -
+				(m->l4_len - sizeof(*th)));
+		ip_h->hdr_checksum = 0;
+		th->cksum = rte_ipv4_udptcp_cksum(ip_h, th);
+		ip_h->hdr_checksum = rte_ipv4_cksum(ip_h);
+	} else {
+		ip6_h = rte_pktmbuf_mtod_offset(m, struct ipv6_hdr *, m->l2_len);
+		rte_memcpy(&ip6_addr, ip6_h->src_addr, sizeof(ip6_addr));
+		rte_memcpy(ip6_h->src_addr, ip6_h->dst_addr, sizeof(ip6_addr));
+		rte_memcpy(ip6_h->dst_addr, &ip6_addr, sizeof(ip6_addr));
+		ip6_h->payload_len = rte_cpu_to_be_16(
+				rte_be_to_cpu_16(ip6_h->payload_len) -
+				(m->l4_len - sizeof(*th)));
+		th->cksum = rte_ipv6_udptcp_cksum(ip6_h, th);
+	}
+
+	if (m->pkt_len < ETHER_MIN_LEN)
+		rte_pktmbuf_append(m, ETHER_MIN_LEN - m->pkt_len);
+
+	if (send_pkt(s, dev, m) != 0)
+		rte_pktmbuf_free(m);
+}
 
 static inline uint32_t
 rx_syn(struct tle_dev *dev, uint32_t type, uint32_t ts,
@@ -1848,10 +1908,17 @@ rx_syn(struct tle_dev *dev, uint32_t type, uint32_t ts,
 	s = rx_obtain_listen_stream(dev, &pi[0], type);
 	if (s == NULL) {
 		for (i = 0; i != num; i++) {
-			rc[i] = ENOENT;
-			rp[i] = mb[i];
+			s = TCP_STREAM(get_stream(dev->ctx));
+			if (s == NULL) {
+				rte_pktmbuf_free(mb[i]);
+				continue;
+			}
+
+			sync_refuse(s, dev, &pi[i], mb[i]);
+			put_stream(dev->ctx, &s->s, 0);
 		}
-		return 0;
+
+		return num;
 	}
 
 	k = 0;
