@@ -64,7 +64,7 @@ typedef uint8_t dpdk_port_t;
 
 static const struct rte_eth_conf port_conf_default = {
 	.rxmode = {
-		.hw_vlan_strip = 1,
+		.offloads = DEV_RX_OFFLOAD_VLAN_STRIP,
 	},
 };
 
@@ -201,14 +201,18 @@ port_init(const struct tldk_port_conf *pcf)
 	if ((pcf->rx_offload & RX_CSUM_OFFLOAD) != 0) {
 		RTE_LOG(ERR, USER1, "%s(%u): enabling RX csum offload;\n",
 			__func__, pcf->id);
-		port_conf.rxmode.hw_ip_checksum = 1;
+		port_conf.rxmode.offloads |= pcf->rx_offload & RX_CSUM_OFFLOAD;
 	}
 
 	port_conf.rxmode.max_rx_pkt_len = pcf->mtu + ETHER_CRC_LEN;
 	if (port_conf.rxmode.max_rx_pkt_len > ETHER_MAX_LEN)
-		port_conf.rxmode.jumbo_frame = 1;
+		port_conf.rxmode.offloads |= DEV_RX_OFFLOAD_JUMBO_FRAME;
 	port_conf.rxmode.mq_mode = ETH_MQ_RX_RSS;
 	port_conf.rx_adv_conf.rss_conf.rss_hf = ETH_RSS_IP | ETH_RSS_TCP;
+	port_conf.rx_adv_conf.rss_conf.rss_hf &=
+		dev_info.flow_type_rss_offloads;
+
+	port_conf.txmode.offloads = pcf->tx_offload;
 
 	rc = rte_eth_dev_configure(pcf->id, pcf->nb_queues, pcf->nb_queues,
 			&port_conf);
@@ -296,13 +300,11 @@ be_queue_init(struct tldk_ctx *tcx, const tldk_conf_t *cf)
 	uint32_t port_id, i, nb_rxd, nb_txd;
 	struct rte_eth_dev_info dev_info;
 	const struct tldk_ctx_conf *ctx;
-	const struct tldk_port_conf *pcf;
 
 	ctx = tcx->cf;
 	for (i = 0; i < ctx->nb_dev; i++) {
 		port_id = ctx->dev[i].port;
 		queue_id = ctx->dev[i].queue;
-		pcf = &cf->port[port_id];
 
 		rte_eth_dev_info_get(port_id, &dev_info);
 
@@ -311,13 +313,6 @@ be_queue_init(struct tldk_ctx *tcx, const tldk_conf_t *cf)
 		nb_rxd = RTE_MIN(RX_RING_SIZE, dev_info.rx_desc_lim.nb_max);
 		nb_txd = RTE_MIN(TX_RING_SIZE, dev_info.tx_desc_lim.nb_max);
 		dev_info.default_txconf.tx_free_thresh = nb_txd / 2;
-
-		if (pcf->tx_offload != 0) {
-			RTE_LOG(ERR, USER1,
-				"%s(port=%u): enabling full featured TX;\n",
-				__func__, port_id);
-			dev_info.default_txconf.txq_flags = 0;
-		}
 
 		socket = rte_eth_dev_socket_id(port_id);
 
@@ -999,7 +994,7 @@ setup_rx_cb(const struct tldk_dev *td, struct tldk_ctx *tcx)
 {
 	int32_t rc;
 	uint32_t i, n, smask;
-	void *cb;
+	const void *cb;
 	const struct ptype2cb *ptype2cb;
 
 	static const struct ptype2cb tcp_ptype2cb[] = {

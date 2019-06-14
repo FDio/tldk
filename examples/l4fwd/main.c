@@ -68,8 +68,7 @@ static char proto_name[3][10] = {"udp", "tcp", ""};
 
 static const struct rte_eth_conf port_conf_default = {
 	.rxmode = {
-		.hw_vlan_strip = 1,
-		.jumbo_frame = 0,
+		.offloads = DEV_RX_OFFLOAD_VLAN_STRIP,
 	},
 };
 
