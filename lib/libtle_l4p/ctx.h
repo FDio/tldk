@@ -37,9 +37,6 @@ struct tle_dport {
 struct tle_dev {
 	struct tle_ctx *ctx;
 	struct {
-		uint64_t ol_flags[TLE_VNUM];
-	} rx;
-	struct {
 		/* used by FE. */
 		uint64_t ol_flags[TLE_VNUM];
 		rte_atomic32_t packet_id[TLE_VNUM];

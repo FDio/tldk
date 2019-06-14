@@ -57,8 +57,7 @@ get_pkt_type(const struct rte_mbuf *m)
 }
 
 static inline union l4_ports
-pkt_info(const struct tle_dev *dev, struct rte_mbuf *m,
-	union l4_ports *ports, union ipv4_addrs *addr4,
+pkt_info(struct rte_mbuf *m, union l4_ports *ports, union ipv4_addrs *addr4,
 	union ipv6_addrs **addr6)
 {
 	uint32_t len;
@@ -72,11 +71,9 @@ pkt_info(const struct tle_dev *dev, struct rte_mbuf *m,
 		pa4 = rte_pktmbuf_mtod_offset(m, union ipv4_addrs *,
 			len + offsetof(struct ipv4_hdr, src_addr));
 		addr4->raw = pa4->raw;
-		m->ol_flags |= dev->rx.ol_flags[TLE_V4];
 	} else if (ret.src == TLE_V6) {
 		*addr6 = rte_pktmbuf_mtod_offset(m, union ipv6_addrs *,
 			len + offsetof(struct ipv6_hdr, src_addr));
-		m->ol_flags |= dev->rx.ol_flags[TLE_V6];
 	}
 
 	len += m->l3_len;
@@ -178,7 +175,7 @@ tle_udp_rx_bulk(struct tle_dev *dev, struct rte_mbuf *pkt[],
 	union ipv6_addrs *pa6[num];
 
 	for (i = 0; i != num; i++)
-		tp[i] = pkt_info(dev, pkt[i], &port[i], &a4[i], &pa6[i]);
+		tp[i] = pkt_info(pkt[i], &port[i], &a4[i], &pa6[i]);
 
 	k = 0;
 	for (i = 0; i != num; i = j) {
@@ -276,7 +273,7 @@ static inline uint32_t
 recv_pkt_process(struct rte_mbuf *m[], uint32_t num, uint32_t type)
 {
 	uint32_t i, k;
-	uint64_t f, flg[num], ofl[num];
+	uint64_t flg[num], ofl[num];
 
 	for (i = 0; i != num; i++) {
 		flg[i] = m[i]->ol_flags;
@@ -286,18 +283,13 @@ recv_pkt_process(struct rte_mbuf *m[], uint32_t num, uint32_t type)
 	k = 0;
 	for (i = 0; i != num; i++) {
 
-		f = flg[i] & (PKT_RX_IP_CKSUM_BAD | PKT_RX_L4_CKSUM_BAD);
-
 		/* drop packets with invalid cksum(s). */
-		if (f != 0 && check_pkt_csum(m[i], m[i]->ol_flags, type,
-				IPPROTO_UDP) != 0) {
+		if (check_pkt_csum(m[i], flg[i], type, IPPROTO_UDP) != 0) {
 			rte_pktmbuf_free(m[i]);
 			m[i] = NULL;
 			k++;
-		} else {
-			m[i]->ol_flags ^= f;
+		} else
 			rte_pktmbuf_adj(m[i], _tx_offload_l4_offset(ofl[i]));
-		}
 	}
 
 	return k;
