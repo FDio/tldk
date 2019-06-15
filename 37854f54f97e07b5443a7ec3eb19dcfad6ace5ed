@@ -16,6 +16,24 @@
       "revId": "37854f54f97e07b5443a7ec3eb19dcfad6ace5ed",
       "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "824f67bb_8e8a27e7",
+        "filename": "dpdk/Makefile",
+        "patchSetId": 3
+      },
+      "lineNbr": 108,
+      "author": {
+        "id": 1754
+      },
+      "writtenOn": "2019-06-15T15:35:09Z",
+      "side": 0,
+      "message": "Sorry about that, I forget to put this back. Will resubmit.",
+      "parentUuid": "944e885b_6366ec50",
+      "revId": "37854f54f97e07b5443a7ec3eb19dcfad6ace5ed",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
     }
   ]
 }

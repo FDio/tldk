@@ -16,6 +16,24 @@
       "revId": "fa48eca8a4505f158ce3f8ea08cebff87365fe31",
       "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "be6bc55d_d983a9c8",
+        "filename": "dpdk/Makefile",
+        "patchSetId": 3
+      },
+      "lineNbr": 105,
+      "author": {
+        "id": 1754
+      },
+      "writtenOn": "2019-06-15T15:35:09Z",
+      "side": 1,
+      "message": "I can understand it makes not confortable for existing users.\n\nWould you consider putting these configrations into another config option so that we can leverage this more, such as:\n\nmake MEMORY_OPT\u003dtrue all",
+      "parentUuid": "f2f90aee_580fa510",
+      "revId": "fa48eca8a4505f158ce3f8ea08cebff87365fe31",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
     }
   ]
 }
