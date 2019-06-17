@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "841c8411_63270d0d",
+        "filename": "lib/libtle_l4p/tcp_rxtx.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 1717,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2019-06-17T18:36:05Z",
+      "side": 1,
+      "message": "As I can see the only place wehre we set rsp.flags \u003d RST is at rx_synack().\n\nfrom rfc 793, 3.4 Reset Generation:\n...\n2.  If the connection is in any non-synchronized state (LISTEN,\n    SYN-SENT, SYN-RECEIVED) ... \nIf the incoming segment has an ACK field, the reset takes its\n    sequence number from the ACK field of the segment, otherwise the\n    reset has sequence number zero and the ACK field is set to the sum\n    of the sequence number and segment length of the incoming segment.\n    The connection remains in the same state.\n\nsame in 3.9 in SEGMENT ARRIVES:\n\nIf the state is SYN-SENT then\n\n      first check the ACK bit\n\n        If the ACK bit is set\n\n          If SEG.ACK \u003d\u003c ISS, or SEG.ACK \u003e SND.NXT, send a reset (unless\n          the RST bit is set, if so drop the segment and return)\n\n            \u003cSEQ\u003dSEG.ACK\u003e\u003cCTL\u003dRST\u003e\nand discard the segment.  Return.\n\nSo seems we should use si.ack here.\n\nBTW, by some reason we are closing stream here.\nAccording to the RFC we actualy shouldn\u0027t do it...\nprobably a bug.",
+      "revId": "e3a6d0349839dd55c0ca2dfb73ab3898aa7c7b8c",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    }
+  ]
+}
