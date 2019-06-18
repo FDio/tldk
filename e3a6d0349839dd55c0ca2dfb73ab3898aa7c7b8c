@@ -16,6 +16,24 @@
       "revId": "e3a6d0349839dd55c0ca2dfb73ab3898aa7c7b8c",
       "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "2e76069f_011a62d3",
+        "filename": "lib/libtle_l4p/tcp_rxtx.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 1717,
+      "author": {
+        "id": 1754
+      },
+      "writtenOn": "2019-06-18T05:33:00Z",
+      "side": 1,
+      "message": "\u003e As I can see the only place wehre we set rsp.flags \u003d RST is at\n \u003e rx_synack().\n\nWe will add two places to send rst.\n1) when remote tries to connect a port which no local socket listens on.\n2) when local app closes a socket while there\u0027s still data to receive. In this case, we don\u0027t know the receiving state of the remote: started from una, some segments may get received but not acked yet, some may get dropped. If we set seq \u003d una, the remote will just ignore the reset packet. So send a packet with nxt as seq no seems more reasonable, no?\n\n \u003e \n \u003e from rfc 793, 3.4 Reset Generation:\n \u003e ...\n \u003e 2.  If the connection is in any non-synchronized state (LISTEN,\n \u003e SYN-SENT, SYN-RECEIVED) ...\n \u003e If the incoming segment has an ACK field, the reset takes its\n \u003e sequence number from the ACK field of the segment, otherwise the\n \u003e reset has sequence number zero and the ACK field is set to the sum\n \u003e of the sequence number and segment length of the incoming segment.\n \u003e The connection remains in the same state.\n \u003e \n \u003e same in 3.9 in SEGMENT ARRIVES:\n \u003e \n \u003e If the state is SYN-SENT then\n \u003e \n \u003e first check the ACK bit\n \u003e \n \u003e If the ACK bit is set\n \u003e \n \u003e If SEG.ACK \u003d\u003c ISS, or SEG.ACK \u003e SND.NXT, send a reset (unless\n \u003e the RST bit is set, if so drop the segment and return)\n \u003e \n \u003e \u003cSEQ\u003dSEG.ACK\u003e\u003cCTL\u003dRST\u003e\n \u003e and discard the segment.  Return.\n \u003e \n \u003e So seems we should use si.ack here.\n\nAh, yes, we shall use si.ack here, and we\u0027d better add above information as a note here.\n\n \u003e \n \u003e BTW, by some reason we are closing stream here.\n \u003e According to the RFC we actualy shouldn\u0027t do it...\n \u003e probably a bug.\n\nHmm, yes, we shall not close the stream here.",
+      "parentUuid": "841c8411_63270d0d",
+      "revId": "e3a6d0349839dd55c0ca2dfb73ab3898aa7c7b8c",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
     }
   ]
 }
