@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "68aa8e3a_4c67adec",
+        "filename": "lib/libtle_l4p/udp_rxtx.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 282,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2019-06-24T16:19:49Z",
+      "side": 0,
+      "message": "one of the purposes of that loop - split read from the mbuf oLflags and tx_offload and actual processing.\nThat way we give cpu time ro perform actual load and reduce memory-load latency.\nSo I think we better keep it here.",
+      "revId": "e3a6d0349839dd55c0ca2dfb73ab3898aa7c7b8c",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    }
+  ]
+}

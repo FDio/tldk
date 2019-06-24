@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "f32ba88c_64e447f2",
+        "filename": "lib/libtle_l4p/misc.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 307,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2019-06-24T16:19:49Z",
+      "side": 1,
+      "message": "I think that patch is not complete. \nRight now (due to the fact there was no CKSUM_UNKNOWN) state we set to dev-\u003erx.ol_flags\nCKSUM_BAD for devices that doesn\u0027t have RX cksum offload.\nSo all packets received from such devices will have CSUM_FLAG set.\nYou removed it for TCP, but for UDP it is still there.\nI guess that\u0027s the reason of Ci failures.\nIn fact, as we have UNKNOWN no, no need to have dev-\u003erx.ol_flags at all.",
+      "revId": "929dba86e1099649708eaa40a18bbc5795338163",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    }
+  ]
+}
