@@ -23,6 +23,7 @@ include $(RTE_SDK)/mk/rte.vars.mk
 
 DIRS-y += dring
 DIRS-y += gtest
+DIRS-y += memtank
 DIRS-y += timer
 
 include $(TLDK_ROOT)/mk/tle.subdir.mk
