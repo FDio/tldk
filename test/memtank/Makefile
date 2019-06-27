@@ -1,4 +1,4 @@
-# Copyright (c) 2016 Intel Corporation.
+# Copyright (c) 2019 Intel Corporation.
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at:
@@ -15,16 +15,28 @@ ifeq ($(RTE_SDK),)
 $(error "Please define RTE_SDK environment variable")
 endif
 
+ifeq ($(RTE_TARGET),)
+$(error "Please define RTE_TARGET environment variable")
+endif
+
 ifeq ($(TLDK_ROOT),)
-$(error "Please define TLDK_SDK environment variable")
+$(error "Please define TLDK_ROOT environment variable")
 endif
 
 include $(RTE_SDK)/mk/rte.vars.mk
 
-DIRS-y += libtle_misc
-DIRS-y += libtle_dring
-DIRS-y += libtle_timer
-DIRS-y += libtle_memtank
-DIRS-y += libtle_l4p
+# binary name
+APP = test_memtank
 
-include $(TLDK_ROOT)/mk/tle.subdir.mk
+# all source are stored in SRCS-y
+SRCS-y += test_memtank.c
+
+CFLAGS += $(WERROR_FLAGS)
+CFLAGS += -I$(RTE_OUTPUT)/include
+
+LDLIBS += -L$(RTE_OUTPUT)/lib
+LDLIBS += -ltle_memtank
+
+EXTRA_CFLAGS += -O3
+
+include $(TLDK_ROOT)/mk/tle.app.mk
