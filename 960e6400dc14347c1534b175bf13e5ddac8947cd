@@ -1,0 +1,38 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "ce473962_1717db39",
+        "filename": "lib/libtle_l4p/misc.h",
+        "patchSetId": 3
+      },
+      "lineNbr": 308,
+      "author": {
+        "id": 1754
+      },
+      "writtenOn": "2019-06-27T02:14:47Z",
+      "side": 1,
+      "message": "Is a likely() necessary here?",
+      "revId": "960e6400dc14347c1534b175bf13e5ddac8947cd",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "7b63df2f_1a01b970",
+        "filename": "lib/libtle_l4p/udp_rxtx.c",
+        "patchSetId": 3
+      },
+      "lineNbr": 276,
+      "author": {
+        "id": 1754
+      },
+      "writtenOn": "2019-06-27T02:14:47Z",
+      "side": 1,
+      "message": "I don\u0027t understand why we fetch ol_flags into this array in advance, for performance?",
+      "revId": "960e6400dc14347c1534b175bf13e5ddac8947cd",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    }
+  ]
+}
