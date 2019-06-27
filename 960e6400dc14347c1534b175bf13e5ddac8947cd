@@ -19,6 +19,24 @@
     },
     {
       "key": {
+        "uuid": "6c745d79_7730ad22",
+        "filename": "lib/libtle_l4p/misc.h",
+        "patchSetId": 3
+      },
+      "lineNbr": 308,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2019-06-27T12:56:58Z",
+      "side": 1,
+      "message": "I don\u0027t think it would bring any real perf boost here.\nIn fact I am not big fun of likeky/unlikely and so far we don\u0027t use it anywehere in l4p lib.\nThe reason for that - the result is totally uncertain, when tried -in most cases I didn\u0027t find any diff\nin perfomance at all. Sometimes it is becomes a bit faster, though sometimes it makes things even slower.",
+      "parentUuid": "ce473962_1717db39",
+      "revId": "960e6400dc14347c1534b175bf13e5ddac8947cd",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "7b63df2f_1a01b970",
         "filename": "lib/libtle_l4p/udp_rxtx.c",
         "patchSetId": 3
@@ -30,6 +48,24 @@
       "writtenOn": "2019-06-27T02:14:47Z",
       "side": 1,
       "message": "I don\u0027t understand why we fetch ol_flags into this array in advance, for performance?",
+      "revId": "960e6400dc14347c1534b175bf13e5ddac8947cd",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "c87c7cec_06b23d09",
+        "filename": "lib/libtle_l4p/udp_rxtx.c",
+        "patchSetId": 3
+      },
+      "lineNbr": 276,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2019-06-27T12:56:58Z",
+      "side": 1,
+      "message": "this is FE call. A that moment these mbufs most likely will not be in the cache any more.\nSo trying to access these mbufs first time will cause memory latency.\nSo if we do just: check_pkt_csum(m[i], m[i]-\u003eol_flagsf, type, IPPROTO_UDP)\nmost likely it will cause pipiline stall.\nHere we hiding this latency by generating loads for bulk of packets,\nso when we\u0027ll try to use flg[i] and ofl[i] it\u0027s read op will be already complete (hopefully).\nQuite common optimization approach - we use it quite in few places in dpdk too.",
+      "parentUuid": "7b63df2f_1a01b970",
       "revId": "960e6400dc14347c1534b175bf13e5ddac8947cd",
       "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
       "unresolved": false
