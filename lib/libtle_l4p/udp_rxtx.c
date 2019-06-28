@@ -457,7 +457,7 @@ stream_drb_alloc(struct tle_udp_stream *s, struct tle_drb *drbs[],
 static inline uint16_t
 queue_pkt_out(struct tle_udp_stream *s, struct tle_dev *dev,
 		const void *pkt[], uint16_t nb_pkt,
-		struct tle_drb *drbs[], uint32_t *nb_drb)
+		struct tle_drb *drbs[], uint32_t *nb_drb, uint8_t all_or_nothing)
 {
 	uint32_t bsz, i, n, nb, nbc, nbm;
 
@@ -479,8 +479,11 @@ queue_pkt_out(struct tle_udp_stream *s, struct tle_dev *dev,
 		return 0;
 
 	/* not enough free drbs, reduce number of packets to send. */
-	else if (nb != nbm)
+	else if (nb != nbm) {
+		if (all_or_nothing)
+			return 0;
 		nb_pkt = nb * bsz;
+	}
 
 	/* enqueue packets to the destination device. */
 	nbc = nb;
@@ -581,7 +584,7 @@ tle_udp_stream_send(struct tle_stream *us, struct rte_mbuf *pkt[],
 		if (k != i) {
 			k += queue_pkt_out(s, dst.dev,
 				(const void **)(uintptr_t)&pkt[k], i - k,
-				drb, &nb);
+				drb, &nb, 0);
 
 			/* stream TX queue is full. */
 			if (k != i) {
@@ -603,7 +606,7 @@ tle_udp_stream_send(struct tle_stream *us, struct rte_mbuf *pkt[],
 			}
 
 			n = queue_pkt_out(s, dst.dev,
-				(const void **)(uintptr_t)frag, rc, drb, &nb);
+				(const void **)(uintptr_t)frag, rc, drb, &nb, 1);
 			if (n == 0) {
 				while (rc-- != 0)
 					rte_pktmbuf_free(frag[rc]);
