@@ -105,6 +105,24 @@
       "revId": "960e6400dc14347c1534b175bf13e5ddac8947cd",
       "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "11a92d31_3a44573f",
+        "filename": "lib/libtle_l4p/udp_rxtx.c",
+        "patchSetId": 3
+      },
+      "lineNbr": 276,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2019-07-01T15:06:46Z",
+      "side": 1,
+      "message": "Personally, I try to avoid prefetch instruction whenver possible.\nMain reason - it is unpredicatable.\nthis instruction is just a hint and cpu is free to reorder or even ignore it.\nAgain from what I saw it\u0027s behaviour can differ depending on cpu model.",
+      "parentUuid": "5fb01186_6cdb6c91",
+      "revId": "960e6400dc14347c1534b175bf13e5ddac8947cd",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
     }
   ]
 }
