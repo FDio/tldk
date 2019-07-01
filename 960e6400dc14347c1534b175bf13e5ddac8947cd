@@ -37,6 +37,24 @@
     },
     {
       "key": {
+        "uuid": "74652762_139bfee5",
+        "filename": "lib/libtle_l4p/misc.h",
+        "patchSetId": 3
+      },
+      "lineNbr": 308,
+      "author": {
+        "id": 1754
+      },
+      "writtenOn": "2019-07-01T08:32:20Z",
+      "side": 1,
+      "message": "Only thought it may not make things faster, never thought it makes things slower. OK, let\u0027s adopt this methodology to make code cleaner.",
+      "parentUuid": "6c745d79_7730ad22",
+      "revId": "960e6400dc14347c1534b175bf13e5ddac8947cd",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "7b63df2f_1a01b970",
         "filename": "lib/libtle_l4p/udp_rxtx.c",
         "patchSetId": 3
@@ -66,6 +84,24 @@
       "side": 1,
       "message": "this is FE call. A that moment these mbufs most likely will not be in the cache any more.\nSo trying to access these mbufs first time will cause memory latency.\nSo if we do just: check_pkt_csum(m[i], m[i]-\u003eol_flagsf, type, IPPROTO_UDP)\nmost likely it will cause pipiline stall.\nHere we hiding this latency by generating loads for bulk of packets,\nso when we\u0027ll try to use flg[i] and ofl[i] it\u0027s read op will be already complete (hopefully).\nQuite common optimization approach - we use it quite in few places in dpdk too.",
       "parentUuid": "7b63df2f_1a01b970",
+      "revId": "960e6400dc14347c1534b175bf13e5ddac8947cd",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "5fb01186_6cdb6c91",
+        "filename": "lib/libtle_l4p/udp_rxtx.c",
+        "patchSetId": 3
+      },
+      "lineNbr": 276,
+      "author": {
+        "id": 1754
+      },
+      "writtenOn": "2019-07-01T08:32:20Z",
+      "side": 1,
+      "message": "Yes, I\u0027ve seen such code here and everywhere. Another way to accelerate it is to use SW prefetch, which way is better?",
+      "parentUuid": "c87c7cec_06b23d09",
       "revId": "960e6400dc14347c1534b175bf13e5ddac8947cd",
       "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
       "unresolved": false
