@@ -246,6 +246,14 @@ tcp_seq_leq(uint32_t l, uint32_t r)
 	return (int32_t)(l - r) <= 0;
 }
 
+static inline uint32_t
+tcp_seq_min(uint32_t l, uint32_t r)
+{
+	if (tcp_seq_lt(l, r))
+		return l;
+	else
+		return r;
+}
 
 static inline void
 get_seg_info(const struct tcp_hdr *th, union seg_info *si)
