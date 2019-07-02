@@ -107,7 +107,7 @@ _ofo_insert_new(struct ofo *ofo, uint32_t pos, union seqlen *sl,
 	for (i = 0, seq = sl->seq; i != n && tcp_seq_lt(seq, end); i++) {
 		seq += mb[i]->pkt_len;
 		if (tcp_seq_lt(end, seq))
-			rte_pktmbuf_trim(mb[i], seq - end);
+			_rte_pktmbuf_trim(mb[i], seq - end);
 		db->obj[i] = mb[i];
 	}
 
@@ -139,7 +139,7 @@ _ofo_insert_right(struct ofo *ofo, uint32_t pos, union seqlen *sl,
 		plen = mb[i]->pkt_len;
 		if (n < plen) {
 			/* adjust partially overlapped packet. */
-			rte_pktmbuf_adj(mb[i], plen - n);
+			mb[i] = _rte_pktmbuf_adj(mb[i], plen - n);
 			break;
 		}
 	}
@@ -163,7 +163,7 @@ _ofo_insert_right(struct ofo *ofo, uint32_t pos, union seqlen *sl,
 	for (j = 0, seq = sl->seq + skip; j != n && tcp_seq_lt(seq, end); j++) {
 		seq += mb[i + j]->pkt_len;
 		if (tcp_seq_lt(end, seq))
-			rte_pktmbuf_trim(mb[i + j], seq - end);
+			_rte_pktmbuf_trim(mb[i + j], seq - end);
 		db->obj[k + j] = mb[i + j];
 	}
 
@@ -281,7 +281,7 @@ _ofodb_enqueue(struct rte_ring *r, const struct ofodb *db, uint32_t *seq)
 			pkt = db->obj[++i];
 		} else {
 			/* pkt is partly overlapped */
-			rte_pktmbuf_adj(pkt, *seq - begin);
+			db->obj[i] = _rte_pktmbuf_adj(pkt, *seq - begin);
 			break;
 		}
 	}
