@@ -973,7 +973,7 @@ rx_ack_listen(struct tle_tcp_stream *s, struct stbl *st,
 }
 
 static inline int
-data_pkt_adjust(const struct tcb *tcb, struct rte_mbuf *mb, uint32_t hlen,
+data_pkt_adjust(const struct tcb *tcb, struct rte_mbuf **mb, uint32_t hlen,
 	uint32_t *seqn, uint32_t *plen)
 {
 	uint32_t len, n, seq;
@@ -981,7 +981,7 @@ data_pkt_adjust(const struct tcb *tcb, struct rte_mbuf *mb, uint32_t hlen,
 	seq = *seqn;
 	len = *plen;
 
-	rte_pktmbuf_adj(mb, hlen);
+	rte_pktmbuf_adj(*mb, hlen);
 	if (len == 0)
 		return -ENODATA;
 	/* cut off the start of the packet */
@@ -990,7 +990,7 @@ data_pkt_adjust(const struct tcb *tcb, struct rte_mbuf *mb, uint32_t hlen,
 		if (n >= len)
 			return -ENODATA;
 
-		rte_pktmbuf_adj(mb, n);
+		*mb = _rte_pktmbuf_adj(*mb, n);
 		*seqn = seq + n;
 		*plen = len - n;
 	}
@@ -1097,7 +1097,7 @@ rx_fin(struct tle_tcp_stream *s, uint32_t state,
 
 	if (plen != 0) {
 
-		ret = data_pkt_adjust(&s->tcb, mb, hlen, &seq, &plen);
+		ret = data_pkt_adjust(&s->tcb, &mb, hlen, &seq, &plen);
 		if (ret != 0)
 			return ret;
 		if (rx_data_enqueue(s, seq, plen, &mb, 1) != 1)
@@ -1303,7 +1303,7 @@ rx_data_ack(struct tle_tcp_stream *s, struct dack_info *tack,
 
 		if (ret == 0) {
 			/* skip duplicate data, if any */
-			ret = data_pkt_adjust(&s->tcb, mb[i], hlen,
+			ret = data_pkt_adjust(&s->tcb, &mb[i], hlen,
 				&seq, &plen);
 		}
 

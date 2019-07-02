@@ -510,6 +510,106 @@ _iovec_to_mbsegs(struct iovec *iv, uint32_t seglen, struct rte_mbuf *mb[],
 	return i;
 }
 
+/**
+ * Remove len bytes at the beginning of an mbuf.
+ *
+ * It's an enhancement version of rte_pktmbuf_abj which not support
+ * adjusting length greater than the length of the first segment.
+ *
+ * Returns a pointer to the new mbuf. If the
+ * length is greater than the total length of the mbuf, then the
+ * function will fail and return NULL, without modifying the mbuf.
+ *
+ * @param m
+ *   The packet mbuf.
+ * @param len
+ *   The amount of data to remove (in bytes).
+ * @return
+ *   A pointer to the new start of the data.
+ */
+static inline struct rte_mbuf *
+_rte_pktmbuf_adj(struct rte_mbuf *m, uint32_t len)
+{
+	struct rte_mbuf *next;
+	uint32_t remain, plen;
+	uint16_t segs;
+
+	if (unlikely(len > m->pkt_len))
+		return NULL;
+
+	plen = m->pkt_len;
+	remain = len;
+	segs = m->nb_segs;
+	/* don't free last segment */
+	while (remain >= m->data_len && m->next) {
+		next = m->next;
+		remain -= m->data_len;
+		segs--;
+		rte_pktmbuf_free_seg(m);
+		m = next;
+	}
+
+	if (remain) {
+		m->data_len = (uint16_t)(m->data_len - remain);
+		m->data_off = (uint16_t)(m->data_off + remain);
+	}
+
+	m->pkt_len = plen - len;
+	m->nb_segs = segs;
+	return m;
+}
+
+/**
+ * Remove len bytes of data at the end of the mbuf.
+ *
+ * It's an enhancement version of rte_pktmbuf_trim, which not support
+ * removing length greater than the length of the last segment.
+ *
+ * @param m
+ *   The packet mbuf.
+ * @param len
+ *   The amount of data to remove (in bytes).
+ * @return
+ *   - 0: On success.
+ *   - -1: On error.
+ */
+static inline int
+_rte_pktmbuf_trim(struct rte_mbuf *m, uint32_t len)
+{
+	struct rte_mbuf *last, *next, *tmp;
+	uint32_t remain;
+	uint16_t segs;
+
+	if (unlikely(len > m->pkt_len))
+		return -1;
+
+	tmp = m;
+	/* find the last segment will remain after trim */
+	remain = m->pkt_len - len;
+	while (remain > tmp->data_len) {
+		remain -= tmp->data_len;
+		tmp = tmp->next;
+	}
+
+	/* trim the remained last segment */
+	tmp->data_len = remain;
+
+	/* remove trimmed segments */
+	segs = m->nb_segs;
+	last = tmp;
+	for (tmp = tmp->next; tmp != NULL; tmp = next) {
+		next = tmp->next;
+		rte_pktmbuf_free_seg(tmp);
+		segs--;
+	}
+
+	last->next = NULL;
+	m->pkt_len -= len;
+	m->nb_segs = segs;
+
+	return 0;
+}
+
 #ifdef __cplusplus
 }
 #endif
