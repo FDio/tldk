@@ -276,7 +276,7 @@ _ofodb_enqueue(struct rte_ring *r, const struct ofodb *db, uint32_t *seq)
 			pkt = db->obj[++i];
 		} else {
 			/* pkt is partly overlapped */
-			rte_pktmbuf_adj(pkt, *seq - begin);
+			db->obj[i] = _rte_pktmbuf_adj(pkt, *seq - begin);
 			break;
 		}
 	}
