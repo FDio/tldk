@@ -1,0 +1,157 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "0057e8f4_65baffd3",
+        "filename": "lib/libtle_l4p/tcp_ofo.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 41,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2019-07-19T12:44:21Z",
+      "side": 1,
+      "message": "don\u0027t know do we need rte_memcpy here...\nit unrolls to quite a big chunk of code.\nsimple hand-maded loop might suit better here.",
+      "revId": "e6abe0460b91b7e999724b26b5260b0bab220c1b",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "368cc2ff_c8dd890d",
+        "filename": "lib/libtle_l4p/tcp_ofo.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 107,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2019-07-19T12:44:21Z",
+      "side": 1,
+      "message": "shouldn\u0027t be tcp_seq_leq(seq, end) here?",
+      "revId": "e6abe0460b91b7e999724b26b5260b0bab220c1b",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "00b6b69f_58a88b71",
+        "filename": "lib/libtle_l4p/tcp_ofo.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 109,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2019-07-19T12:44:21Z",
+      "side": 1,
+      "message": "better to do that after the loop.",
+      "revId": "e6abe0460b91b7e999724b26b5260b0bab220c1b",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "27b6617f_31e9c295",
+        "filename": "lib/libtle_l4p/tcp_ofo.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 110,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2019-07-19T12:44:21Z",
+      "side": 1,
+      "message": "as a side note - we use mbuf_trim() and mbuf_adj() all ovet the places, so that is not valid for all cases,\nonly when data to trim/adj fully located in last/first segment.\nFor proper one we need to be able to handle situation when that data spawns over multiple segments.\nI think we need something like: mbuf_get_seg_ofs()/mbuf_cut_seg_ofs()\nat http://git.dpdk.org/dpdk/tree/lib/librte_ipsec/misc.h\nfrom latest dpdk.org.\nThough it probably deserves a separate patch.",
+      "revId": "e6abe0460b91b7e999724b26b5260b0bab220c1b",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "53d02dfe_ab153456",
+        "filename": "lib/libtle_l4p/tcp_ofo.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 154,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2019-07-19T12:44:21Z",
+      "side": 1,
+      "message": "this code (select end, copy mbufs to db) used in 2 places and is nearly identical, probably worth a separate function.",
+      "revId": "e6abe0460b91b7e999724b26b5260b0bab220c1b",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "c6d23760_32049e79",
+        "filename": "lib/libtle_l4p/tcp_ofo.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 163,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2019-07-19T12:44:21Z",
+      "side": 1,
+      "message": "same comments as for block above - I think it need to be leq() here, and trim() could be moved out of the loop.\nAs I said above, I think this block of code worth a separate function.",
+      "revId": "e6abe0460b91b7e999724b26b5260b0bab220c1b",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "3182c1c2_62d61f77",
+        "filename": "lib/libtle_l4p/tcp_ofo.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 166,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2019-07-19T12:44:21Z",
+      "side": 1,
+      "message": "in theory we can have a packet stat spawns across whole db.[pos+1] sequence space and beyond.\nLet say db-\u003esl\u003d{.seq\u003d100, .len\u003d100}, seq\u003d50, pkt_len\u003d1000.\nIn that case we should either split input packet into 2, or remove whole db and create new for input packet.\nThough not sure how realistic is such scenario.",
+      "revId": "e6abe0460b91b7e999724b26b5260b0bab220c1b",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "554f74b7_eb1cffb3",
+        "filename": "lib/libtle_l4p/tcp_ofo.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 202,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2019-07-19T12:44:21Z",
+      "side": 1,
+      "message": "I don\u0027t think we need that if () here.\nif i\u003d\u003d-1, then loop below will not execute: i \u003c n -1 will always be false.",
+      "revId": "e6abe0460b91b7e999724b26b5260b0bab220c1b",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "e31749a0_cea8477e",
+        "filename": "lib/libtle_l4p/tcp_ofo.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 250,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2019-07-19T12:44:21Z",
+      "side": 1,
+      "message": "memmove could be expensive. probably better just hand-maded loop here.",
+      "revId": "e6abe0460b91b7e999724b26b5260b0bab220c1b",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    }
+  ]
+}
