@@ -1,0 +1,72 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "9b842b97_5ac086f9",
+        "filename": "lib/libtle_l4p/misc.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 531,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2019-07-19T15:36:20Z",
+      "side": 1,
+      "message": "here and in trim len fromally should be uint32_t - mbuf-\u003epkt_len is 32bit.",
+      "revId": "80abb140cba76e1731759ba361020a356efd1ea5",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "be112ace_823a9a8c",
+        "filename": "lib/libtle_l4p/misc.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 540,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2019-07-19T15:36:20Z",
+      "side": 1,
+      "message": "the question is what we want to do if len \u003d\u003d m-\u003edata_len?\nDo we want to leave first segment with no data inside the packet, or no?\nI presume we don\u0027t, in that case it should be len \u003e\u003d m-\u003edata_len.",
+      "revId": "80abb140cba76e1731759ba361020a356efd1ea5",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "ccd6d603_9e9c35bc",
+        "filename": "lib/libtle_l4p/misc.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 545,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2019-07-19T15:36:20Z",
+      "side": 1,
+      "message": "one thought here: would be there situation when we do want to copy from header mbuf ol_flags, tx_offload, probably something\nelse?",
+      "revId": "80abb140cba76e1731759ba361020a356efd1ea5",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "b8ba05a3_e783177c",
+        "filename": "lib/libtle_l4p/misc.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 612,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2019-07-19T15:36:20Z",
+      "side": 1,
+      "message": "seems ok, but looks a bit overcomplicated and a bit hard to follow.\nCan I usgget to have common function similar to mbuf_get_seg_ofs() from http://git.dpdk.org/dpdk/tree/lib/librte_ipsec/misc.h\n(we\u0027ll also need uint32_t *seg_idx or so) and use it for both trim() and adj().",
+      "revId": "80abb140cba76e1731759ba361020a356efd1ea5",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    }
+  ]
+}
