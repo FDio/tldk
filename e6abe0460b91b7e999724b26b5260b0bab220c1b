@@ -19,6 +19,24 @@
     },
     {
       "key": {
+        "uuid": "2ebaef3d_b8182a30",
+        "filename": "lib/libtle_l4p/tcp_ofo.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 41,
+      "author": {
+        "id": 1759
+      },
+      "writtenOn": "2019-07-29T07:59:19Z",
+      "side": 1,
+      "message": "Ack",
+      "parentUuid": "0057e8f4_65baffd3",
+      "revId": "e6abe0460b91b7e999724b26b5260b0bab220c1b",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "368cc2ff_c8dd890d",
         "filename": "lib/libtle_l4p/tcp_ofo.h",
         "patchSetId": 1
@@ -30,6 +48,24 @@
       "writtenOn": "2019-07-19T12:44:21Z",
       "side": 1,
       "message": "shouldn\u0027t be tcp_seq_leq(seq, end) here?",
+      "revId": "e6abe0460b91b7e999724b26b5260b0bab220c1b",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "5335d191_c158c4f0",
+        "filename": "lib/libtle_l4p/tcp_ofo.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 107,
+      "author": {
+        "id": 1759
+      },
+      "writtenOn": "2019-07-29T07:59:19Z",
+      "side": 1,
+      "message": "No, if seq\u003d\u003dend, mb[i] is totally overlapped by next ofodb.",
+      "parentUuid": "368cc2ff_c8dd890d",
       "revId": "e6abe0460b91b7e999724b26b5260b0bab220c1b",
       "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
       "unresolved": true
@@ -53,6 +89,24 @@
     },
     {
       "key": {
+        "uuid": "a6022402_58ce8904",
+        "filename": "lib/libtle_l4p/tcp_ofo.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 109,
+      "author": {
+        "id": 1759
+      },
+      "writtenOn": "2019-07-29T07:59:19Z",
+      "side": 1,
+      "message": "OK.",
+      "parentUuid": "00b6b69f_58a88b71",
+      "revId": "e6abe0460b91b7e999724b26b5260b0bab220c1b",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "27b6617f_31e9c295",
         "filename": "lib/libtle_l4p/tcp_ofo.h",
         "patchSetId": 1
@@ -70,6 +124,24 @@
     },
     {
       "key": {
+        "uuid": "1dccfada_040262ad",
+        "filename": "lib/libtle_l4p/tcp_ofo.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 110,
+      "author": {
+        "id": 1759
+      },
+      "writtenOn": "2019-07-29T07:59:19Z",
+      "side": 1,
+      "message": "Yes, we have already committed a separate patch to support multi segment trim/adj.",
+      "parentUuid": "27b6617f_31e9c295",
+      "revId": "e6abe0460b91b7e999724b26b5260b0bab220c1b",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "53d02dfe_ab153456",
         "filename": "lib/libtle_l4p/tcp_ofo.h",
         "patchSetId": 1
@@ -81,6 +153,24 @@
       "writtenOn": "2019-07-19T12:44:21Z",
       "side": 1,
       "message": "this code (select end, copy mbufs to db) used in 2 places and is nearly identical, probably worth a separate function.",
+      "revId": "e6abe0460b91b7e999724b26b5260b0bab220c1b",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "b0990f53_41b08112",
+        "filename": "lib/libtle_l4p/tcp_ofo.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 154,
+      "author": {
+        "id": 1759
+      },
+      "writtenOn": "2019-07-29T07:59:19Z",
+      "side": 1,
+      "message": "Good suggestion. i\u0027ll try to extract it into separate function.",
+      "parentUuid": "53d02dfe_ab153456",
       "revId": "e6abe0460b91b7e999724b26b5260b0bab220c1b",
       "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
       "unresolved": true
@@ -121,6 +211,24 @@
     },
     {
       "key": {
+        "uuid": "cde6f2f2_63557f83",
+        "filename": "lib/libtle_l4p/tcp_ofo.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 166,
+      "author": {
+        "id": 1759
+      },
+      "writtenOn": "2019-07-29T07:59:19Z",
+      "side": 1,
+      "message": "Yes, we have also considered this scenario. In this scenario we\u0027ll lose part of the pkt and need extra retransmission. However this code still works in this scenario. For the scenario is quite rare and the process is a bit complicated, we suggest fix it later in a separate commit.",
+      "parentUuid": "3182c1c2_62d61f77",
+      "revId": "e6abe0460b91b7e999724b26b5260b0bab220c1b",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "554f74b7_eb1cffb3",
         "filename": "lib/libtle_l4p/tcp_ofo.h",
         "patchSetId": 1
@@ -138,6 +246,24 @@
     },
     {
       "key": {
+        "uuid": "c123a3c6_12b24a09",
+        "filename": "lib/libtle_l4p/tcp_ofo.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 202,
+      "author": {
+        "id": 1759
+      },
+      "writtenOn": "2019-07-29T07:59:19Z",
+      "side": 1,
+      "message": "Right.",
+      "parentUuid": "554f74b7_eb1cffb3",
+      "revId": "e6abe0460b91b7e999724b26b5260b0bab220c1b",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "e31749a0_cea8477e",
         "filename": "lib/libtle_l4p/tcp_ofo.h",
         "patchSetId": 1
@@ -149,6 +275,24 @@
       "writtenOn": "2019-07-19T12:44:21Z",
       "side": 1,
       "message": "memmove could be expensive. probably better just hand-maded loop here.",
+      "revId": "e6abe0460b91b7e999724b26b5260b0bab220c1b",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "3c27eee5_f6d9d82f",
+        "filename": "lib/libtle_l4p/tcp_ofo.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 250,
+      "author": {
+        "id": 1759
+      },
+      "writtenOn": "2019-07-29T07:59:19Z",
+      "side": 1,
+      "message": "Ack.",
+      "parentUuid": "e31749a0_cea8477e",
       "revId": "e6abe0460b91b7e999724b26b5260b0bab220c1b",
       "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
       "unresolved": true
