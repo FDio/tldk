@@ -19,6 +19,24 @@
     },
     {
       "key": {
+        "uuid": "e3cdfe50_ce042113",
+        "filename": "lib/libtle_l4p/misc.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 531,
+      "author": {
+        "id": 1759
+      },
+      "writtenOn": "2019-07-29T03:57:37Z",
+      "side": 1,
+      "message": "ack.",
+      "parentUuid": "9b842b97_5ac086f9",
+      "revId": "80abb140cba76e1731759ba361020a356efd1ea5",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "be112ace_823a9a8c",
         "filename": "lib/libtle_l4p/misc.h",
         "patchSetId": 1
@@ -30,6 +48,24 @@
       "writtenOn": "2019-07-19T15:36:20Z",
       "side": 1,
       "message": "the question is what we want to do if len \u003d\u003d m-\u003edata_len?\nDo we want to leave first segment with no data inside the packet, or no?\nI presume we don\u0027t, in that case it should be len \u003e\u003d m-\u003edata_len.",
+      "revId": "80abb140cba76e1731759ba361020a356efd1ea5",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "7969b979_37e5e11d",
+        "filename": "lib/libtle_l4p/misc.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 540,
+      "author": {
+        "id": 1759
+      },
+      "writtenOn": "2019-07-29T03:57:37Z",
+      "side": 1,
+      "message": "right, we also found this issue during further test. should be \u003e\u003d here.",
+      "parentUuid": "be112ace_823a9a8c",
       "revId": "80abb140cba76e1731759ba361020a356efd1ea5",
       "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
       "unresolved": true
@@ -53,6 +89,24 @@
     },
     {
       "key": {
+        "uuid": "eef8c3a4_7defa224",
+        "filename": "lib/libtle_l4p/misc.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 545,
+      "author": {
+        "id": 1759
+      },
+      "writtenOn": "2019-07-29T03:57:37Z",
+      "side": 1,
+      "message": "Right, this function could only be used on mbuf that contains no more info other than data payload. \nIf we do want to copy info from header segment, we would better wrap another function for it introduces extra cost.\nMaybe we should add some comment to remind this.",
+      "parentUuid": "ccd6d603_9e9c35bc",
+      "revId": "80abb140cba76e1731759ba361020a356efd1ea5",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "b8ba05a3_e783177c",
         "filename": "lib/libtle_l4p/misc.h",
         "patchSetId": 1
@@ -67,6 +121,23 @@
       "revId": "80abb140cba76e1731759ba361020a356efd1ea5",
       "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "1ea1e8bc_eacfa3e9",
+        "filename": "lib/libtle_l4p/misc.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 612,
+      "author": {
+        "id": 1759
+      },
+      "writtenOn": "2019-07-29T03:57:37Z",
+      "side": 1,
+      "message": "I also found trim is hard to understand by myself. \nHowever, if we use function like mbuf_get_seg_ofs() in adj(), we have to travel mbuf twice which is not desirable. So i suggest to reimplement trim() like mbuf_get_seg_ofs() and mbuf_cut_seg_ofs().",
+      "revId": "80abb140cba76e1731759ba361020a356efd1ea5",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
     }
   ]
 }
