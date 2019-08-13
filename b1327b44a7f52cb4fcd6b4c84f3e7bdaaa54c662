@@ -1,0 +1,38 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "2ee80432_98452fa6",
+        "filename": "lib/libtle_l4p/misc.h",
+        "patchSetId": 4
+      },
+      "lineNbr": 596,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2019-08-13T11:04:13Z",
+      "side": 1,
+      "message": "I don\u0027t think we need these 2 lines.\npkt_len is valid only for first segment.",
+      "revId": "b1327b44a7f52cb4fcd6b4c84f3e7bdaaa54c662",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "60b75fa4_ca95a6af",
+        "filename": "lib/libtle_l4p/misc.h",
+        "patchSetId": 4
+      },
+      "lineNbr": 601,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2019-08-13T11:04:13Z",
+      "side": 1,
+      "message": "we probably want to set next\u003dNULL for new last segment, something like:\nlast \u003d tmp;\n...\nlast-\u003enext \u003d NULL;\nm-\u003epkt_len -\u003d len;\n...",
+      "revId": "b1327b44a7f52cb4fcd6b4c84f3e7bdaaa54c662",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    }
+  ]
+}
