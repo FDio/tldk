@@ -1,0 +1,8 @@
+Verified+1: fd.io JJB <jobbuilder@projectrotterdam.info>
+Code-Review+2: Konstantin Ananyev <konstantin.ananyev@intel.com>
+Code-Review+1: Jielong Zhou <jielong.zjl@antfin.com>
+Submitted-by: Konstantin Ananyev <konstantin.ananyev@intel.com>
+Submitted-at: Wed, 14 Aug 2019 06:58:03 +0000
+Reviewed-on: https://gerrit.fd.io/r/c/tldk/+/20458
+Project: tldk
+Branch: refs/heads/master
