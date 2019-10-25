@@ -78,7 +78,9 @@
    +----examples
    |      |
    |      +--l4fwd - sample app to demonstrate and test libtle_l4p TCP/UDP
-   |            usage (refer to examples/l4fwd/README for more information)
+   |           | usage (refer to examples/l4fwd/README for more information)
+   |           |
+   |           +--test - functional test scripts for l4fwd app
    |
    +----test - unit-tests
    |      |
