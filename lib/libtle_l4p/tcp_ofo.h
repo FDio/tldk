@@ -289,11 +289,11 @@ _ofodb_enqueue(struct rte_ring *r, const struct ofodb *db, uint32_t *seq)
 	return num - n;
 }
 
-struct ofo *
-tcp_ofo_alloc(uint32_t nbufs, int32_t socket);
+void
+tcp_ofo_calc_elems(uint32_t nbufs, uint32_t *nobj, uint32_t *ndb, uint32_t *sz);
 
 void
-tcp_ofo_free(struct ofo *ofo);
+tcp_ofo_init(struct ofo *ofo, uint32_t nobj, uint32_t ndb);
 
 #ifdef __cplusplus
 }
