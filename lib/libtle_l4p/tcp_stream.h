@@ -150,11 +150,34 @@ struct sdr {
 	STAILQ_HEAD(, tle_stream) be;
 };
 
+/* tempalte sizes/offsets/etc. for tcp stream */
+struct stream_szofs {
+	uint32_t size;
+	struct {
+		uint32_t ofs;
+		uint32_t nb_obj;
+		uint32_t nb_max;
+	} ofo;
+	struct {
+		uint32_t ofs;
+		uint32_t nb_obj;
+	} rxq, txq;
+	struct {
+		uint32_t ofs;
+		uint32_t blk_sz;
+		uint32_t rng_sz;
+		uint32_t nb_rng;
+		uint32_t nb_obj;
+		uint32_t nb_max;
+	} drb;
+};
+
 struct tcp_streams {
 	struct stbl st;
 	struct tle_timer_wheel *tmr; /* timer wheel */
 	struct rte_ring *tsq;        /* to-send streams queue */
 	struct sdr dr;               /* death row for zombie streams */
+	struct stream_szofs szofs;   /* size and offsets for stream data */
 	struct tle_tcp_stream s[];   /* array of allocated streams. */
 };
 
