@@ -19,6 +19,24 @@
     },
     {
       "key": {
+        "uuid": "eb9d85eb_7c82d323",
+        "filename": "examples/l4fwd/Test/config.sh",
+        "patchSetId": 1
+      },
+      "lineNbr": 9,
+      "author": {
+        "id": 1913
+      },
+      "writtenOn": "2019-10-30T12:00:41Z",
+      "side": 1,
+      "message": "Ack",
+      "parentUuid": "d0ec64ac_b395166d",
+      "revId": "3383b7c19acfe6cec0851885f81a42289a3cf85f",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "ccc16a15_85303a76",
         "filename": "examples/l4fwd/Test/config.sh",
         "patchSetId": 1
@@ -30,6 +48,24 @@
       "writtenOn": "2019-10-29T18:20:24Z",
       "side": 1,
       "message": "I think there is some incosistency:\nuser can redefine local addr in nctxrx.sh, but can\u0027t do the same for remote addr, remote mask and tcp port.\nEither need to make all these values hardcoded and stored in one place (not spread across\ndifferent files), or make all of them configurable.\nProbably hardcoded aproach is an easy one.",
+      "revId": "3383b7c19acfe6cec0851885f81a42289a3cf85f",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "a40fa219_3a79b5c9",
+        "filename": "examples/l4fwd/Test/config.sh",
+        "patchSetId": 1
+      },
+      "lineNbr": 12,
+      "author": {
+        "id": 1913
+      },
+      "writtenOn": "2019-10-30T12:00:41Z",
+      "side": 1,
+      "message": "Ack",
+      "parentUuid": "ccc16a15_85303a76",
       "revId": "3383b7c19acfe6cec0851885f81a42289a3cf85f",
       "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
       "unresolved": true
@@ -53,6 +89,24 @@
     },
     {
       "key": {
+        "uuid": "6a46169b_46442ee5",
+        "filename": "examples/l4fwd/Test/config.sh",
+        "patchSetId": 1
+      },
+      "lineNbr": 80,
+      "author": {
+        "id": 1913
+      },
+      "writtenOn": "2019-10-30T12:00:41Z",
+      "side": 1,
+      "message": "That was initial example value, will change that",
+      "parentUuid": "a97f2492_b9a36b5f",
+      "revId": "3383b7c19acfe6cec0851885f81a42289a3cf85f",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "e79f13e7_75e2686b",
         "filename": "examples/l4fwd/Test/config.sh",
         "patchSetId": 1
@@ -64,6 +118,24 @@
       "writtenOn": "2019-10-29T18:20:24Z",
       "side": 1,
       "message": "probably better to use rx_offload\u003d0,tx_offload\u003d0\nthen it will work on all devices, not only ones with HW cksum support.\nit might be a bit slower, but this is a functional test.",
+      "revId": "3383b7c19acfe6cec0851885f81a42289a3cf85f",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "e8eca115_6053a416",
+        "filename": "examples/l4fwd/Test/config.sh",
+        "patchSetId": 1
+      },
+      "lineNbr": 103,
+      "author": {
+        "id": 1913
+      },
+      "writtenOn": "2019-10-30T12:00:41Z",
+      "side": 1,
+      "message": "Ack",
+      "parentUuid": "e79f13e7_75e2686b",
       "revId": "3383b7c19acfe6cec0851885f81a42289a3cf85f",
       "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
       "unresolved": true
@@ -87,6 +159,24 @@
     },
     {
       "key": {
+        "uuid": "6f7ac086_76cbf379",
+        "filename": "examples/l4fwd/Test/config.sh",
+        "patchSetId": 1
+      },
+      "lineNbr": 114,
+      "author": {
+        "id": 1913
+      },
+      "writtenOn": "2019-10-30T12:00:41Z",
+      "side": 1,
+      "message": "Ack",
+      "parentUuid": "f892206a_db982a50",
+      "revId": "3383b7c19acfe6cec0851885f81a42289a3cf85f",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "4c89297b_4356b968",
         "filename": "examples/l4fwd/Test/config.sh",
         "patchSetId": 1
@@ -98,6 +188,24 @@
       "writtenOn": "2019-10-29T18:20:24Z",
       "side": 1,
       "message": "is it really needed?\nuser can also do /bin/bash -x ...",
+      "revId": "3383b7c19acfe6cec0851885f81a42289a3cf85f",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "ac74ea58_9283c346",
+        "filename": "examples/l4fwd/Test/config.sh",
+        "patchSetId": 1
+      },
+      "lineNbr": 152,
+      "author": {
+        "id": 1913
+      },
+      "writtenOn": "2019-10-30T12:00:41Z",
+      "side": 1,
+      "message": "If user do \u0027-x\u0027 it will print a lot more info than with \u0027-v\u0027. I wanted to have a clean output without \u0027-v\u0027, just to print results. With \u0027-v\u0027 I wanted it to still be clean and easily readable. \u0027-x\u0027 is for printing all commands done, but it is not easy to read through. I like it that way, but I can remove it if needed.",
+      "parentUuid": "4c89297b_4356b968",
       "revId": "3383b7c19acfe6cec0851885f81a42289a3cf85f",
       "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
       "unresolved": true
@@ -121,6 +229,24 @@
     },
     {
       "key": {
+        "uuid": "01955c77_f3e709a9",
+        "filename": "examples/l4fwd/Test/config.sh",
+        "patchSetId": 1
+      },
+      "lineNbr": 244,
+      "author": {
+        "id": 1913
+      },
+      "writtenOn": "2019-10-30T12:00:41Z",
+      "side": 1,
+      "message": "Ack",
+      "parentUuid": "d1efc876_924ee2ee",
+      "revId": "3383b7c19acfe6cec0851885f81a42289a3cf85f",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "181420f7_0e3ac3ef",
         "filename": "examples/l4fwd/Test/config.sh",
         "patchSetId": 1
@@ -132,6 +258,24 @@
       "writtenOn": "2019-10-29T18:20:24Z",
       "side": 1,
       "message": "why to do check at all?\nWouldn\u0027t be easier just remove all previous netem setting unconditionally.",
+      "revId": "3383b7c19acfe6cec0851885f81a42289a3cf85f",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "c654f038_cf961472",
+        "filename": "examples/l4fwd/Test/config.sh",
+        "patchSetId": 1
+      },
+      "lineNbr": 246,
+      "author": {
+        "id": 1913
+      },
+      "writtenOn": "2019-10-30T12:00:41Z",
+      "side": 1,
+      "message": "You are right, will change that",
+      "parentUuid": "181420f7_0e3ac3ef",
       "revId": "3383b7c19acfe6cec0851885f81a42289a3cf85f",
       "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
       "unresolved": true
@@ -155,6 +299,24 @@
     },
     {
       "key": {
+        "uuid": "a2e6bcb5_9f5dd560",
+        "filename": "examples/l4fwd/Test/example_env_vars",
+        "patchSetId": 1
+      },
+      "lineNbr": 5,
+      "author": {
+        "id": 1913
+      },
+      "writtenOn": "2019-10-30T12:00:41Z",
+      "side": 1,
+      "message": "Ack",
+      "parentUuid": "5e258b71_3986eaca",
+      "revId": "3383b7c19acfe6cec0851885f81a42289a3cf85f",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "5af04f5c_55e74bea",
         "filename": "examples/l4fwd/Test/nctxrx.sh",
         "patchSetId": 1
@@ -166,6 +328,24 @@
       "writtenOn": "2019-10-29T18:20:24Z",
       "side": 1,
       "message": "might be add \u0027simultaneously\u0027",
+      "revId": "3383b7c19acfe6cec0851885f81a42289a3cf85f",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "085c2836_20b7b15c",
+        "filename": "examples/l4fwd/Test/nctxrx.sh",
+        "patchSetId": 1
+      },
+      "lineNbr": 78,
+      "author": {
+        "id": 1913
+      },
+      "writtenOn": "2019-10-30T12:00:41Z",
+      "side": 1,
+      "message": "Ack",
+      "parentUuid": "5af04f5c_55e74bea",
       "revId": "3383b7c19acfe6cec0851885f81a42289a3cf85f",
       "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
       "unresolved": true
@@ -189,6 +369,24 @@
     },
     {
       "key": {
+        "uuid": "d58f8634_abb0c8c3",
+        "filename": "examples/l4fwd/Test/nctxrx.sh",
+        "patchSetId": 1
+      },
+      "lineNbr": 135,
+      "author": {
+        "id": 1913
+      },
+      "writtenOn": "2019-10-30T12:00:41Z",
+      "side": 1,
+      "message": "Will change that to local predefined file",
+      "parentUuid": "eca86d82_1484dc38",
+      "revId": "3383b7c19acfe6cec0851885f81a42289a3cf85f",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "73965445_66bcabd4",
         "filename": "examples/l4fwd/Test/nctxrx.sh",
         "patchSetId": 1
@@ -200,6 +398,24 @@
       "writtenOn": "2019-10-29T18:20:24Z",
       "side": 1,
       "message": "cksum ${REMOTE_DIR}/${of} ${REMOTE_OUTDIR}/${of}.out.${i}\nwould be better - user will see stragithway that cksums differ.",
+      "revId": "3383b7c19acfe6cec0851885f81a42289a3cf85f",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "41db0de2_7d2fc9eb",
+        "filename": "examples/l4fwd/Test/nctxrx.sh",
+        "patchSetId": 1
+      },
+      "lineNbr": 250,
+      "author": {
+        "id": 1913
+      },
+      "writtenOn": "2019-10-30T12:00:41Z",
+      "side": 1,
+      "message": "Ack",
+      "parentUuid": "73965445_66bcabd4",
       "revId": "3383b7c19acfe6cec0851885f81a42289a3cf85f",
       "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
       "unresolved": true
@@ -223,6 +439,24 @@
     },
     {
       "key": {
+        "uuid": "7ceadebf_091ed9fc",
+        "filename": "examples/l4fwd/Test/nctxrx.sh",
+        "patchSetId": 1
+      },
+      "lineNbr": 283,
+      "author": {
+        "id": 1913
+      },
+      "writtenOn": "2019-10-30T12:00:41Z",
+      "side": 1,
+      "message": "They are copied to results.out when update_results() is invoked (with some editing).",
+      "parentUuid": "b5e90a79_0a617292",
+      "revId": "3383b7c19acfe6cec0851885f81a42289a3cf85f",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "25817fab_13ecb47d",
         "filename": "examples/l4fwd/Test/run_test.sh",
         "patchSetId": 1
@@ -234,6 +468,24 @@
       "writtenOn": "2019-10-29T18:22:40Z",
       "side": 1,
       "message": "could you remind me, while there seems no point to increase reorder percentage?",
+      "revId": "3383b7c19acfe6cec0851885f81a42289a3cf85f",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "226a7efb_51917335",
+        "filename": "examples/l4fwd/Test/run_test.sh",
+        "patchSetId": 1
+      },
+      "lineNbr": 29,
+      "author": {
+        "id": 1913
+      },
+      "writtenOn": "2019-10-30T12:00:41Z",
+      "side": 1,
+      "message": "It is not the percentage. When reorder is set to 5, it means that every 5\u0027th segment will be send before preceding 4 (5\u003c-1\u003c-2\u003c-3\u003c-4\u003c-10\u003c-6\u003c-7\u003c-8\u003c-9). Initially I thought it only makes sense for low numbers like 3, but I was mistaken. Of course to some extent (bigger numbers will test bigger ofo buffers). For now, it is set to be exact n\u0027th segment to be reordered, but we can change it to be more real life case, where there is some probability involved.",
+      "parentUuid": "25817fab_13ecb47d",
       "revId": "3383b7c19acfe6cec0851885f81a42289a3cf85f",
       "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
       "unresolved": true
@@ -257,6 +509,24 @@
     },
     {
       "key": {
+        "uuid": "8b660145_7e43ce61",
+        "filename": "examples/l4fwd/Test/run_test.sh",
+        "patchSetId": 1
+      },
+      "lineNbr": 30,
+      "author": {
+        "id": 1913
+      },
+      "writtenOn": "2019-10-30T12:00:41Z",
+      "side": 1,
+      "message": "Ack",
+      "parentUuid": "9c71497b_6a828ede",
+      "revId": "3383b7c19acfe6cec0851885f81a42289a3cf85f",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "fb2b87f1_5849dfb7",
         "filename": "examples/l4fwd/Test/run_test.sh",
         "patchSetId": 1
@@ -274,6 +544,24 @@
     },
     {
       "key": {
+        "uuid": "b67d971c_6653ba84",
+        "filename": "examples/l4fwd/Test/run_test.sh",
+        "patchSetId": 1
+      },
+      "lineNbr": 70,
+      "author": {
+        "id": 1913
+      },
+      "writtenOn": "2019-10-30T12:00:41Z",
+      "side": 1,
+      "message": "Must be leftover from using vim. Will change that.",
+      "parentUuid": "fb2b87f1_5849dfb7",
+      "revId": "3383b7c19acfe6cec0851885f81a42289a3cf85f",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "a79ea8b1_9fb434ce",
         "filename": "examples/l4fwd/Test/run_test.sh",
         "patchSetId": 1
@@ -285,6 +573,24 @@
       "writtenOn": "2019-10-29T18:20:24Z",
       "side": 1,
       "message": "wonder why reorder and and loss are mutuallye exclusive?\nWhy we can\u0027t run reorder tests first, then loss tests?\nSame as for ipv4/ipv6?\nmight be better - by default no loss/reorder?\nREORDERS\u003d\"0\", LOSSES\u003d\"0\"\nif -r - add reorders, if -l - add losses\n?",
+      "revId": "3383b7c19acfe6cec0851885f81a42289a3cf85f",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "429b2397_86ca17c2",
+        "filename": "examples/l4fwd/Test/run_test.sh",
+        "patchSetId": 1
+      },
+      "lineNbr": 75,
+      "author": {
+        "id": 1913
+      },
+      "writtenOn": "2019-10-30T12:00:41Z",
+      "side": 1,
+      "message": "For now reorder and loss tests are on by default. So when user runs script it will perform all tests. For IP protocol there is no default value, so the user must specify which one to invoke (or both) - they are not exclusive. I have added exclusive tests possibility (for reorder and loss) to:\n1) limit the options needs to be passed to invoke tests (no -l/r means all tests)\n2) have a possibility to run and test only one group of tests\n3) it can be useful when we decide to extend test cases (like add duplicate segments tests), so invoking as usual will run all tests",
+      "parentUuid": "a79ea8b1_9fb434ce",
       "revId": "3383b7c19acfe6cec0851885f81a42289a3cf85f",
       "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
       "unresolved": true
