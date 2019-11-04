@@ -125,7 +125,7 @@ LDLIBS += -lstdc++
 LDLIBS += -L$(GMOCK_DIR) -L$(GMOCK_DIR)/../lib -lgmock
 LDLIBS += -L$(GMOCK_DIR)/gtest -L$(GMOCK_DIR)/../lib -lgtest
 LDLIBS += -L$(RTE_OUTPUT)/lib
-LDLIBS += -whole-archive -ltle_l4p -ltle_dring -ltle_timer
+LDLIBS += -whole-archive -ltle_l4p -ltle_dring -ltle_memtank -ltle_timer
 
 include $(TLDK_ROOT)/mk/tle.app.mk
 endif
