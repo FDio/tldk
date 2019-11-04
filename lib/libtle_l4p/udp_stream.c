@@ -170,6 +170,7 @@ udp_init_streams(struct tle_ctx *ctx)
 		}
 	}
 
+	ctx->streams.nb_free = ctx->prm.max_streams;
 	return 0;
 }
 

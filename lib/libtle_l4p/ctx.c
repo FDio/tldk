@@ -116,8 +116,6 @@ tle_ctx_create(const struct tle_ctx_param *ctx_prm)
 	for (i = 0; i != RTE_DIM(ctx->use); i++)
 		tle_pbm_init(ctx->use + i, LPORT_START_BLK);
 
-	ctx->streams.nb_free = ctx->prm.max_streams;
-
 	/* Initialization of siphash state is done here to speed up the
 	 * fastpath processing.
 	 */
