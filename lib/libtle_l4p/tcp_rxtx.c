@@ -947,15 +947,15 @@ rx_ack_listen(struct tle_tcp_stream *s, struct stbl *st,
 		return rc;
 
 	/* allocate new stream */
-	ts = get_stream(ctx);
-	cs = TCP_STREAM(ts);
-	if (ts == NULL)
+	cs = tcp_stream_get(ctx, 0);
+	if (cs == NULL)
 		return ENFILE;
 
 	/* prepare stream to handle new connection */
 	if (accept_prep_stream(s, st, cs, &to, tms, pi, si) == 0) {
 
 		/* put new stream in the accept queue */
+		ts = &cs->s;
 		if (_rte_ring_enqueue_burst(s->rx.q,
 				(void * const *)&ts, 1) == 1) {
 			*csp = cs;
@@ -1951,11 +1951,14 @@ tle_tcp_stream_accept(struct tle_stream *ts, struct tle_stream *rs[],
 {
 	uint32_t n;
 	struct tle_tcp_stream *s;
+	struct tle_memtank *mts;
 
 	s = TCP_STREAM(ts);
 	n = _rte_ring_dequeue_burst(s->rx.q, (void **)rs, num);
 	if (n == 0)
 		return 0;
+
+	mts = CTX_TCP_MTS(ts->ctx);
 
 	/*
 	 * if we still have packets to read,
@@ -1967,6 +1970,7 @@ tle_tcp_stream_accept(struct tle_stream *ts, struct tle_stream *rs[],
 		tcp_stream_release(s);
 	}
 
+	tle_memtank_grow(mts);
 	return n;
 }
 

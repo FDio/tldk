@@ -95,6 +95,8 @@ init_context(struct tldk_ctx *tcx, const struct tldk_ctx_conf *cf,
 	cprm.socket_id = sid;
 	cprm.proto = TLE_PROTO_TCP;
 	cprm.max_streams = cf->nb_stream;
+	cprm.free_streams.min = cf->free_streams.nb_min;
+	cprm.free_streams.max = cf->free_streams.nb_max;
 	cprm.max_stream_rbufs = cf->nb_rbuf;
 	cprm.max_stream_sbufs = cf->nb_sbuf;
 	if (cf->be_in_worker != 0)
