@@ -38,6 +38,7 @@ CFLAGS += -I$(RTE_OUTPUT)/include
 
 LDLIBS += -L$(RTE_OUTPUT)/lib
 LDLIBS += -ltle_l4p
+LDLIBS += -ltle_memtank
 LDLIBS += -ltle_timer
 
 EXTRA_CFLAGS += -O3

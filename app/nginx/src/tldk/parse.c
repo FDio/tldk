@@ -413,6 +413,18 @@ tldk_ctx_parse(ngx_conf_t *cf, ngx_command_t *dummy, void *conf)
 					&pvl) < 0)
 			return NGX_CONF_ERROR;
 		tcx->nb_stream = pvl.u64;
+	} else if (ngx_strcmp(v[0].data, "min_free_streams") == 0) {
+		if (cf->args->nelts != 2 ||
+				parse_uint_val((const char *)v[1].data,
+					&pvl) < 0)
+			return NGX_CONF_ERROR;
+		tcx->free_streams.nb_min = pvl.u64;
+	} else if (ngx_strcmp(v[0].data, "max_free_streams") == 0) {
+		if (cf->args->nelts != 2 ||
+				parse_uint_val((const char *)v[1].data,
+					&pvl) < 0)
+			return NGX_CONF_ERROR;
+		tcx->free_streams.nb_max = pvl.u64;
 	} else if (ngx_strcmp(v[0].data, "rbufs") == 0) {
 		if (cf->args->nelts != 2 ||
 				parse_uint_val((const char *)v[1].data,

@@ -18,6 +18,7 @@
 
 #include <rte_vect.h>
 #include <tle_dring.h>
+#include <tle_memtank.h>
 #include <tle_tcp.h>
 #include <tle_event.h>
 
@@ -176,9 +177,9 @@ struct tcp_streams {
 	struct stbl st;
 	struct tle_timer_wheel *tmr; /* timer wheel */
 	struct rte_ring *tsq;        /* to-send streams queue */
+	struct tle_memtank *mts;     /* memtank to allocate streams from */
 	struct sdr dr;               /* death row for zombie streams */
 	struct stream_szofs szofs;   /* size and offsets for stream data */
-	struct tle_tcp_stream s[];   /* array of allocated streams. */
 };
 
 #define CTX_TCP_STREAMS(ctx)	((struct tcp_streams *)(ctx)->streams.buf)
@@ -186,6 +187,7 @@ struct tcp_streams {
 #define CTX_TCP_TMWHL(ctx)	(CTX_TCP_STREAMS(ctx)->tmr)
 #define CTX_TCP_TSQ(ctx)	(CTX_TCP_STREAMS(ctx)->tsq)
 #define CTX_TCP_SDR(ctx)	(&CTX_TCP_STREAMS(ctx)->dr)
+#define CTX_TCP_MTS(ctx)	(CTX_TCP_STREAMS(ctx)->mts)
 
 #ifdef __cplusplus
 }
