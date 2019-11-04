@@ -1239,9 +1239,10 @@ if [ $USE_TLDK = YES ]; then
                      src/tldk/tldk_event.c
                      src/tldk/parse.c"
     ngx_module_libs="-L${TLDK_ROOT}/${RTE_TARGET}/lib -Wl,--whole-archive
-                     -ltle_l4p -ltle_dring -ltle_timer -Wl,--no-whole-archive
-                     -L${RTE_SDK}/${RTE_TARGET}/lib -Wl,--whole-archive -ldpdk
-                     -lm -lpcap -lnuma -Wl,--no-whole-archive"
+                     -ltle_l4p -ltle_dring -ltle_memtank -ltle_timer
+                     -Wl,--no-whole-archive -L${RTE_SDK}/${RTE_TARGET}/lib
+                     -Wl,--whole-archive -ldpdk -lm -lpcap -lnuma
+                     -Wl,--no-whole-archive"
     ngx_module_link=YES
     ngx_module_order=
 

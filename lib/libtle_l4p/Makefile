@@ -48,6 +48,7 @@ SYMLINK-y-include += tle_udp.h
 
 # this lib dependencies
 DEPDIRS-y += lib/libtle_misc
+DEPDIRS-y += lib/libtle_memtank
 DEPDIRS-y += lib/libtle_dring
 DEPDIRS-y += lib/libtle_timer
 
