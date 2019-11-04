@@ -86,6 +86,10 @@ struct tldk_ctx_conf {
 	uint32_t lcore;
 	uint32_t nb_mbuf;
 	uint32_t nb_stream;
+	struct {
+		uint32_t nb_min;
+		uint32_t nb_max;
+	} free_streams;
 	uint32_t nb_rbuf;
 	uint32_t nb_sbuf;
 	uint32_t nb_dev;

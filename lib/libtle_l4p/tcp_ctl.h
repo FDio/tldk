@@ -143,10 +143,10 @@ empty_lq(struct tle_tcp_stream *s)
 static inline void
 tcp_stream_reset(struct tle_ctx *ctx, struct tle_tcp_stream *s)
 {
-	struct stbl *st;
 	uint16_t uop;
+	struct tcp_streams *ts;
 
-	st = CTX_TCP_STLB(ctx);
+	ts = CTX_TCP_STREAMS(ctx);
 
 	/* reset TX armed */
 	rte_atomic32_set(&s->tx.arm, 0);
@@ -167,7 +167,7 @@ tcp_stream_reset(struct tle_ctx *ctx, struct tle_tcp_stream *s)
 
 	if (s->ste != NULL) {
 		/* remove entry from RX streams table */
-		stbl_del_stream(st, s->ste, s,
+		stbl_del_stream(&ts->st, s->ste, s,
 			(s->flags & TLE_CTX_FLAG_ST) == 0);
 		s->ste = NULL;
 		empty_rq(s);
@@ -181,7 +181,36 @@ tcp_stream_reset(struct tle_ctx *ctx, struct tle_tcp_stream *s)
 	 * if there still are pkts queued for TX,
 	 * then put this stream to the tail of free list.
 	 */
-	put_stream(ctx, &s->s, TCP_STREAM_TX_FINISHED(s));
+	if (TCP_STREAM_TX_PENDING(s)) 
+		put_stream(ctx, &s->s, 0);
+	else {
+		s->s.type = TLE_VNUM;
+		tle_memtank_free(ts->mts, (void **)&s, 1, 0);
+	}
+}
+
+static inline struct tle_tcp_stream *
+tcp_stream_get(struct tle_ctx *ctx, uint32_t flag)
+{
+	struct tle_stream *s;
+	struct tle_tcp_stream *cs;
+	struct tcp_streams *ts;
+
+	ts = CTX_TCP_STREAMS(ctx);
+	
+	/* check TX pending list */
+	s = get_stream(ctx);
+	cs = TCP_STREAM(s);
+	if (s != NULL) {
+		if (TCP_STREAM_TX_FINISHED(cs))
+			return cs;
+		put_stream(ctx, &cs->s, 0);
+	}
+
+	if (tle_memtank_alloc(ts->mts, (void **)&cs, 1, flag) != 1)
+		return NULL;
+
+	return cs;
 }
 
 #ifdef __cplusplus
