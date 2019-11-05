@@ -300,6 +300,24 @@
     },
     {
       "key": {
+        "uuid": "29d11253_6f39b6c2",
+        "filename": "examples/l4fwd/Test/config.sh",
+        "patchSetId": 1
+      },
+      "lineNbr": 246,
+      "author": {
+        "id": 1913
+      },
+      "writtenOn": "2019-11-05T13:09:33Z",
+      "side": 1,
+      "message": "When I remove checks, and netem was not set on a machine previously, it will report error, which may mislead user that something is wrong. That is why there was that check in the first place - as I remember now.",
+      "parentUuid": "c654f038_cf961472",
+      "revId": "3383b7c19acfe6cec0851885f81a42289a3cf85f",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "5e258b71_3986eaca",
         "filename": "examples/l4fwd/Test/example_env_vars",
         "patchSetId": 1
