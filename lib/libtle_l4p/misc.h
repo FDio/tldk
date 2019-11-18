@@ -16,11 +16,33 @@
 #ifndef _MISC_H_
 #define _MISC_H_
 
+#include <tle_stats.h>
 #include <tle_dpdk_wrapper.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+union typflg {
+	uint16_t raw;
+	struct {
+		uint8_t type;  /* TLE_V4/TLE_V6 */
+		uint8_t flags; /* TCP header flags */
+	};
+};
+
+union pkt_info {
+	rte_xmm_t raw;
+	struct {
+		union typflg tf;
+		uint16_t csf;  /* checksum flags */
+		union l4_ports port;
+		union {
+			union ipv4_addrs addr4;
+			const union ipv6_addrs *addr6;
+		};
+	};
+};
 
 static inline int
 xmm_cmp(const rte_xmm_t *da, const rte_xmm_t *sa)
@@ -286,43 +308,41 @@ _ipv4x_cksum(const void *iph, size_t len)
 	return (cksum == 0xffff) ? cksum : ~cksum;
 }
 
-/*
- * helper function to check csum.
- */
 static inline int
-check_pkt_csum(const struct rte_mbuf *m, uint64_t ol_flags, uint32_t type,
-	uint32_t proto)
+check_pkt_csum(const struct rte_mbuf *m, uint32_t type, uint32_t proto)
 {
 	const struct ipv4_hdr *l3h4;
 	const struct ipv6_hdr *l3h6;
 	const struct udp_hdr *l4h;
-	uint64_t fl3, fl4;
-	uint16_t csum;
 	int32_t ret;
-
-	fl4 = ol_flags & PKT_RX_L4_CKSUM_MASK;
-	fl3 = (type == TLE_V4) ?
-		(ol_flags & PKT_RX_IP_CKSUM_MASK) : PKT_RX_IP_CKSUM_GOOD;
+	uint16_t csum;
+	uint64_t ol_flags = m->ol_flags;
 
 	/* case 0: both ip and l4 cksum is verified or data is valid */
-	if ((fl3 | fl4) == (PKT_RX_IP_CKSUM_GOOD | PKT_RX_L4_CKSUM_GOOD))
+	if ((ol_flags & PKT_RX_IP_CKSUM_GOOD) &&
+	    (ol_flags & PKT_RX_L4_CKSUM_GOOD))
 		return 0;
 
 	/* case 1: either ip or l4 cksum bad */
-	if (fl3 == PKT_RX_IP_CKSUM_BAD || fl4 == PKT_RX_L4_CKSUM_BAD)
+	if ((ol_flags & PKT_RX_IP_CKSUM_MASK) == PKT_RX_IP_CKSUM_BAD)
+		return 1;
+
+	if ((ol_flags & PKT_RX_L4_CKSUM_MASK) == PKT_RX_L4_CKSUM_BAD)
 		return 1;
 
 	/* case 2: either ip or l4 or both cksum is unknown */
+	ret = 0;
 	l3h4 = rte_pktmbuf_mtod_offset(m, const struct ipv4_hdr *, m->l2_len);
 	l3h6 = rte_pktmbuf_mtod_offset(m, const struct ipv6_hdr *, m->l2_len);
 
-	ret = 0;
-	if (fl3 == PKT_RX_IP_CKSUM_UNKNOWN && l3h4->hdr_checksum != 0) {
+	if ((ol_flags & PKT_RX_IP_CKSUM_MASK) == PKT_RX_IP_CKSUM_UNKNOWN &&
+			l3h4->hdr_checksum != 0) {
 		csum = _ipv4x_cksum(l3h4, m->l3_len);
 		ret = (csum != UINT16_MAX);
 	}
 
-	if (ret == 0 && fl4 == PKT_RX_L4_CKSUM_UNKNOWN) {
+	if (ret == 0 && (ol_flags & PKT_RX_L4_CKSUM_MASK) ==
+			PKT_RX_L4_CKSUM_UNKNOWN) {
 
 		/*
 		 * for IPv4 it is allowed to have zero UDP cksum,
@@ -376,8 +396,20 @@ rwl_acquire(rte_atomic32_t *p)
 static inline void
 rwl_down(rte_atomic32_t *p)
 {
-	 while (rte_atomic32_cmpset((volatile uint32_t *)p, 0, INT32_MIN) == 0)
+	while (rte_atomic32_cmpset((volatile uint32_t *)p, 0, INT32_MIN) == 0)
 		rte_pause();
+}
+
+static inline int
+rwl_try_down(rte_atomic32_t *p)
+{
+	while (rte_atomic32_cmpset((volatile uint32_t *)p, 0, INT32_MIN) == 0) {
+		/* Already down */
+		if (rte_atomic32_read(p) == INT32_MIN)
+			return -1;
+		rte_pause();
+	}
+	return 0;
 }
 
 static inline void

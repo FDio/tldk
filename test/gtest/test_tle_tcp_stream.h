@@ -41,6 +41,8 @@ static struct tle_ctx_param ctx_prm_tmpl = {
 	.socket_id = SOCKET_ID_ANY,
 	.proto = TLE_PROTO_TCP,
 	.max_streams = MAX_STREAMS,
+	.min_streams = MAX_STREAMS,
+	.delta_streams = 0,
 	.max_stream_rbufs = MAX_STREAM_RBUFS,
 	.max_stream_sbufs = MAX_STREAM_SBUFS,
 };

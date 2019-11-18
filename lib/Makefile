@@ -25,5 +25,6 @@ DIRS-y += libtle_misc
 DIRS-y += libtle_dring
 DIRS-y += libtle_timer
 DIRS-y += libtle_l4p
+DIRS-y += libtle_glue
 
 include $(TLDK_ROOT)/mk/tle.subdir.mk

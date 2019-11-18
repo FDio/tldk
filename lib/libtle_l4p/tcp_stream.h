@@ -17,6 +17,8 @@
 #define _TCP_STREAM_H_
 
 #include <rte_vect.h>
+#include <rte_mbuf.h>
+
 #include <tle_dring.h>
 #include <tle_tcp.h>
 #include <tle_event.h>
@@ -45,23 +47,28 @@ enum {
 };
 
 enum {
-	TCP_OP_LISTEN =  0x1,
-	TCP_OP_ACCEPT =  0x2,
-	TCP_OP_CONNECT = 0x4,
-	TCP_OP_CLOSE =   0x8,
+	TCP_OP_LISTEN =		0x1,
+	TCP_OP_ACCEPT =		0x2,
+	TCP_OP_CONNECT =	0x4,
+	TCP_OP_CLOSE =		0x8,
+	TCP_OP_RESET =		0x10,
+	TCP_OP_KEEPALIVE =	0x20
 };
 
 struct tcb {
+	int err;
 	volatile uint16_t state;
 	volatile uint16_t uop; /* operations by user performed */
 	struct {
 		uint32_t nxt;
+		uint32_t cpy; /* head of yet unread data */
 		uint32_t irs; /* initial received sequence */
 		uint32_t wnd;
 		uint32_t ts;
 		struct {
 			uint32_t seq;
-			uint32_t on;
+			uint32_t on; /* on == 1: received an out-of-order fin
+				      * on == 2: received an in order fin */
 		} frs;
 		uint32_t srtt;   /* smoothed round trip time (scaled by >> 3) */
 		uint32_t rttvar; /* rtt variance */
@@ -83,13 +90,30 @@ struct tcb {
 		uint32_t ssthresh; /* slow start threshold */
 		uint32_t rto;      /* retransmission timeout */
 		uint32_t rto_tw;   /* TIME_WAIT retransmission timeout */
+		uint32_t rto_fw;   /* FIN_WAIT_2 waiting timeout */
 		uint32_t iss;      /* initial send sequence */
+		uint32_t waitlen;  /* total length of unacknowledged pkt */
+		uint32_t cork_ts;
 		uint16_t mss;
 		uint8_t  wscale;
 		uint8_t nb_retx; /* number of retransmission */
 		uint8_t nb_retm; /**< max number of retx attempts. */
+		uint8_t nb_keepalive;/* number of sended keepalive */
+		bool     update_rcv; /* Flag for updating recv window */
+		uint16_t nxt_offset; /* Partial tx, next data of a segment to tx */
+		uint32_t una_offset; /* Partial ack, next data of a mbuf to ack */
+		struct rte_mbuf *nxt_pkt; /* Partial tx, next segment to send */
 	} snd;
 	struct syn_opts so; /* initial syn options. */
+};
+
+enum {
+	TIMER_RTO,
+	TIMER_DACK,
+	TIMER_KEEPALIVE,
+	TIMER_NUM,
+	TIMER_MAX_NUM = 8,
+	TIMER_MASK = TIMER_MAX_NUM - 1
 };
 
 struct tle_tcp_stream {
@@ -103,7 +127,7 @@ struct tle_tcp_stream {
 	struct tcb tcb;
 
 	struct {
-		void *handle;
+		void *handle[TIMER_NUM];
 	} timer;
 
 	struct {
@@ -155,7 +179,6 @@ struct tcp_streams {
 	struct tle_timer_wheel *tmr; /* timer wheel */
 	struct rte_ring *tsq;        /* to-send streams queue */
 	struct sdr dr;               /* death row for zombie streams */
-	struct tle_tcp_stream s[];   /* array of allocated streams. */
 };
 
 #define CTX_TCP_STREAMS(ctx)	((struct tcp_streams *)(ctx)->streams.buf)

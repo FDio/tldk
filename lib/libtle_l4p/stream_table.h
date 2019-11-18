@@ -16,199 +16,415 @@
 #ifndef _STREAM_TABLE_H_
 #define _STREAM_TABLE_H_
 
+#include <string.h>
 #include <rte_hash.h>
-#include "tcp_misc.h"
+#include "stream.h"
+#include "misc.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+#define HASH_SIZE_32K 32771
+#define HASH_SIZE_64K 65537
+#define HASH_SIZE_128K 131071
+
+#define HASH_SIZE HASH_SIZE_64K
+
 struct stbl_entry {
 	void *data;
 };
 
-struct shtbl {
-	uint32_t nb_ent;  /* max number of entries in the table. */
-	rte_spinlock_t l; /* lock to protect the hash table */
-	struct rte_hash *t;
-	struct stbl_entry *ent;
+struct stbl {
+	rte_spinlock_t l;
+	uint32_t need_lock;
+	struct stbl_entry head[HASH_SIZE];
 } __rte_cache_aligned;
 
-struct stbl {
-	struct shtbl ht[TLE_VNUM];
-};
-
-struct stbl4_key {
-	union l4_ports port;
-	union ipv4_addrs addr;
-} __attribute__((__packed__));
-
-struct stbl6_key {
-	union l4_ports port;
-	union ipv6_addrs addr;
-} __attribute__((__packed__));
-
-struct stbl_key {
-	union l4_ports port;
-	union {
-		union ipv4_addrs addr4;
-		union ipv6_addrs addr6;
-	};
-} __attribute__((__packed__));
-
-extern void stbl_fini(struct stbl *st);
-
-extern int stbl_init(struct stbl *st, uint32_t num, int32_t socket);
-
-static inline void
-stbl_pkt_fill_key(struct stbl_key *k, const union pkt_info *pi, uint32_t type)
+static inline int
+stbl_init(struct stbl *st, uint32_t lock)
 {
-	static const struct stbl_key zero = {
-		.port.raw = 0,
-	};
-
-	k->port = pi->port;
-	if (type == TLE_V4)
-		k->addr4 = pi->addr4;
-	else if (type == TLE_V6)
-		k->addr6 = *pi->addr6;
-	else
-		*k = zero;
+	st->need_lock = lock;
+	return 0;
 }
 
-static inline void
-stbl_lock(struct stbl *st, uint32_t type)
+static inline int
+stbl_fini(struct stbl *st)
 {
-	rte_spinlock_lock(&st->ht[type].l);
+	st->need_lock = 0;
+	return 0;
 }
 
-static inline void
-stbl_unlock(struct stbl *st, uint32_t type)
+static inline uint8_t
+compare_pkt(const struct tle_stream *s, const union pkt_info *pi)
 {
-	rte_spinlock_unlock(&st->ht[type].l);
+	if (s->type != pi->tf.type)
+		return -1;
+
+	if (s->port.raw != pi->port.raw)
+		return -1;
+
+	if (s->type == TLE_V4) {
+		if (s->ipv4.addr.raw != pi->addr4.raw)
+			return -1;
+	} else {
+		if (memcmp(&s->ipv6.addr, pi->addr6, sizeof(union ipv6_addrs)))
+			return -1;
+	}
+
+	return 0;
 }
 
-static inline struct stbl_entry *
-stbl_add_entry(struct stbl *st, const union pkt_info *pi)
+static inline uint32_t
+stbl_hash_stream(const struct tle_stream *s)
 {
-	int32_t rc;
-	uint32_t type;
-	struct shtbl *ht;
-	struct stbl_key k;
+	int i;
+	unsigned int hash;
 
-	type = pi->tf.type;
-	stbl_pkt_fill_key(&k, pi, type);
-	ht = st->ht + type;
+	if (s->type == TLE_V4) {
+		hash = s->ipv4.addr.src ^ s->ipv4.addr.dst
+				^ s->port.src ^ s->port.dst;
+	} else {
+		hash = s->port.src ^ s->port.dst;
+		for (i = 0; i < 4; i++) {
+			hash ^= s->ipv6.addr.src.u32[i];
+			hash ^= s->ipv6.addr.dst.u32[i];
+		}
+	}
 
-	rc = rte_hash_add_key(ht->t, &k);
-	if ((uint32_t)rc >= ht->nb_ent)
-		return NULL;
-	return ht->ent + rc;
+	return hash % HASH_SIZE;
 }
 
-static inline struct stbl_entry *
-stbl_add_stream(struct stbl *st, const union pkt_info *pi, const void *s)
+static inline uint32_t
+stbl_hash_pkt(const union pkt_info* pi)
 {
-	struct stbl_entry *se;
+	int i;
+	unsigned int hash;
 
-	se = stbl_add_entry(st, pi);
-	if (se != NULL)
-		se->data = (void *)(uintptr_t)s;
-	return se;
+	if (pi->tf.type == TLE_V4) {
+		hash = pi->addr4.src ^ pi->addr4.dst ^ pi->port.src ^ pi->port.dst;
+	} else {
+		hash = pi->port.src ^ pi->port.dst;
+		for (i = 0; i < 4; i++) {
+			hash ^= pi->addr6->src.u32[i];
+			hash ^= pi->addr6->dst.u32[i];
+		}
+	}
+
+	return hash % HASH_SIZE;
 }
 
-static inline struct stbl_entry *
-stbl_find_entry(struct stbl *st, const union pkt_info *pi)
+static inline struct stbl_entry*
+stbl_add_stream(struct stbl *st, struct tle_stream *s)
 {
-	int32_t rc;
-	uint32_t type;
-	struct shtbl *ht;
-	struct stbl_key k;
+	struct stbl_entry* entry;
 
-	type = pi->tf.type;
-	stbl_pkt_fill_key(&k, pi, type);
-	ht = st->ht + type;
+	if (st->need_lock)
+		rte_spinlock_lock(&st->l);
+	entry = &st->head[stbl_hash_stream(s)];
+	s->link.stqe_next = (struct tle_stream*)entry->data;
+	entry->data = s;
+	if (st->need_lock)
+		rte_spinlock_unlock(&st->l);
 
-	rc = rte_hash_lookup(ht->t, &k);
-	if ((uint32_t)rc >= ht->nb_ent)
-		return NULL;
-	return ht->ent + rc;
+	return entry;
 }
 
-static inline void *
-stbl_find_data(struct stbl *st, const union pkt_info *pi)
+static inline struct tle_stream *
+stbl_find_stream(struct stbl *st, const union pkt_info *pi)
 {
-	struct stbl_entry *ent;
+	struct tle_stream* head;
 
-	ent = stbl_find_entry(st, pi);
-	return (ent == NULL) ? NULL : ent->data;
-}
+	if (st->need_lock)
+		rte_spinlock_lock(&st->l);
+	head = (struct tle_stream*)st->head[stbl_hash_pkt(pi)].data;
+	while (head != NULL) {
+		if (compare_pkt(head, pi) == 0)
+			break;
 
-#include "tcp_stream.h"
-
-static inline void
-stbl_stream_fill_key(struct stbl_key *k, const struct tle_stream *s,
-	uint32_t type)
-{
-	static const struct stbl_key zero = {
-		.port.raw = 0,
-	};
-
-	k->port = s->port;
-	if (type == TLE_V4)
-		k->addr4 = s->ipv4.addr;
-	else if (type == TLE_V6)
-		k->addr6 = s->ipv6.addr;
-	else
-		*k = zero;
-}
-
-static inline struct stbl_entry *
-stbl_add_stream_lock(struct stbl *st, const struct tle_tcp_stream *s)
-{
-	uint32_t type;
-	struct stbl_key k;
-	struct stbl_entry *se;
-	struct shtbl *ht;
-	int32_t rc;
-
-	type = s->s.type;
-	stbl_stream_fill_key(&k, &s->s, type);
-	ht = st->ht + type;
-
-	stbl_lock(st, type);
-	rc = rte_hash_add_key(ht->t, &k);
-	stbl_unlock(st, type);
-
-	if ((uint32_t)rc >= ht->nb_ent)
-		return NULL;
-
-	se = ht->ent + rc;
-	if (se != NULL)
-		se->data = (void *)(uintptr_t)s;
-
-	return se;
+		head = head->link.stqe_next;
+	}
+	if (st->need_lock)
+		rte_spinlock_unlock(&st->l);
+	return head;
 }
 
 static inline void
 stbl_del_stream(struct stbl *st, struct stbl_entry *se,
-	const struct tle_tcp_stream *s, uint32_t lock)
+		struct tle_stream *s)
 {
-	uint32_t type;
-	struct stbl_key k;
+	struct tle_stream *prev, *current;
 
+	if (st->need_lock)
+		rte_spinlock_lock(&st->l);
 	if (se == NULL)
+		se = &st->head[stbl_hash_stream(s)];
+	prev = NULL;
+	current = (struct tle_stream*)se->data;
+	while (current != NULL) {
+		if (current != s) {
+			prev = current;
+			current = current->link.stqe_next;
+			continue;
+		}
+
+		if (prev)
+			prev->link.stqe_next = current->link.stqe_next;
+		else
+			se->data = current->link.stqe_next;
+		break;
+	}
+	if (st->need_lock)
+		rte_spinlock_unlock(&st->l);
+
+	s->link.stqe_next = NULL;
+}
+
+struct bhash4_key {
+	uint16_t port;
+	uint32_t addr;
+} __attribute__((__packed__));
+
+struct bhash6_key {
+	uint16_t port;
+	rte_xmm_t addr;
+} __attribute__((__packed__));
+
+struct bhash_key {
+	uint16_t port;
+	union {
+		uint32_t  addr4;
+		rte_xmm_t addr6;
+	};
+} __attribute__((__packed__));
+
+void bhash_fini(struct tle_ctx *ctx);
+
+int bhash_init(struct tle_ctx *ctx);
+
+static inline int
+bhash_sockaddr2key(const struct sockaddr *addr, struct bhash_key *key)
+{
+	int t;
+	const struct sockaddr_in *lin4;
+	const struct sockaddr_in6 *lin6;
+
+	if (addr->sa_family == AF_INET) {
+		lin4 = (const struct sockaddr_in *)addr;
+		key->port = lin4->sin_port;
+		key->addr4 = lin4->sin_addr.s_addr;
+		t = TLE_V4;
+	} else {
+		lin6 = (const struct sockaddr_in6 *)addr;
+		memcpy(&key->addr6, &lin6->sin6_addr, sizeof(key->addr6));
+		key->port = lin6->sin6_port;
+		t = TLE_V6;
+	}
+
+	return t;
+}
+
+/* Return 0 on success;
+ * Return errno on failure.
+ */
+static inline int
+bhash_add_entry(struct tle_ctx *ctx, const struct sockaddr *addr,
+		struct tle_stream *s)
+{
+	int t;
+	int rc;
+	int is_first;
+	struct bhash_key key;
+	struct rte_hash *bhash;
+	struct tle_stream *old, *tmp;
+
+	is_first = 0;
+	t = bhash_sockaddr2key(addr, &key);
+
+	rte_spinlock_lock(&ctx->bhash_lock[t]);
+	bhash = ctx->bhash[t];
+	rc = rte_hash_lookup_data(bhash, &key, (void **)&old);
+	if (rc == -ENOENT) {
+		is_first = 1;
+		s->link.stqe_next = NULL; /* just to avoid follow */
+		rc = rte_hash_add_key_data(bhash, &key, s);
+	} else if (rc >= 0) {
+		if (t == TLE_V4 && old->type == TLE_V6) {
+			/* V6 stream may listen V4 address, assure V4 stream
+			 * is ahead of V6 stream in the list
+			 */
+			s->link.stqe_next = old;
+			rte_hash_add_key_data(bhash, &key, s);
+		} else {
+			tmp = old->link.stqe_next;
+			old->link.stqe_next = s;
+			s->link.stqe_next = tmp;
+		}
+	}
+	rte_spinlock_unlock(&ctx->bhash_lock[t]);
+
+	/* IPv6 socket with unspecified address could receive IPv4 packets.
+	 * So the stream should also be recorded in IPv4 table.
+	 * Only the first stream need be inserted into V4 list, otherwise
+	 * the V6 list is already following V4 list.
+	 */
+	if (t == TLE_V6 && !s->option.ipv6only && is_first &&
+			IN6_IS_ADDR_UNSPECIFIED(&key.addr6)) {
+		t = TLE_V4;
+		rte_spinlock_lock(&ctx->bhash_lock[t]);
+		bhash = ctx->bhash[t];
+		rc = rte_hash_lookup_data(bhash, &key, (void **)&old);
+		if (rc == -ENOENT)
+			rc = rte_hash_add_key_data(bhash, &key, s);
+		else if (rc >= 0) {
+			while(old->link.stqe_next != NULL)
+				old = old->link.stqe_next;
+			old->link.stqe_next = s;
+			s->link.stqe_next = NULL;
+		}
+		rte_spinlock_unlock(&ctx->bhash_lock[t]);
+	}
+
+	return (rc >= 0) ? 0 : (-rc);
+}
+
+static inline void
+bhash_del_entry(struct tle_ctx *ctx, struct tle_stream *s,
+		const struct sockaddr *addr)
+{
+	int t;
+	int rc;
+	struct bhash_key key;
+	struct tle_stream *f, *cur, *pre = NULL;
+
+	t = bhash_sockaddr2key(addr, &key);
+
+	rte_spinlock_lock(&ctx->bhash_lock[t]);
+	rc = rte_hash_lookup_data(ctx->bhash[t], &key, (void **)&f);
+	if (rc >= 0) {
+		cur = f;
+		pre = NULL;
+		while (cur != s) {
+			pre = cur;
+			cur = cur->link.stqe_next;
+		}
+
+		if (pre == NULL) {
+			cur = cur->link.stqe_next;
+			if (cur == NULL)
+				rte_hash_del_key(ctx->bhash[t], &key);
+			else /* change data */
+				rte_hash_add_key_data(ctx->bhash[t], &key, cur);
+		} else
+			pre->link.stqe_next = cur->link.stqe_next;
+	}
+
+	rte_spinlock_unlock(&ctx->bhash_lock[t]);
+
+	if (rc < 0)
 		return;
 
-	se->data = NULL;
+	s->link.stqe_next = NULL;
 
-	type = s->s.type;
-	stbl_stream_fill_key(&k, &s->s, type);
-	if (lock != 0)
-		stbl_lock(st, type);
-	rte_hash_del_key(st->ht[type].t, &k);
-	if (lock != 0)
-		stbl_unlock(st, type);
+	/* IPv6 socket with unspecified address could receive IPv4 packets.
+	 * So the stream should also be recorded in IPv4 table*/
+	if (t == TLE_V6 && !s->option.ipv6only && pre == NULL &&
+			IN6_IS_ADDR_UNSPECIFIED(&key.addr6)) {
+		t = TLE_V4;
+		rte_spinlock_lock(&ctx->bhash_lock[t]);
+		rc = rte_hash_lookup_data(ctx->bhash[t], &key, (void **)&f);
+		if (rc >= 0) {
+			cur = f;
+			pre = NULL;
+			while (cur != s) {
+				pre = cur;
+				cur = cur->link.stqe_next;
+			}
+
+			if (pre == NULL) {
+				cur = cur->link.stqe_next;
+				if (cur == NULL)
+					rte_hash_del_key(ctx->bhash[t], &key);
+				else /* change data */
+					rte_hash_add_key_data(ctx->bhash[t], &key, cur);
+			} else
+				pre->link.stqe_next = cur->link.stqe_next;
+		}
+
+		rte_spinlock_unlock(&ctx->bhash_lock[t]);
+	}
+
+}
+
+static inline void *
+bhash_reuseport_get_stream(struct tle_stream *s)
+{
+	int n = 0;
+	struct tle_stream *e, *all[32];
+
+	e = s;
+	while(e && n < 32) {
+		all[n++] = e;
+		e = e->link.stqe_next;
+	}
+
+	/* for each connection, this function will be called twice
+	 * 1st time for the first handshake: SYN
+	 * 2nd time for the third handshake: ACK
+	 */
+	return all[(s->reuseport_seed++) % n];
+}
+
+static inline void *
+bhash_lookup4(struct rte_hash *t, uint32_t addr, uint16_t port, uint8_t reuse)
+{
+	int rc;
+	void *s = NULL;
+	struct bhash_key key = {
+		.port = port,
+		.addr4 = addr,
+	};
+
+	rc = rte_hash_lookup_data(t, &key, &s);
+	if (rc == -ENOENT) {
+		key.addr4 = INADDR_ANY;
+		rc = rte_hash_lookup_data(t, &key, &s);
+	}
+
+	if (rc >= 0) {
+		if (reuse)
+			return bhash_reuseport_get_stream(s);
+		else
+			return s;
+	}
+
+	return NULL;
+}
+
+static inline void *
+bhash_lookup6(struct rte_hash *t, rte_xmm_t addr, uint16_t port, uint8_t reuse)
+{
+	int rc;
+	void *s = NULL;
+	struct bhash_key key = {
+		.port = port,
+		.addr6 = addr,
+	};
+
+	rc = rte_hash_lookup_data(t, &key, &s);
+	if (rc == -ENOENT) {
+		memcpy(&key.addr6, &tle_ipv6_any, sizeof(key.addr6));
+		rc = rte_hash_lookup_data(t, &key, &s);
+	}
+
+	if (rc >= 0) {
+		if (reuse)
+			return bhash_reuseport_get_stream(s);
+		else
+			return s;
+	}
+
+	return NULL;
 }
 
 #ifdef __cplusplus
