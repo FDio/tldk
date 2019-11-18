@@ -1,0 +1,645 @@
+From 307f7debe0f2143e70659b7a082537077b20d185 Mon Sep 17 00:00:00 2001
+From: Jianfeng Tan <henry.tjf@antfin.com>
+Date: Thu, 19 Jul 2018 11:25:22 +0000
+Subject: [PATCH] net/virtio-user: support raw socket as backend
+
+We will support tapfd or raw socket fd opened by application and
+passed into virtio-user for initialization.
+
+Note if there are multiple queue pairs, users are still supposed
+to pass down the iface name with the first queue pair fd passed
+through this parameter.
+
+Signed-off-by: Jianfeng Tan <henry.tjf@antfin.com>
+---
+ drivers/net/virtio/Makefile                   |   1 +
+ drivers/net/virtio/virtio_user/vhost_kernel.c |  78 ++++++---
+ drivers/net/virtio/virtio_user/vhost_kernel.h |  15 ++
+ .../virtio/virtio_user/vhost_kernel_sock.c    | 156 ++++++++++++++++++
+ .../net/virtio/virtio_user/vhost_kernel_tap.c |  64 ++++++-
+ .../net/virtio/virtio_user/vhost_kernel_tap.h |  39 -----
+ .../net/virtio/virtio_user/virtio_user_dev.c  |  16 +-
+ .../net/virtio/virtio_user/virtio_user_dev.h  |   3 +-
+ drivers/net/virtio/virtio_user_ethdev.c       |  20 ++-
+ 9 files changed, 318 insertions(+), 74 deletions(-)
+ create mode 100644 drivers/net/virtio/virtio_user/vhost_kernel.h
+ create mode 100644 drivers/net/virtio/virtio_user/vhost_kernel_sock.c
+ delete mode 100644 drivers/net/virtio/virtio_user/vhost_kernel_tap.h
+
+diff --git a/drivers/net/virtio/Makefile b/drivers/net/virtio/Makefile
+index 6c2c9967b..2e1fc9b5e 100644
+--- a/drivers/net/virtio/Makefile
++++ b/drivers/net/virtio/Makefile
+@@ -41,6 +41,7 @@ ifeq ($(CONFIG_RTE_VIRTIO_USER),y)
+ SRCS-$(CONFIG_RTE_LIBRTE_VIRTIO_PMD) += virtio_user/vhost_user.c
+ SRCS-$(CONFIG_RTE_LIBRTE_VIRTIO_PMD) += virtio_user/vhost_kernel.c
+ SRCS-$(CONFIG_RTE_LIBRTE_VIRTIO_PMD) += virtio_user/vhost_kernel_tap.c
++SRCS-$(CONFIG_RTE_LIBRTE_VIRTIO_PMD) += virtio_user/vhost_kernel_sock.c
+ SRCS-$(CONFIG_RTE_LIBRTE_VIRTIO_PMD) += virtio_user/virtio_user_dev.c
+ SRCS-$(CONFIG_RTE_LIBRTE_VIRTIO_PMD) += virtio_user_ethdev.c
+ endif
+diff --git a/drivers/net/virtio/virtio_user/vhost_kernel.c b/drivers/net/virtio/virtio_user/vhost_kernel.c
+index 6b19180d7..fa84287f5 100644
+--- a/drivers/net/virtio/virtio_user/vhost_kernel.c
++++ b/drivers/net/virtio/virtio_user/vhost_kernel.c
+@@ -6,13 +6,14 @@
+ #include <sys/stat.h>
+ #include <fcntl.h>
+ #include <unistd.h>
++#include <sys/ioctl.h>
+ 
+ #include <rte_memory.h>
+ #include <rte_eal_memconfig.h>
+ 
+ #include "vhost.h"
+ #include "virtio_user_dev.h"
+-#include "vhost_kernel_tap.h"
++#include "vhost_kernel.h"
+ 
+ struct vhost_memory_kernel {
+ 	uint32_t nregions;
+@@ -152,27 +153,25 @@ prepare_vhost_memory_kernel(void)
+ 	 (1ULL << VIRTIO_NET_F_HOST_TSO6) |	\
+ 	 (1ULL << VIRTIO_NET_F_CSUM))
+ 
+-static unsigned int
+-tap_support_features(void)
++#define PATH_SYS_CLASS_NET "/sys/class/net"
++
++static int
++vhost_kernel_is_tap(struct virtio_user_dev *dev)
+ {
+-	int tapfd;
+-	unsigned int tap_features;
++	char path[128];
+ 
+-	tapfd = open(PATH_NET_TUN, O_RDWR);
+-	if (tapfd < 0) {
+-		PMD_DRV_LOG(ERR, "fail to open %s: %s",
+-			    PATH_NET_TUN, strerror(errno));
+-		return -1;
+-	}
++	if (dev->ifname == NULL)
++		return 0;
+ 
+-	if (ioctl(tapfd, TUNGETFEATURES, &tap_features) == -1) {
+-		PMD_DRV_LOG(ERR, "TUNGETFEATURES failed: %s", strerror(errno));
+-		close(tapfd);
+-		return -1;
+-	}
++	snprintf(path, 128, PATH_SYS_CLASS_NET"/%s", dev->ifname);
++	if(access(path, F_OK) == -1)
++		return 1;
+ 
+-	close(tapfd);
+-	return tap_features;
++	snprintf(path, 128, PATH_SYS_CLASS_NET"/%s/tun_flags", dev->ifname);
++	if(access(path, F_OK) != -1)
++		return 1;
++
++	return 0;
+ }
+ 
+ static int
+@@ -186,7 +185,6 @@ vhost_kernel_ioctl(struct virtio_user_dev *dev,
+ 	struct vhost_memory_kernel *vm = NULL;
+ 	int vhostfd;
+ 	unsigned int queue_sel;
+-	unsigned int features;
+ 
+ 	PMD_DRV_LOG(INFO, "%s", vhost_msg_strings[req]);
+ 
+@@ -240,21 +238,36 @@ vhost_kernel_ioctl(struct virtio_user_dev *dev,
+ 	}
+ 
+ 	if (!ret && req_kernel == VHOST_GET_FEATURES) {
+-		features = tap_support_features();
+-		/* with tap as the backend, all these features are supported
++		int vnet_hdr, mq;
++
++		if (vhost_kernel_is_tap(dev))
++			tap_support_features(&vnet_hdr, &mq);
++		else
++			sock_support_features(dev->be_fd, &vnet_hdr, &mq);
++
++		/* with kernel vhost, all these features are supported
+ 		 * but not claimed by vhost-net, so we add them back when
+ 		 * reporting to upper layer.
+ 		 */
+-		if (features & IFF_VNET_HDR) {
++		if (vnet_hdr) {
+ 			*((uint64_t *)arg) |= VHOST_KERNEL_GUEST_OFFLOADS_MASK;
+ 			*((uint64_t *)arg) |= VHOST_KERNEL_HOST_OFFLOADS_MASK;
+ 		}
+ 
+-		/* vhost_kernel will not declare this feature, but it does
++		/* kernel vhost will not declare this feature, but it does
+ 		 * support multi-queue.
+ 		 */
+-		if (features & IFF_MULTI_QUEUE)
++		if (mq)
+ 			*(uint64_t *)arg |= (1ull << VIRTIO_NET_F_MQ);
++
++		/* raw socket only supports vnet header size of 10, so we must
++		 * eliminate below features.
++		 */
++		if (!vhost_kernel_is_tap(dev) &&
++		    vnet_hdr == sizeof(struct virtio_net_hdr)) {
++			*((uint64_t *)arg) &= ~(1ull << VIRTIO_NET_F_MRG_RXBUF);
++			*((uint64_t *)arg) &= ~(1ull << VIRTIO_F_VERSION_1);
++		}
+ 	}
+ 
+ 	if (vm)
+@@ -333,7 +346,8 @@ vhost_kernel_enable_queue_pair(struct virtio_user_dev *dev,
+ 
+ 	if (!enable) {
+ 		if (dev->tapfds[pair_idx] >= 0) {
+-			close(dev->tapfds[pair_idx]);
++			if (dev->be_fd < 0)
++				close(dev->tapfds[pair_idx]);
+ 			dev->tapfds[pair_idx] = -1;
+ 		}
+ 		return vhost_kernel_set_backend(vhostfd, -1);
+@@ -347,8 +361,18 @@ vhost_kernel_enable_queue_pair(struct virtio_user_dev *dev,
+ 	else
+ 		hdr_size = sizeof(struct virtio_net_hdr);
+ 
+-	tapfd = vhost_kernel_open_tap(&dev->ifname, hdr_size, req_mq,
+-			 (char *)dev->mac_addr, dev->features);
++	if (vhost_kernel_is_tap(dev)) {
++		tapfd = vhost_kernel_open_tap(&dev->ifname, hdr_size,
++				req_mq, (char *)dev->mac_addr, dev->features);
++	} else {
++		if (pair_idx == 0 && dev->be_fd >= 0)
++			tapfd = vhost_kernel_set_sock(dev->be_fd,
++					hdr_size, req_mq);
++		else
++			tapfd = vhost_kernel_open_sock(dev->ifname,
++					hdr_size, dev->mac_addr, req_mq);
++	}
++
+ 	if (tapfd < 0) {
+ 		PMD_DRV_LOG(ERR, "fail to open tap for vhost kernel");
+ 		return -1;
+diff --git a/drivers/net/virtio/virtio_user/vhost_kernel.h b/drivers/net/virtio/virtio_user/vhost_kernel.h
+new file mode 100644
+index 000000000..75d6c5bf6
+--- /dev/null
++++ b/drivers/net/virtio/virtio_user/vhost_kernel.h
+@@ -0,0 +1,15 @@
++/* SPDX-License-Identifier: BSD-3-Clause
++ * Copyright(c) 2016 Intel Corporation
++ */
++
++int vhost_kernel_open_tap(char **p_ifname, int hdr_size, int req_mq,
++			 const char *mac, uint64_t features);
++
++void tap_support_features(int *vnet_hdr, int *mq);
++
++int vhost_kernel_open_sock(char *ifname, int hdr_size,
++			   uint8_t *mac, int req_mq);
++
++int vhost_kernel_set_sock(int sockfd, int hdr_size, int req_mq);
++
++void sock_support_features(int fd, int *vnet_hdr, int *mq);
+diff --git a/drivers/net/virtio/virtio_user/vhost_kernel_sock.c b/drivers/net/virtio/virtio_user/vhost_kernel_sock.c
+new file mode 100644
+index 000000000..7c2ace294
+--- /dev/null
++++ b/drivers/net/virtio/virtio_user/vhost_kernel_sock.c
+@@ -0,0 +1,156 @@
++/* SPDX-License-Identifier: BSD-3-Clause
++ * Copyright(c) 2018 Alibaba Group
++ * Copyright(c) 2018 Ant Financial Services Group
++ */
++
++#include <unistd.h>
++#include <sys/types.h>
++#include <sys/stat.h>
++#include <fcntl.h>
++#include <net/if.h>
++#include <net/if_arp.h>
++#include <errno.h>
++#include <string.h>
++#include <limits.h>
++#include <sys/socket.h>
++#include <arpa/inet.h>
++#include <netpacket/packet.h>
++#include <linux/if_ether.h>
++#include <sys/ioctl.h>
++
++#include <rte_ether.h>
++
++#include "../virtqueue.h"
++#include "../virtio_logs.h"
++#include "vhost_kernel.h"
++
++#ifndef PACKET_VNET_HDR
++#define PACKET_VNET_HDR		15
++#endif
++
++#ifndef PACKET_FANOUT
++#define PACKET_FANOUT		18
++#endif
++
++#ifndef PACKET_VNET_HDR_SZ
++#define PACKET_VNET_HDR_SZ	128
++#endif
++
++void
++sock_support_features(int fd, int *vnet_hdr, int *mq)
++{
++	int hdr_size = sizeof(struct virtio_net_hdr_mrg_rxbuf);
++	int local_fd = 0;
++
++	if (fd < 0) {
++		fd = socket(PF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
++		if (fd < 0) {
++			*mq = 0;
++			*vnet_hdr = 0;
++			return;
++		}
++		local_fd = 1;
++	}
++
++	*mq = 1;
++
++	if (setsockopt(fd, SOL_PACKET, PACKET_VNET_HDR_SZ,
++			(void *)&hdr_size, sizeof(hdr_size))) {
++		*vnet_hdr = sizeof(struct virtio_net_hdr);
++	} else
++		*vnet_hdr = hdr_size;
++
++	if (local_fd)
++		close(fd);
++}
++
++int
++vhost_kernel_set_sock(int sockfd, int hdr_size, int req_mq)
++{
++	int ret;
++	int fanout_type = 0; /* PACKET_FANOUT_HASH */
++
++	if (hdr_size == sizeof(struct virtio_net_hdr))
++		ret = setsockopt(sockfd, SOL_PACKET, PACKET_VNET_HDR,
++				 (void *)&hdr_size, sizeof(hdr_size));
++	else
++		ret = setsockopt(sockfd, SOL_PACKET, PACKET_VNET_HDR_SZ,
++				 (void *)&hdr_size, sizeof(hdr_size));
++	if (ret) {
++		PMD_DRV_LOG(ERR, "failed to set vnet hdr (%d): %s",
++			    hdr_size, strerror(errno));
++		close(sockfd);
++		return -1;
++	}
++
++	if (fcntl(sockfd, F_SETFL, fcntl(sockfd, F_GETFL) | O_NONBLOCK))
++	{
++		PMD_DRV_LOG(ERR, "fcntl O_NONBLOCK failed! %s",
++			    strerror(errno));
++		close(sockfd);
++		return -1;
++	}
++
++	if (req_mq) {
++		if (setsockopt(sockfd, SOL_PACKET, PACKET_FANOUT,
++				(void *)&fanout_type, sizeof(fanout_type))) {
++			PMD_DRV_LOG(ERR, "PACKET_FANOUT failed! %s",
++				    strerror(errno));
++			close(sockfd);
++			return -1;
++		}
++	}
++
++	return sockfd;
++}
++
++int
++vhost_kernel_open_sock(char *ifname, int hdr_size,
++			uint8_t *mac, int req_mq)
++{
++	int sockfd;
++	struct ifreq ifr;
++	struct sockaddr_ll addr_ll;
++
++	sockfd = socket(PF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
++	if (sockfd < 0) {
++		PMD_DRV_LOG(ERR, "socket failed: %s", strerror(errno));
++		return -1;
++	}
++
++	memset(&ifr, 0, sizeof(ifr));
++	strncpy(ifr.ifr_name, ifname, IFNAMSIZ - 1);
++
++	if (ioctl(sockfd, SIOCGIFINDEX, (void*)&ifr)) {
++		PMD_DRV_LOG(ERR, "SIOCGIFINDEX failed: %s", strerror(errno));
++		close(sockfd);
++		return -1;
++	}
++
++	memset(&addr_ll, 0, sizeof(addr_ll));
++	addr_ll.sll_ifindex   = ifr.ifr_ifindex;
++	addr_ll.sll_family    = AF_PACKET;
++	addr_ll.sll_protocol  = htons(ETH_P_ALL);
++	addr_ll.sll_hatype    = 0;
++	//addr_ll.sll_pkttype   = PACKET_HOST;
++	//addr_ll.sll_halen     = ETH_ALEN;
++	if (bind(sockfd, (struct sockaddr*)&addr_ll, sizeof(addr_ll))) {
++		PMD_DRV_LOG(ERR, "bind failed: %s", strerror(errno));
++		close(sockfd);
++		return -1;
++	}
++
++	ifr.ifr_flags |= IFF_PROMISC | IFF_UP;
++
++	if (ioctl(sockfd, SIOCSIFFLAGS, (char*)&ifr)) {
++		PMD_DRV_LOG(ERR, "SIOCSIFFLAGS failed: %s", strerror(errno));
++		close(sockfd);
++		return -1;
++	}
++
++	ifr.ifr_hwaddr.sa_family = ARPHRD_ETHER;
++	if (ioctl(sockfd, SIOCGIFHWADDR, &ifr) == 0)
++		memcpy(mac, ifr.ifr_hwaddr.sa_data, ETHER_ADDR_LEN);
++
++	return vhost_kernel_set_sock(sockfd, hdr_size, req_mq);
++}
+diff --git a/drivers/net/virtio/virtio_user/vhost_kernel_tap.c b/drivers/net/virtio/virtio_user/vhost_kernel_tap.c
+index a3faf1d0c..85dd24dd6 100644
+--- a/drivers/net/virtio/virtio_user/vhost_kernel_tap.c
++++ b/drivers/net/virtio/virtio_user/vhost_kernel_tap.c
+@@ -11,13 +11,75 @@
+ #include <errno.h>
+ #include <string.h>
+ #include <limits.h>
++#include <sys/ioctl.h>
+ 
+ #include <rte_ether.h>
+ 
+-#include "vhost_kernel_tap.h"
++#include "vhost_kernel.h"
+ #include "../virtio_logs.h"
+ #include "../virtio_pci.h"
+ 
++/* TUN ioctls */
++#define TUNSETIFF     _IOW('T', 202, int)
++#define TUNGETFEATURES _IOR('T', 207, unsigned int)
++#define TUNSETOFFLOAD  _IOW('T', 208, unsigned int)
++#define TUNGETIFF      _IOR('T', 210, unsigned int)
++#define TUNSETSNDBUF   _IOW('T', 212, int)
++#define TUNGETVNETHDRSZ _IOR('T', 215, int)
++#define TUNSETVNETHDRSZ _IOW('T', 216, int)
++#define TUNSETQUEUE  _IOW('T', 217, int)
++#define TUNSETVNETLE _IOW('T', 220, int)
++#define TUNSETVNETBE _IOW('T', 222, int)
++
++/* TUNSETIFF ifr flags */
++#define IFF_TAP          0x0002
++#define IFF_NO_PI        0x1000
++#define IFF_ONE_QUEUE    0x2000
++#define IFF_VNET_HDR     0x4000
++#define IFF_MULTI_QUEUE  0x0100
++#define IFF_ATTACH_QUEUE 0x0200
++#define IFF_DETACH_QUEUE 0x0400
++
++/* Features for GSO (TUNSETOFFLOAD). */
++#define TUN_F_CSUM	0x01	/* You can hand me unchecksummed packets. */
++#define TUN_F_TSO4	0x02	/* I can handle TSO for IPv4 packets */
++#define TUN_F_TSO6	0x04	/* I can handle TSO for IPv6 packets */
++#define TUN_F_TSO_ECN	0x08	/* I can handle TSO with ECN bits. */
++#define TUN_F_UFO	0x10	/* I can handle UFO packets */
++
++/* Constants */
++#define PATH_NET_TUN	"/dev/net/tun"
++
++void
++tap_support_features(int *vnet_hdr, int *mq)
++{
++	int tapfd;
++	unsigned int tap_features;
++
++	*vnet_hdr = 0;
++	*mq = 0;
++
++	tapfd = open(PATH_NET_TUN, O_RDWR);
++	if (tapfd < 0) {
++		PMD_DRV_LOG(ERR, "fail to open %s: %s",
++			    PATH_NET_TUN, strerror(errno));
++		return;
++	}
++
++	if (ioctl(tapfd, TUNGETFEATURES, &tap_features) == -1) {
++		PMD_DRV_LOG(ERR, "TUNGETFEATURES failed: %s", strerror(errno));
++		close(tapfd);
++		return;
++	}
++
++	close(tapfd);
++
++	if (tap_features & IFF_VNET_HDR)
++		*vnet_hdr = 1;
++	if (tap_features & IFF_MULTI_QUEUE)
++		*mq = 1;
++}
++
+ static int
+ vhost_kernel_tap_set_offload(int fd, uint64_t features)
+ {
+diff --git a/drivers/net/virtio/virtio_user/vhost_kernel_tap.h b/drivers/net/virtio/virtio_user/vhost_kernel_tap.h
+deleted file mode 100644
+index e0e95b4f5..000000000
+--- a/drivers/net/virtio/virtio_user/vhost_kernel_tap.h
++++ /dev/null
+@@ -1,39 +0,0 @@
+-/* SPDX-License-Identifier: BSD-3-Clause
+- * Copyright(c) 2016 Intel Corporation
+- */
+-
+-#include <sys/ioctl.h>
+-
+-/* TUN ioctls */
+-#define TUNSETIFF     _IOW('T', 202, int)
+-#define TUNGETFEATURES _IOR('T', 207, unsigned int)
+-#define TUNSETOFFLOAD  _IOW('T', 208, unsigned int)
+-#define TUNGETIFF      _IOR('T', 210, unsigned int)
+-#define TUNSETSNDBUF   _IOW('T', 212, int)
+-#define TUNGETVNETHDRSZ _IOR('T', 215, int)
+-#define TUNSETVNETHDRSZ _IOW('T', 216, int)
+-#define TUNSETQUEUE  _IOW('T', 217, int)
+-#define TUNSETVNETLE _IOW('T', 220, int)
+-#define TUNSETVNETBE _IOW('T', 222, int)
+-
+-/* TUNSETIFF ifr flags */
+-#define IFF_TAP          0x0002
+-#define IFF_NO_PI        0x1000
+-#define IFF_ONE_QUEUE    0x2000
+-#define IFF_VNET_HDR     0x4000
+-#define IFF_MULTI_QUEUE  0x0100
+-#define IFF_ATTACH_QUEUE 0x0200
+-#define IFF_DETACH_QUEUE 0x0400
+-
+-/* Features for GSO (TUNSETOFFLOAD). */
+-#define TUN_F_CSUM	0x01	/* You can hand me unchecksummed packets. */
+-#define TUN_F_TSO4	0x02	/* I can handle TSO for IPv4 packets */
+-#define TUN_F_TSO6	0x04	/* I can handle TSO for IPv6 packets */
+-#define TUN_F_TSO_ECN	0x08	/* I can handle TSO with ECN bits. */
+-#define TUN_F_UFO	0x10	/* I can handle UFO packets */
+-
+-/* Constants */
+-#define PATH_NET_TUN	"/dev/net/tun"
+-
+-int vhost_kernel_open_tap(char **p_ifname, int hdr_size, int req_mq,
+-			 const char *mac, uint64_t features);
+diff --git a/drivers/net/virtio/virtio_user/virtio_user_dev.c b/drivers/net/virtio/virtio_user/virtio_user_dev.c
+index 20816c936..7e655a0d5 100644
+--- a/drivers/net/virtio/virtio_user/virtio_user_dev.c
++++ b/drivers/net/virtio/virtio_user/virtio_user_dev.c
+@@ -294,7 +294,7 @@ virtio_user_fill_intr_handle(struct virtio_user_dev *dev)
+ 	eth_dev->intr_handle->max_intr = dev->max_queue_pairs + 1;
+ 	eth_dev->intr_handle->type = RTE_INTR_HANDLE_VDEV;
+ 	/* For virtio vdev, no need to read counter for clean */
+-	eth_dev->intr_handle->efd_counter_size = 0;
++	eth_dev->intr_handle->efd_counter_size = 8;
+ 	eth_dev->intr_handle->fd = -1;
+ 	if (dev->vhostfd >= 0)
+ 		eth_dev->intr_handle->fd = dev->vhostfd;
+@@ -312,7 +312,9 @@ virtio_user_mem_event_cb(enum rte_mem_event type __rte_unused,
+ {
+ 	struct virtio_user_dev *dev = arg;
+ 	struct rte_memseg_list *msl;
++#if 0
+ 	uint16_t i;
++#endif
+ 
+ 	/* ignore externally allocated memory */
+ 	msl = rte_mem_virt2memseg_list(addr);
+@@ -325,15 +327,19 @@ virtio_user_mem_event_cb(enum rte_mem_event type __rte_unused,
+ 		goto exit;
+ 
+ 	/* Step 1: pause the active queues */
++#if 0
+ 	for (i = 0; i < dev->queue_pairs; i++)
+ 		dev->ops->enable_qp(dev, i, 0);
++#endif
+ 
+ 	/* Step 2: update memory regions */
+ 	dev->ops->send_request(dev, VHOST_USER_SET_MEM_TABLE, NULL);
+ 
+ 	/* Step 3: resume the active queues */
++#if 0
+ 	for (i = 0; i < dev->queue_pairs; i++)
+ 		dev->ops->enable_qp(dev, i, 1);
++#endif
+ 
+ exit:
+ 	pthread_mutex_unlock(&dev->mutex);
+@@ -412,7 +418,7 @@ virtio_user_dev_setup(struct virtio_user_dev *dev)
+ int
+ virtio_user_dev_init(struct virtio_user_dev *dev, char *path, int queues,
+ 		     int cq, int queue_size, const char *mac, char **ifname,
+-		     int mrg_rxbuf, int in_order)
++		     int mrg_rxbuf, int in_order, int fd)
+ {
+ 	pthread_mutex_init(&dev->mutex, NULL);
+ 	snprintf(dev->path, PATH_MAX, "%s", path);
+@@ -435,6 +441,12 @@ virtio_user_dev_init(struct virtio_user_dev *dev, char *path, int queues,
+ 		return -1;
+ 	}
+ 
++	if (fd >= 0) {
++		dev->be_fd = fd;
++	} else {
++		dev->be_fd = -1;
++	}
++
+ 	if (!dev->is_server) {
+ 		if (dev->ops->send_request(dev, VHOST_USER_SET_OWNER,
+ 					   NULL) < 0) {
+diff --git a/drivers/net/virtio/virtio_user/virtio_user_dev.h b/drivers/net/virtio/virtio_user/virtio_user_dev.h
+index c42ce5d4b..575c21e3b 100644
+--- a/drivers/net/virtio/virtio_user/virtio_user_dev.h
++++ b/drivers/net/virtio/virtio_user/virtio_user_dev.h
+@@ -21,6 +21,7 @@ struct virtio_user_dev {
+ 	char		*ifname;
+ 	int		*vhostfds;
+ 	int		*tapfds;
++	int		be_fd;
+ 
+ 	/* for both vhost_user and vhost_kernel */
+ 	int		callfds[VIRTIO_MAX_VIRTQUEUES];
+@@ -50,7 +51,7 @@ int virtio_user_start_device(struct virtio_user_dev *dev);
+ int virtio_user_stop_device(struct virtio_user_dev *dev);
+ int virtio_user_dev_init(struct virtio_user_dev *dev, char *path, int queues,
+ 			 int cq, int queue_size, const char *mac, char **ifname,
+-			 int mrg_rxbuf, int in_order);
++			 int mrg_rxbuf, int in_order, int fd);
+ void virtio_user_dev_uninit(struct virtio_user_dev *dev);
+ void virtio_user_handle_cq(struct virtio_user_dev *dev, uint16_t queue_idx);
+ uint8_t virtio_user_handle_mq(struct virtio_user_dev *dev, uint16_t q_pairs);
+diff --git a/drivers/net/virtio/virtio_user_ethdev.c b/drivers/net/virtio/virtio_user_ethdev.c
+index f8791391a..d5e87b24c 100644
+--- a/drivers/net/virtio/virtio_user_ethdev.c
++++ b/drivers/net/virtio/virtio_user_ethdev.c
+@@ -221,8 +221,7 @@ virtio_user_get_features(struct virtio_hw *hw)
+ {
+ 	struct virtio_user_dev *dev = virtio_user_get_dev(hw);
+ 
+-	/* unmask feature bits defined in vhost user protocol */
+-	return dev->device_features & VIRTIO_PMD_SUPPORTED_GUEST_FEATURES;
++	return dev->device_features;
+ }
+ 
+ static void
+@@ -361,6 +360,8 @@ static const char *valid_args[] = {
+ 	VIRTIO_USER_ARG_MRG_RXBUF,
+ #define VIRTIO_USER_ARG_IN_ORDER       "in_order"
+ 	VIRTIO_USER_ARG_IN_ORDER,
++#define VIRTIO_USER_ARG_FD             "fd"
++	VIRTIO_USER_ARG_FD,
+ 	NULL
+ };
+ 
+@@ -464,6 +465,7 @@ virtio_user_pmd_probe(struct rte_vdev_device *dev)
+ 	uint64_t server_mode = VIRTIO_USER_DEF_SERVER_MODE;
+ 	uint64_t mrg_rxbuf = 1;
+ 	uint64_t in_order = 1;
++	uint64_t fd = -1;
+ 	char *path = NULL;
+ 	char *ifname = NULL;
+ 	char *mac_addr = NULL;
+@@ -581,6 +583,15 @@ virtio_user_pmd_probe(struct rte_vdev_device *dev)
+ 		}
+ 	}
+ 
++	if (rte_kvargs_count(kvlist, VIRTIO_USER_ARG_FD) == 1) {
++		if (rte_kvargs_process(kvlist, VIRTIO_USER_ARG_FD,
++				       &get_integer_arg, &fd) < 0) {
++			PMD_INIT_LOG(ERR, "error to parse %s",
++				     VIRTIO_USER_ARG_FD);
++			goto end;
++		}
++	}
++
+ 	if (rte_eal_process_type() == RTE_PROC_PRIMARY) {
+ 		struct virtio_user_dev *vu_dev;
+ 
+@@ -598,7 +609,7 @@ virtio_user_pmd_probe(struct rte_vdev_device *dev)
+ 			vu_dev->is_server = false;
+ 		if (virtio_user_dev_init(hw->virtio_user_dev, path, queues, cq,
+ 				 queue_size, mac_addr, &ifname, mrg_rxbuf,
+-				 in_order) < 0) {
++				 in_order, fd) < 0) {
+ 			PMD_INIT_LOG(ERR, "virtio_user_dev_init fails");
+ 			virtio_user_eth_dev_free(eth_dev);
+ 			goto end;
+@@ -677,4 +688,5 @@ RTE_PMD_REGISTER_PARAM_STRING(net_virtio_user,
+ 	"iface=<string> "
+ 	"server=<0|1> "
+ 	"mrg_rxbuf=<0|1> "
+-	"in_order=<0|1>");
++	"in_order=<0|1>"
++	"fd=<int>");
+-- 
+2.17.1
+

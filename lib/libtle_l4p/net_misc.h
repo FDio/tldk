@@ -16,6 +16,7 @@
 #ifndef _NET_MISC_H_
 #define _NET_MISC_H_
 
+#include <stdbool.h>
 #include <rte_ip.h>
 #include <rte_udp.h>
 #include "osdep.h"
@@ -70,6 +71,26 @@ union ip_addrs {
 	union ipv4_addrs v4;
 	union ipv6_addrs v6;
 };
+
+static inline bool
+is_empty_addr(const struct sockaddr *addr)
+{
+	bool any = false;
+	const struct sockaddr_in *in4;
+	const struct sockaddr_in6 *in6;
+
+	if (addr->sa_family == AF_INET) {
+		in4 = (const struct sockaddr_in *)addr;
+		if (in4->sin_addr.s_addr == INADDR_ANY)
+			any = true;
+	} else if (addr->sa_family == AF_INET6) {
+		in6 = (const struct sockaddr_in6 *)addr;
+		if (IN6_IS_ADDR_UNSPECIFIED(&in6->sin6_addr))
+			any = true;
+	}
+
+	return any;
+}
 
 #ifdef __cplusplus
 }

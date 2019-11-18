@@ -13,68 +13,47 @@
  * limitations under the License.
  */
 #include <string.h>
-#include <rte_malloc.h>
 #include <rte_errno.h>
 
 #include "stream_table.h"
 
 void
-stbl_fini(struct stbl *st)
+bhash_fini(struct tle_ctx *ctx)
 {
 	uint32_t i;
 
-	for (i = 0; i != RTE_DIM(st->ht); i++) {
-		rte_hash_free(st->ht[i].t);
-		rte_free(st->ht[i].ent);
-	}
-
-	memset(st, 0, sizeof(*st));
+	for (i = 0; i != RTE_DIM(ctx->bhash); i++)
+		rte_hash_free(ctx->bhash[i]);
 }
 
 int
-stbl_init(struct stbl *st, uint32_t num, int32_t socket)
+bhash_init(struct tle_ctx *ctx)
 {
-	int32_t rc;
-	size_t i, sz;
-	struct rte_hash_parameters hprm;
+	int rc = 0;
+	struct rte_hash_parameters hprm = {0};
+	bool ipv6 = ctx->prm.lookup6 != NULL;
 	char buf[RTE_HASH_NAMESIZE];
 
-	num = RTE_MAX(5 * num / 4, 0x10U);
-
-	memset(&hprm, 0, sizeof(hprm));
 	hprm.name = buf;
-	hprm.entries = num;
-	hprm.socket_id = socket;
+	hprm.entries = 4096;
+	hprm.extra_flag = RTE_HASH_EXTRA_FLAGS_EXT_TABLE;
+	hprm.socket_id = ctx->prm.socket_id;
 
-	rc = 0;
-
-	snprintf(buf, sizeof(buf), "stbl4@%p", st);
-	hprm.key_len = sizeof(struct stbl4_key);
-	st->ht[TLE_V4].t = rte_hash_create(&hprm);
-	if (st->ht[TLE_V4].t == NULL)
+	snprintf(buf, sizeof(buf), "bhash4@%p", ctx);
+	hprm.key_len = sizeof(struct bhash4_key);
+	ctx->bhash[TLE_V4] = rte_hash_create(&hprm);
+	if (ctx->bhash[TLE_V4] == NULL)
 		rc = (rte_errno != 0) ? -rte_errno : -ENOMEM;
 
-	if (rc == 0) {
-		snprintf(buf, sizeof(buf), "stbl6@%p", st);
-		hprm.key_len = sizeof(struct stbl6_key);
-		st->ht[TLE_V6].t = rte_hash_create(&hprm);
-		if (st->ht[TLE_V6].t == NULL)
+	if (rc == 0 && ipv6) {
+		snprintf(buf, sizeof(buf), "bhash6@%p", ctx);
+		hprm.key_len = sizeof(struct bhash6_key);
+		ctx->bhash[TLE_V6] = rte_hash_create(&hprm);
+		if (ctx->bhash[TLE_V6] == NULL) {
+			rte_hash_free(ctx->bhash[TLE_V4]);
 			rc = (rte_errno != 0) ? -rte_errno : -ENOMEM;
+		}
 	}
-
-	for (i = 0; i != RTE_DIM(st->ht) && rc == 0; i++) {
-
-		sz = sizeof(*st->ht[i].ent) * num;
-		st->ht[i].ent = rte_zmalloc_socket(NULL, sz,
-			RTE_CACHE_LINE_SIZE, socket);
-		if (st->ht[i].ent == NULL)
-			rc = -ENOMEM;
-		else
-			st->ht[i].nb_ent = num;
-	}
-
-	if (rc != 0)
-		stbl_fini(st);
 
 	return rc;
 }

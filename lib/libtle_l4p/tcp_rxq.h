@@ -17,6 +17,7 @@
 #define _TCP_RXQ_H_
 
 #include "tcp_ofo.h"
+#include "tcp_ctl.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -74,6 +75,7 @@ rx_ofo_reduce(struct tle_tcp_stream *s)
 
 	s->tcb.rcv.nxt = seq;
 	_ofo_remove(ofo, 0, i);
+
 	return n;
 }
 
@@ -133,6 +135,8 @@ rx_data_enqueue(struct tle_tcp_stream *s, uint32_t seq, uint32_t len,
 	}
 
 	n = rte_ring_count(s->rx.q);
+	/* update receive window with left recv buffer*/
+	s->tcb.rcv.wnd = calc_rx_wnd(s, s->tcb.rcv.wscale);
 	if (r != n) {
 		/* raise RX event */
 		if (s->rx.ev != NULL)

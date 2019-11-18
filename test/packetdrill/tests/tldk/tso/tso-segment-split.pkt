@@ -1,0 +1,63 @@
+// Test TSO segment split
+
+// Establish a connection.
+0.000 socket(..., SOCK_STREAM, IPPROTO_TCP) = 3
+0.000 setsockopt(3, SOL_SOCKET, SO_REUSEADDR, [1], 4) = 0
+0.000 bind(3, ..., ...) = 0
+0.000 listen(3, 1) = 0
+
+0.100 < S 0:0(0) win 5360 <mss 536,sackOK,nop,nop,nop,wscale 7>
++0  > S. 0:0(0) ack 1 <mss 1460,wscale 10,nop>
+
++.1 < . 1:1(0) ack 1 win 5360
+0.200 accept(3, ..., ...) = 4
+
+// Send 10 MSS.
+0.200 write(4, ..., 5360) = 5360
+0.200 > . 1:5361(5360) ack 1
+
+// Ack 1st mss (partial ack), and update rcv windows to 1 mss
+0.200 < . 1:1(0) ack 537 win 536
+
+// Get 3 dupacks, and reduce rcv window to only 1 mss
+0.300 < . 1:1(0) ack 537 win 536
+0.300 < . 1:1(0) ack 537 win 536
+0.300 < . 1:1(0) ack 537 win 536
+
+// We've received 3 duplicate ACKs, so we do a fast retransmit;
+// Segment split happens here.
+0.300 > . 537:1073(536) ack 1
+
+// Ack 2nd mss (partial ack)
+0.300 < . 1:1(0) ack 1073 win 536
+
+// 3nd mss
+0.300 > . 1073:1609(536) ack 1
+
+// Now let's try ack somehere between (3*mss, 4*mss)
+0.303 < . 1:1(0) ack 2049 win 536
+
+// We shall send from 2049, and send another mss.
+0.303 > . 2049:2585(536) ack 1
+
+// We send some more new data, but it cannot be sent for limited window.
+0.303 write(4, ..., 5360) = 5360
+
+0.305 < . 1:1(0) ack 2585 win 5360
+
+0.306 > . 2585:5361(2776) ack 1
+0.306 < . 1:1(0) ack 5361 win 5360
+
+// FIXME: the cwnd has been reduced to 2*mss
+0.307 > . 5361:6433(1072) ack 1
+0.307 < . 1:1(0) ack 6433 win 5360
+
+// FIXME: below behavisor makes no sense
+0.307 > . 6433:7409(976) ack 1
+0.307 < . 1:1(0) ack 7409 win 5360
+
+0.307 > . 7409:9457(2048) ack 1
+0.307 < . 1:1(0) ack 9457 win 5360
+
+0.308 > . 9457:10721(1264) ack 1
+0.308 < . 1:1(0) ack 10721 win 5360

@@ -1,0 +1,43 @@
+From 9bbe20eda858fd7fcbd8f137e5f96f51d571a556 Mon Sep 17 00:00:00 2001
+From: Jianfeng Tan <henry.tjf@antfin.com>
+Date: Wed, 29 Aug 2018 14:20:51 +0000
+Subject: [PATCH 4/9] net/virtio-user: add rss update for virtio-user
+
+---
+ drivers/net/virtio/virtio_ethdev.c | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
+
+diff --git a/drivers/net/virtio/virtio_ethdev.c b/drivers/net/virtio/virtio_ethdev.c
+index 614357da7..e7336cde9 100644
+--- a/drivers/net/virtio/virtio_ethdev.c
++++ b/drivers/net/virtio/virtio_ethdev.c
+@@ -738,6 +738,18 @@ virtio_dev_rx_queue_intr_disable(struct rte_eth_dev *dev, uint16_t queue_id)
+ 	return 0;
+ }
+ 
++static int
++virtio_rss_hash_update(struct rte_eth_dev *dev,
++                       struct rte_eth_rss_conf *rss_conf __rte_unused)
++{
++       struct virtio_hw *hw = dev->data->dev_private;
++
++       if (hw->virtio_user_dev)
++               return 0;
++
++       return -1;
++}
++
+ /*
+  * dev_ops for virtio, bare necessities for basic operation
+  */
+@@ -772,6 +784,7 @@ static const struct eth_dev_ops virtio_eth_dev_ops = {
+ 	.mac_addr_add            = virtio_mac_addr_add,
+ 	.mac_addr_remove         = virtio_mac_addr_remove,
+ 	.mac_addr_set            = virtio_mac_addr_set,
++	.rss_hash_update         = virtio_rss_hash_update,
+ };
+ 
+ static void
+-- 
+2.17.1
+

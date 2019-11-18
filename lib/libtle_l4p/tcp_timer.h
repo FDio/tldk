@@ -27,43 +27,53 @@ extern "C" {
  * all RTO values are in ms.
  */
 #define	TCP_RTO_MAX	60000U        /* RFC 6298 (2.5) */
-#define	TCP_RTO_MIN	1000U         /* RFC 6298 (2.4) */
+#define	TCP_RTO_MIN	200U          /* Linux/include/net/tcp.h: TCP_RTO_MIN */
 #define	TCP_RTO_2MSL	(2 * TCP_RTO_MAX)
-#define	TCP_RTO_DEFAULT	TCP_RTO_MIN   /* RFC 6298 (2.1)*/
+#define	TCP_RTO_DEFAULT	1000U   /* RFC 6298 (2.1)*/
 #define	TCP_RTO_GRANULARITY	100U
 
+static inline struct tle_tcp_stream *
+timer_stream(struct tle_tcp_stream *s)
+{
+	return (struct tle_tcp_stream *)((unsigned long)s & (~(unsigned long)TIMER_MASK));
+}
+
+static inline uint8_t
+timer_type(struct tle_tcp_stream *s)
+{
+	return (uint8_t)((unsigned long)s & (unsigned long)TIMER_MASK);
+}
 
 static inline void
-timer_stop(struct tle_tcp_stream *s)
+timer_stop(struct tle_tcp_stream *s, uint8_t type)
 {
 	struct tle_timer_wheel *tw;
 
-	if (s->timer.handle != NULL) {
+	if (s->timer.handle[type] != NULL) {
 		tw = CTX_TCP_TMWHL(s->s.ctx);
-		tle_timer_stop(tw, s->timer.handle);
-		s->timer.handle = NULL;
+		tle_timer_stop(tw, s->timer.handle[type]);
+		s->timer.handle[type] = NULL;
 	}
 }
 
 static inline void
-timer_start(struct tle_tcp_stream *s)
+timer_start(struct tle_tcp_stream *s, uint8_t type, uint32_t timeout)
 {
 	struct tle_timer_wheel *tw;
 
-	if (s->timer.handle == NULL) {
+	if (s->timer.handle[type] == NULL) {
 		tw = CTX_TCP_TMWHL(s->s.ctx);
-		s->timer.handle = tle_timer_start(tw, s, s->tcb.snd.rto);
-		s->tcb.snd.nb_retx = 0;
+		s->timer.handle[type] = tle_timer_start(tw, (void*)((unsigned long)s | type), timeout);
 	}
 }
 
 static inline void
-timer_restart(struct tle_tcp_stream *s)
+timer_restart(struct tle_tcp_stream *s, uint8_t type, uint32_t timeout)
 {
 	struct tle_timer_wheel *tw;
 
 	tw = CTX_TCP_TMWHL(s->s.ctx);
-	s->timer.handle = tle_timer_start(tw, s, s->tcb.snd.rto);
+	s->timer.handle[type] = tle_timer_start(tw, (void*)((unsigned long)s | type), timeout);
 }
 
 
@@ -71,10 +81,10 @@ timer_restart(struct tle_tcp_stream *s)
  * reset number of retransmissions and restart RTO timer.
  */
 static inline void
-timer_reset(struct tle_tcp_stream *s)
+timer_reset(struct tle_tcp_stream *s, uint8_t type, uint32_t timeout)
 {
-	timer_stop(s);
-	timer_start(s);
+	timer_stop(s, type);
+	timer_start(s, type, timeout);
 }
 
 static inline uint32_t
