@@ -1,0 +1,305 @@
+From c2a2b8eec349156b31f2faab61cc6063ef3f0c61 Mon Sep 17 00:00:00 2001
+From: Jianfeng Tan <henry.tjf@antfin.com>
+Date: Wed, 26 Dec 2018 14:40:07 +0000
+Subject: [PATCH 2/2] mbuf: add dynamic mbuf mempool support
+
+Signed-off-by: Jianfeng Tan <henry.tjf@antfin.com>
+---
+ examples/Makefile                      |  1 +
+ examples/dynamic_mbuf_pool/Makefile    | 56 ++++++++++++++++
+ examples/dynamic_mbuf_pool/main.c      | 92 ++++++++++++++++++++++++++
+ examples/dynamic_mbuf_pool/meson.build | 11 +++
+ lib/librte_mbuf/rte_mbuf.c             | 51 ++++++++++++++
+ lib/librte_mbuf/rte_mbuf.h             |  5 ++
+ lib/librte_mbuf/rte_mbuf_version.map   |  8 ++-
+ 7 files changed, 223 insertions(+), 1 deletion(-)
+ create mode 100644 examples/dynamic_mbuf_pool/Makefile
+ create mode 100644 examples/dynamic_mbuf_pool/main.c
+ create mode 100644 examples/dynamic_mbuf_pool/meson.build
+
+diff --git a/examples/Makefile b/examples/Makefile
+index 33fe0e586..3df9cb7ad 100644
+--- a/examples/Makefile
++++ b/examples/Makefile
+@@ -21,6 +21,7 @@ DIRS-$(CONFIG_RTE_LIBRTE_CRYPTODEV) += fips_validation
+ DIRS-$(CONFIG_RTE_LIBRTE_FLOW_CLASSIFY) += flow_classify
+ DIRS-y += flow_filtering
+ DIRS-y += helloworld
++DIRS-y += dynamic_mbuf_pool
+ DIRS-$(CONFIG_RTE_LIBRTE_PIPELINE) += ip_pipeline
+ ifeq ($(CONFIG_RTE_LIBRTE_LPM),y)
+ DIRS-$(CONFIG_RTE_IP_FRAG) += ip_reassembly
+diff --git a/examples/dynamic_mbuf_pool/Makefile b/examples/dynamic_mbuf_pool/Makefile
+new file mode 100644
+index 000000000..f2761f661
+--- /dev/null
++++ b/examples/dynamic_mbuf_pool/Makefile
+@@ -0,0 +1,56 @@
++# SPDX-License-Identifier: BSD-3-Clause
++# Copyright(c) 2010-2014 Intel Corporation
++
++# binary name
++APP = dynamic_mbuf_pool
++
++# all source are stored in SRCS-y
++SRCS-y := main.c
++
++# Build using pkg-config variables if possible
++$(shell pkg-config --exists libdpdk)
++ifeq ($(.SHELLSTATUS),0)
++
++all: shared
++.PHONY: shared static
++shared: build/$(APP)-shared
++	ln -sf $(APP)-shared build/$(APP)
++static: build/$(APP)-static
++	ln -sf $(APP)-static build/$(APP)
++
++PC_FILE := $(shell pkg-config --path libdpdk)
++CFLAGS += -O3 $(shell pkg-config --cflags libdpdk)
++LDFLAGS_SHARED = $(shell pkg-config --libs libdpdk)
++LDFLAGS_STATIC = -Wl,-Bstatic $(shell pkg-config --static --libs libdpdk)
++
++build/$(APP)-shared: $(SRCS-y) Makefile $(PC_FILE) | build
++	$(CC) $(CFLAGS) $(SRCS-y) -o $@ $(LDFLAGS) $(LDFLAGS_SHARED)
++
++build/$(APP)-static: $(SRCS-y) Makefile $(PC_FILE) | build
++	$(CC) $(CFLAGS) $(SRCS-y) -o $@ $(LDFLAGS) $(LDFLAGS_STATIC)
++
++build:
++	@mkdir -p $@
++
++.PHONY: clean
++clean:
++	rm -f build/$(APP) build/$(APP)-static build/$(APP)-shared
++	rmdir --ignore-fail-on-non-empty build
++
++else
++
++ifeq ($(RTE_SDK),)
++$(error "Please define RTE_SDK environment variable")
++endif
++
++# Default target, can be overridden by command line or environment
++RTE_TARGET ?= x86_64-native-linuxapp-gcc
++
++include $(RTE_SDK)/mk/rte.vars.mk
++
++CFLAGS += -O3
++CFLAGS += $(WERROR_FLAGS)
++
++include $(RTE_SDK)/mk/rte.extapp.mk
++
++endif
+diff --git a/examples/dynamic_mbuf_pool/main.c b/examples/dynamic_mbuf_pool/main.c
+new file mode 100644
+index 000000000..a568d7cec
+--- /dev/null
++++ b/examples/dynamic_mbuf_pool/main.c
+@@ -0,0 +1,92 @@
++/* SPDX-License-Identifier: BSD-3-Clause
++ * Copyright(c) 2010-2014 Intel Corporation
++ */
++
++#include <stdio.h>
++#include <string.h>
++#include <stdint.h>
++#include <errno.h>
++#include <sys/queue.h>
++#include <sys/types.h>
++#include <sys/stat.h>
++#include <fcntl.h>
++#include <unistd.h>
++
++#include <rte_memory.h>
++#include <rte_launch.h>
++#include <rte_eal.h>
++#include <rte_per_lcore.h>
++#include <rte_lcore.h>
++#include <rte_debug.h>
++#include <rte_memory.h>
++#include <rte_mbuf.h>
++#include <rte_memzone.h>
++
++#define HUGE_2M "/sys/kernel/mm/hugepages/hugepages-2048kB/free_hugepages"
++#define HUGE_1G "/sys/kernel/mm/hugepages/hugepages-1048576kB/free_hugepages"
++
++static long int
++get_value(const char *path)
++{
++	int fd, len;
++	long int value;
++	char buf[1024];
++
++	fd = open(path, O_RDONLY);
++	if (fd < 0)
++		return ULONG_MAX;
++
++	len = read(fd, buf, sizeof(buf));
++
++	close(fd);
++
++	if (len <= 0) {
++		return ULONG_MAX;
++	}
++
++	value = strtol(buf, NULL, 10);
++	return value;
++}
++
++static void
++print_free_hugepages(void)
++{
++	printf("2M: %ld\t\t1G: %ld\n", get_value(HUGE_2M), get_value(HUGE_1G));
++}
++
++int
++main(int argc, char **argv)
++{
++	int i;
++	int ret;
++	int n = 512 * 1024;
++	int dynamic_size = 8 * 1024;
++	struct rte_mbuf *m;
++	struct rte_mempool *mp;
++
++	ret = rte_eal_init(argc, argv);
++	if (ret < 0)
++		rte_panic("Cannot init EAL\n");
++
++	mp = rte_pktmbuf_dynamic_pool_create("mbuf_pool", n,
++				64, 0, RTE_MBUF_DEFAULT_BUF_SIZE,
++				0, dynamic_size);
++	if (mp == NULL)
++		rte_panic("Failed to create mbuf mempool");
++
++	for (i = 0; i < n; i++) {
++		m = rte_pktmbuf_alloc(mp);
++		if (m == NULL)
++			break;
++
++		if ((i % dynamic_size) == 1) {
++			print_free_hugepages();
++			usleep(100 * 1000);
++		}
++	}
++
++	printf("have allocated %d mbufs", i);
++	rte_memzone_dump(stdout);
++
++	return 0;
++}
+diff --git a/examples/dynamic_mbuf_pool/meson.build b/examples/dynamic_mbuf_pool/meson.build
+new file mode 100644
+index 000000000..c34e11e36
+--- /dev/null
++++ b/examples/dynamic_mbuf_pool/meson.build
+@@ -0,0 +1,11 @@
++# SPDX-License-Identifier: BSD-3-Clause
++# Copyright(c) 2017 Intel Corporation
++
++# meson file, for building this example as part of a main DPDK build.
++#
++# To build this example as a standalone application with an already-installed
++# DPDK instance, use 'make'
++
++sources = files(
++	'main.c'
++)
+diff --git a/lib/librte_mbuf/rte_mbuf.c b/lib/librte_mbuf/rte_mbuf.c
+index 9790b4fb1..b70abd88c 100644
+--- a/lib/librte_mbuf/rte_mbuf.c
++++ b/lib/librte_mbuf/rte_mbuf.c
+@@ -167,6 +167,57 @@ rte_pktmbuf_pool_create(const char *name, unsigned int n,
+ 			data_room_size, socket_id, NULL);
+ }
+ 
++struct rte_mempool *
++rte_pktmbuf_dynamic_pool_create(const char *name, unsigned int n,
++	unsigned int cache_size, uint16_t priv_size,
++	uint16_t data_room_size, int socket_id, int dynamic_size)
++{
++	struct rte_mempool *mp;
++	struct rte_pktmbuf_pool_private mbp_priv;
++	const char *mp_ops_name;
++	unsigned elt_size;
++	int ret;
++
++	if (RTE_ALIGN(priv_size, RTE_MBUF_PRIV_ALIGN) != priv_size) {
++		RTE_LOG(ERR, MBUF, "mbuf priv_size=%u is not aligned\n",
++			priv_size);
++		rte_errno = EINVAL;
++		return NULL;
++	}
++	elt_size = sizeof(struct rte_mbuf) + (unsigned)priv_size +
++		(unsigned)data_room_size;
++	mbp_priv.mbuf_data_room_size = data_room_size;
++	mbp_priv.mbuf_priv_size = priv_size;
++
++	mp = rte_mempool_create_empty(name, n, elt_size, cache_size,
++		 sizeof(struct rte_pktmbuf_pool_private),
++		 socket_id, MEMPOOL_F_DYNAMIC);
++	if (mp == NULL)
++		return NULL;
++
++	mp_ops_name = rte_mbuf_best_mempool_ops();
++	ret = rte_mempool_set_ops_byname(mp, mp_ops_name, NULL);
++	if (ret != 0) {
++		RTE_LOG(ERR, MBUF, "error setting mempool handler\n");
++		rte_mempool_free(mp);
++		rte_errno = -ret;
++		return NULL;
++	}
++	rte_pktmbuf_pool_init(mp, &mbp_priv);
++
++	rte_mempool_set_dynamic_size(mp, dynamic_size);
++	rte_mempool_set_dynamic_cb(mp, rte_pktmbuf_init);
++
++	ret = rte_mempool_populate_default(mp);
++	if (ret < 0) {
++		rte_mempool_free(mp);
++		rte_errno = -ret;
++		return NULL;
++	}
++
++	return mp;
++}
++
+ /* do some sanity checks on a mbuf: panic if it fails */
+ void
+ rte_mbuf_sanity_check(const struct rte_mbuf *m, int is_header)
+diff --git a/lib/librte_mbuf/rte_mbuf.h b/lib/librte_mbuf/rte_mbuf.h
+index 3dbc6695e..5a2d81605 100644
+--- a/lib/librte_mbuf/rte_mbuf.h
++++ b/lib/librte_mbuf/rte_mbuf.h
+@@ -1183,6 +1183,11 @@ rte_pktmbuf_pool_create(const char *name, unsigned n,
+ 	unsigned cache_size, uint16_t priv_size, uint16_t data_room_size,
+ 	int socket_id);
+ 
++struct rte_mempool *
++rte_pktmbuf_dynamic_pool_create(const char *name, unsigned int n,
++	unsigned int cache_size, uint16_t priv_size,
++	uint16_t data_room_size, int socket_id, int dynamic_size);
++
+ /**
+  * Create a mbuf pool with a given mempool ops name
+  *
+diff --git a/lib/librte_mbuf/rte_mbuf_version.map b/lib/librte_mbuf/rte_mbuf_version.map
+index cae68db8d..d6d25af95 100644
+--- a/lib/librte_mbuf/rte_mbuf_version.map
++++ b/lib/librte_mbuf/rte_mbuf_version.map
+@@ -44,4 +44,10 @@ DPDK_18.08 {
+ 	rte_mbuf_set_user_mempool_ops;
+ 	rte_mbuf_user_mempool_ops;
+ 	rte_pktmbuf_pool_create_by_ops;
+-} DPDK_16.11;
++} DPDK_18.11;
++
++DPDK_18.11 {
++	global:
++
++	rte_pktmbuf_dynamic_pool_create;
++} DPDK_18.12;
+-- 
+2.17.1
+

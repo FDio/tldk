@@ -21,10 +21,13 @@ DPDK_PKTMBUF_HEADROOM ?= 128
 DPDK_MARCH            ?= native
 DPDK_TUNE             ?= generic
 DPDK_DEBUG            ?= n
+DPDK_DESTDIR          ?= $(CURDIR)/install
+PACKETDRILL           ?= n
 
 B := $(DPDK_BUILD_DIR)
 I := $(DPDK_INSTALL_DIR)
-DPDK_GIT_REPO ?= http://dpdk.org/git/dpdk
+#DPDK_GIT_REPO ?= http://dpdk.org/git/dpdk -b v18.11
+DPDK_GIT_REPO ?= http://gitlab.alibaba-inc.com/nanovisor/DPDK.git
 DPDK_SOURCE := $(B)/dpdk
 
 ifneq (,$(findstring clang,$(CC)))
@@ -40,8 +43,8 @@ endif
 JOBS := $(shell grep processor /proc/cpuinfo | wc -l)
 
 # compiler/linker custom arguments
-DPDK_CPU_CFLAGS := -pie -fPIC
-DPDK_CPU_LDFLAGS :=
+DPDK_CPU_CFLAGS := -fPIC
+DPDK_CPU_LDFLAGS := -r
 DPDK_EXTRA_LDFLAGS := -g
 
 ifeq ($(DPDK_DEBUG),n)
@@ -78,6 +81,7 @@ DPDK_MAKE_ARGS := -C $(DPDK_SOURCE) -j $(JOBS) \
 	EXTRA_LDFLAGS="$(DPDK_EXTRA_LDFLAGS)" \
 	CPU_CFLAGS="$(DPDK_CPU_CFLAGS)" \
 	CPU_LDFLAGS="$(DPDK_CPU_LDFLAGS)" \
+	DESTDIR="$(DPDK_DESTDIR)" \
         $(DPDK_MAKE_EXTRA_ARGS)
 
 DPDK_SOURCE_FILES := $(shell  [ -e $(DPDK_SOURCE) ] && \
@@ -102,10 +106,10 @@ $(B)/custom-config: $(B)/.patch.ok Makefile
 	$(call set,RTE_MAX_LCORE,256)
 	$(call set,RTE_PKTMBUF_HEADROOM,$(DPDK_PKTMBUF_HEADROOM))
 	$(call set,RTE_LIBEAL_USE_HPET,y)
-	$(call set,RTE_BUILD_COMBINE_LIBS,y)
+	$(call set,RTE_BUILD_COMBINE_LIBS,n)
 	$(call set,RTE_LIBRTE_I40E_16BYTE_RX_DESC,y)
 	$(call set,RTE_LIBRTE_I40E_ITR_INTERVAL,16)
-	$(call set,RTE_LIBRTE_PMD_PCAP,y)
+	$(call set,RTE_LIBRTE_PMD_PCAP,n)
 	@# enable debug init for device drivers
 	$(call set,RTE_LIBRTE_I40E_DEBUG_INIT,$(DPDK_DEBUG))
 	$(call set,RTE_LIBRTE_IXGBE_DEBUG_INIT,$(DPDK_DEBUG))
@@ -115,13 +119,102 @@ $(B)/custom-config: $(B)/.patch.ok Makefile
 	$(call set,RTE_LIBRTE_PMD_BOND,y)
 	$(call set,RTE_LIBRTE_IP_FRAG,y)
 	@# not needed
+	$(call set,RTE_LIBRTE_TIMER,y)
 	$(call set,RTE_LIBRTE_CFGFILE,n)
+	$(call set,RTE_LIBRTE_LPM,y)
+	$(call set,RTE_LIBRTE_ACL,n)
 	$(call set,RTE_LIBRTE_POWER,n)
 	$(call set,RTE_LIBRTE_DISTRIBUTOR,n)
 	$(call set,RTE_LIBRTE_REORDER,n)
+	$(call set,RTE_LIBRTE_PORT,n)
+	$(call set,RTE_LIBRTE_TABLE,n)
+	$(call set,RTE_LIBRTE_PIPELINE,n)
 	$(call set,RTE_LIBRTE_FLOW_CLASSIFY,n)
 	$(call set,RTE_LIBRTE_PMD_CRYPTO_SCHEDULER,n)
 	$(call set,RTE_KNI_KMOD,n)
+	$(call set,RTE_LIBRTE_ENA_PMD,n)
+	$(call set,RTE_LIBRTE_FM10K_PMD,n)
+	$(call set,RTE_LIBRTE_CXGBE_PMD,n)
+	$(call set,RTE_LIBRTE_ENIC_PMD,n)
+	$(call set,RTE_LIBRTE_BNXT_PMD,n)
+	$(call set,RTE_LIBRTE_SFC_EFX_PMD,n)
+	$(call set,RTE_LIBRTE_PMD_SOFTNIC,n)
+	$(call set,RTE_LIBRTE_THUNDERX_NICVF_PMD,n)
+	$(call set,RTE_LIBRTE_LIO_PMD,n)
+	$(call set,RTE_LIBRTE_OCTEONTX_PMD,n)
+	$(call set,RTE_LIBRTE_VMXNET3_PMD,n)
+	$(call set,RTE_LIBRTE_QEDE_PMD,n)
+	$(call set,RTE_LIBRTE_ARK_PMD,n)
+	$(call set,RTE_LIBRTE_PMD_NULL,n)
+	$(call set,RTE_LIBRTE_CRYPTODEV,n)
+	$(call set,RTE_LIBRTE_PMD_NULL_CRYPTO,n)
+	$(call set,RTE_LIBRTE_SECURITY,n)
+	$(call set,RTE_LIBRTE_EVENTDEV,n)
+	$(call set,RTE_LIBRTE_PMD_SKELETON_EVENTDEV,n)
+	$(call set,RTE_LIBRTE_PMD_OCTEONTX_SSOVF,n)
+	$(call set,RTE_LIBRTE_OCTEONTX_MEMPOOL,n)
+	$(call set,RTE_LIBRTE_EFD,n)
+	$(call set,RTE_LIBRTE_MEMBER,n)
+	$(call set,RTE_LIBRTE_JOBSTATS,n)
+	$(call set,RTE_LIBRTE_METER,n)
+	$(call set,RTE_LIBRTE_SCHED,n)
+	$(call set,RTE_APP_TEST,n)
+	$(call set,RTE_APP_CRYPTO_PERF,n)
+	$(call set,RTE_APP_EVENTDEV,n)
+	$(call set,RTE_LIBRTE_PMD_FAILSAFE,n)
+	$(call set,RTE_LIBRTE_EM_PMD,n)
+	$(call set,RTE_LIBRTE_IGB_PMD,n)
+	$(call set,RTE_LIBRTE_LATENCY_STATS,n)
+	$(call set,RTE_EAL_IGB_UIO,n)
+	$(call set,RTE_LIBRTE_KNI,n)
+	$(call set,RTE_LIBRTE_PMD_KNI,n)
+	$(call set,RTE_KNI_KMOD,n)
+	$(call set,RTE_KNI_KMOD_ETHTOOL,n)
+	$(call set,RTE_LIBRTE_BITRATE,n)
+	$(call set,RTE_LIBRTE_METRICS,y)
+	$(call set,RTE_LIBRTE_AVP_PMD,n)
+	$(call set,RTE_LIBRTE_NFP_PMD,n)
+	$(call set,RTE_LIBRTE_PMD_TAP,n)
+	$(call set,RTE_LIBRTE_VHOST,$(PACKETDRILL))
+	$(call set,RTE_LIBRTE_IFC_PMD,n)
+	$(call set,RTE_LIBRTE_PMD_VHOST,n)
+	$(call set,RTE_PROC_INFO,n)
+	$(call set,RTE_TEST_PMD,n)
+	$(call set,RTE_LIBRTE_FSLMC_BUS,n)
+	$(call set,RTE_LIBRTE_DPAA_BUS,n)
+	$(call set,RTE_LIBRTE_VMBUS,n)
+	$(call set,RTE_LIBRTE_IFPGA_BUS,n)
+	$(call set,RTE_LIBRTE_BPF,n)
+	$(call set,RTE_LIBRTE_COMPRESSDEV,n)
+	$(call set,RTE_LIBRTE_VDEV_NETVSC_PMD,n)
+	$(call set,RTE_LIBRTE_NETVSC_PMD,n)
+	$(call set,RTE_LIBRTE_RAWDEV,n)
+	$(call set,RTE_LIBRTE_EAL_VMWARE_TSC_MAP_SUPPORT,n)
+	$(call set,RTE_LIBRTE_AXGBE_PMD,n)
+	$(call set,RTE_LIBRTE_AVF_PMD,n)
+	$(call set,RTE_LIBRTE_BBDEV,n)
+	$(call set,RTE_LIBRTE_IP_FRAG_MAX_FRAG,48)
+	$(call set,RTE_MAX_NUMA_NODES,2)
+	$(call set,RTE_MAX_ETHPORTS,4)
+	$(call set,RTE_MAX_QUEUES_PER_PORT,8)
+	$(call set,RTE_LIBRTE_I40E_PMD,n)
+	$(call set,RTE_LIBRTE_IXGBE_PMD,n)
+	$(call set,RTE_LIBRTE_ENETC_PMD,n)
+	$(call set,RTE_LIBRTE_PMD_BOND,n)
+	$(call set,RTE_LIBRTE_ATLANTIC_PMD,n)
+	$(call set,RTE_LIBRTE_LPM,n)
+	$(call set,RTE_LIBRTE_GSO,n)
+	$(call set,RTE_MAX_VFIO_GROUPS,4)
+	$(call set,RTE_MAX_VFIO_CONTAINERS,4)
+	$(call set,RTE_LIBRTE_COMMON_DPAAX,n)
+	$(call set,RTE_LIBRTE_PMD_OCTEONTX_CRYPTO,n)
+	$(call set,RTE_EAL_NUMA_AWARE_HUGEPAGES,n)
+	$(call set,RTE_DRIVER_MEMPOOL_STACK,y)
+	$(call set,RTE_DRIVER_MEMPOOL_BUCKET,n)
+	$(call set,RTE_LIBRTE_PMD_QAT,n)
+	$(call set,RTE_LIBRTE_PMD_AF_PACKET,n)
+	$(call set,RTE_MAX_MEM_MB,1024)
+	$(call set,RTE_LIBRTE_PDUMP,n)
 	@rm -f .config.ok
 
 $(B)/.download.ok:
@@ -165,4 +258,4 @@ build: $(B)/.build.ok
 
 .PHONY: clean
 clean:
-	@rm -rf $(B) $(I)
+	@rm -rf $(DPDK_BUILD_DIR) $(DPDK_DESTDIR)

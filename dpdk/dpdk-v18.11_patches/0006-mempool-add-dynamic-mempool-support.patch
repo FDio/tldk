@@ -1,0 +1,247 @@
+From 9d2ddfe6012b37297bc84f6ddcce810232162e5b Mon Sep 17 00:00:00 2001
+From: Jianfeng Tan <henry.tjf@antfin.com>
+Date: Wed, 26 Dec 2018 14:39:24 +0000
+Subject: [PATCH 1/2] mempool: add dynamic mempool support
+
+Signed-off-by: Jianfeng Tan <henry.tjf@antfin.com>
+---
+ drivers/mempool/ring/rte_mempool_ring.c | 26 +++++++----
+ lib/librte_mempool/rte_mempool.c        | 27 +++++++++--
+ lib/librte_mempool/rte_mempool.h        | 62 ++++++++++++++++++++-----
+ 3 files changed, 92 insertions(+), 23 deletions(-)
+
+diff --git a/drivers/mempool/ring/rte_mempool_ring.c b/drivers/mempool/ring/rte_mempool_ring.c
+index bc123fc52..e8fec9119 100644
+--- a/drivers/mempool/ring/rte_mempool_ring.c
++++ b/drivers/mempool/ring/rte_mempool_ring.c
+@@ -49,30 +49,40 @@ common_ring_get_count(const struct rte_mempool *mp)
+ static int
+ common_ring_alloc(struct rte_mempool *mp)
+ {
++	int n;
+ 	int rg_flags = 0, ret;
+ 	char rg_name[RTE_RING_NAMESIZE];
+ 	struct rte_ring *r;
+ 
+-	ret = snprintf(rg_name, sizeof(rg_name),
+-		RTE_MEMPOOL_MZ_FORMAT, mp->name);
+-	if (ret < 0 || ret >= (int)sizeof(rg_name)) {
+-		rte_errno = ENAMETOOLONG;
+-		return -rte_errno;
+-	}
+-
+ 	/* ring flags */
+ 	if (mp->flags & MEMPOOL_F_SP_PUT)
+ 		rg_flags |= RING_F_SP_ENQ;
+ 	if (mp->flags & MEMPOOL_F_SC_GET)
+ 		rg_flags |= RING_F_SC_DEQ;
+ 
++	if (mp->flags & MEMPOOL_F_DYNAMIC) {
++		n = RTE_MIN(mp->size, mp->populated_size + mp->dynamic_size);
++
++		ret = snprintf(rg_name, sizeof(rg_name),
++			RTE_MEMPOOL_MZ_FORMAT"_%x", mp->name, n);
++	} else {
++		n = mp->size;
++		ret = snprintf(rg_name, sizeof(rg_name),
++			RTE_MEMPOOL_MZ_FORMAT, mp->name);
++	}
++
++	if (ret < 0 || ret >= (int)sizeof(rg_name)) {
++		rte_errno = ENAMETOOLONG;
++		return -rte_errno;
++	}
++
+ 	/*
+ 	 * Allocate the ring that will be used to store objects.
+ 	 * Ring functions will return appropriate errors if we are
+ 	 * running as a secondary process etc., so no checks made
+ 	 * in this function for that condition.
+ 	 */
+-	r = rte_ring_create(rg_name, rte_align32pow2(mp->size + 1),
++	r = rte_ring_create(rg_name, rte_align32pow2(n + 1),
+ 		mp->socket_id, rg_flags);
+ 	if (r == NULL)
+ 		return -rte_errno;
+diff --git a/lib/librte_mempool/rte_mempool.c b/lib/librte_mempool/rte_mempool.c
+index 683b216f9..70039f6c3 100644
+--- a/lib/librte_mempool/rte_mempool.c
++++ b/lib/librte_mempool/rte_mempool.c
+@@ -152,6 +152,8 @@ mempool_add_elem(struct rte_mempool *mp, __rte_unused void *opaque,
+ 	hdr->mp = mp;
+ 	hdr->iova = iova;
+ 	STAILQ_INSERT_TAIL(&mp->elt_list, hdr, next);
++	if (mp->flags & MEMPOOL_F_DYNAMIC && mp->dyn_obj_cb)
++		mp->dyn_obj_cb(mp, NULL, obj, mp->populated_size);
+ 	mp->populated_size++;
+ 
+ #ifdef RTE_LIBRTE_MEMPOOL_DEBUG
+@@ -426,9 +428,10 @@ rte_mempool_populate_default(struct rte_mempool *mp)
+ 	ssize_t mem_size;
+ 	size_t align, pg_sz, pg_shift;
+ 	rte_iova_t iova;
+-	unsigned mz_id, n;
++	unsigned mz_id, n, avail;
+ 	int ret;
+ 	bool no_contig, try_contig, no_pageshift, external;
++	bool dynamic = (mp->flags & MEMPOOL_F_DYNAMIC) ? true : false;
+ 
+ 	ret = mempool_ops_alloc_once(mp);
+ 	if (ret != 0)
+@@ -441,7 +444,7 @@ rte_mempool_populate_default(struct rte_mempool *mp)
+ 	external = ret;
+ 
+ 	/* mempool must not be populated */
+-	if (mp->nb_mem_chunks != 0)
++	if (mp->nb_mem_chunks != 0 && !dynamic)
+ 		return -EEXIST;
+ 
+ 	no_contig = mp->flags & MEMPOOL_F_NO_IOVA_CONTIG;
+@@ -512,7 +515,16 @@ rte_mempool_populate_default(struct rte_mempool *mp)
+ 		pg_shift = rte_bsf32(pg_sz);
+ 	}
+ 
+-	for (mz_id = 0, n = mp->size; n > 0; mz_id++, n -= ret) {
++	n = mp->size;
++	if (dynamic) {
++		n = RTE_MIN(mp->size - mp->populated_size, mp->dynamic_size);
++		if (mp->nb_mem_chunks != 0 && rte_mempool_ops_alloc(mp) != 0)
++			return -ENOMEM;
++	}
++
++	avail = 0;
++	mz_id = mp->nb_mem_chunks;
++	for (; n > 0; mz_id++, n -= ret, avail += ret) {
+ 		size_t min_chunk_size;
+ 		unsigned int flags;
+ 
+@@ -607,9 +619,16 @@ rte_mempool_populate_default(struct rte_mempool *mp)
+ 		}
+ 	}
+ 
+-	return mp->size;
++	return avail;
+ 
+  fail:
++	if (dynamic) {
++		if (avail)
++			return avail;
++
++		return ret;
++	}
++
+ 	rte_mempool_free_memchunks(mp);
+ 	return ret;
+ }
+diff --git a/lib/librte_mempool/rte_mempool.h b/lib/librte_mempool/rte_mempool.h
+index 7c9cd9a2f..0886b19f2 100644
+--- a/lib/librte_mempool/rte_mempool.h
++++ b/lib/librte_mempool/rte_mempool.h
+@@ -207,6 +207,16 @@ struct rte_mempool_info {
+ 	unsigned int contig_block_size;
+ } __rte_cache_aligned;
+ 
++struct rte_mempool;
++/**
++ * An object callback function for mempool.
++ *
++ * Used by rte_mempool_create() and rte_mempool_obj_iter().
++ */
++typedef void (rte_mempool_obj_cb_t)(struct rte_mempool *mp,
++		void *opaque, void *obj, unsigned obj_idx);
++typedef rte_mempool_obj_cb_t rte_mempool_obj_ctor_t; /* compat */
++
+ /**
+  * The RTE mempool structure.
+  */
+@@ -247,6 +257,8 @@ struct rte_mempool {
+ 	struct rte_mempool_cache *local_cache; /**< Per-lcore local cache */
+ 
+ 	uint32_t populated_size;         /**< Number of populated objects. */
++	uint32_t dynamic_size;           /**< Number of dynamic populated objects. */
++	rte_mempool_obj_cb_t *dyn_obj_cb; /**< elem cb for dynamic populated objects. */
+ 	struct rte_mempool_objhdr_list elt_list; /**< List of objects in pool */
+ 	uint32_t nb_mem_chunks;          /**< Number of memory chunks */
+ 	struct rte_mempool_memhdr_list mem_list; /**< List of memory chunks */
+@@ -264,6 +276,8 @@ struct rte_mempool {
+ #define MEMPOOL_F_POOL_CREATED   0x0010 /**< Internal: pool is created. */
+ #define MEMPOOL_F_NO_IOVA_CONTIG 0x0020 /**< Don't need IOVA contiguous objs. */
+ #define MEMPOOL_F_NO_PHYS_CONTIG MEMPOOL_F_NO_IOVA_CONTIG /* deprecated */
++#define MEMPOOL_F_DYNAMIC        0x0040 /**< Don't populate element once for all */
++#define MEMPOOL_F_DYNAMIC_NOW    0x0080 /**< It's is dynamically populated now */
+ 
+ /**
+  * @internal When debug is enabled, store some statistics.
+@@ -839,15 +853,6 @@ int rte_mempool_register_ops(const struct rte_mempool_ops *ops);
+ 		rte_mempool_register_ops(&ops);			\
+ 	}
+ 
+-/**
+- * An object callback function for mempool.
+- *
+- * Used by rte_mempool_create() and rte_mempool_obj_iter().
+- */
+-typedef void (rte_mempool_obj_cb_t)(struct rte_mempool *mp,
+-		void *opaque, void *obj, unsigned obj_idx);
+-typedef rte_mempool_obj_cb_t rte_mempool_obj_ctor_t; /* compat */
+-
+ /**
+  * A memory callback function for mempool.
+  *
+@@ -989,6 +994,22 @@ struct rte_mempool *
+ rte_mempool_create_empty(const char *name, unsigned n, unsigned elt_size,
+ 	unsigned cache_size, unsigned private_data_size,
+ 	int socket_id, unsigned flags);
++
++static inline void
++rte_mempool_set_dynamic_size(struct rte_mempool *mp, int dynamic_size)
++{
++	mp->flags |= MEMPOOL_F_DYNAMIC;
++	mp->dynamic_size = dynamic_size;
++}
++
++static inline void
++rte_mempool_set_dynamic_cb(struct rte_mempool *mp,
++			   rte_mempool_obj_cb_t *dyn_obj_cb)
++{
++	mp->flags |= MEMPOOL_F_DYNAMIC;
++	mp->dyn_obj_cb = dyn_obj_cb;
++}
++
+ /**
+  * Free a mempool
+  *
+@@ -1390,9 +1411,28 @@ __mempool_generic_get(struct rte_mempool *mp, void **obj_table,
+ 	/* get remaining objects from ring */
+ 	ret = rte_mempool_ops_dequeue_bulk(mp, obj_table, n);
+ 
+-	if (ret < 0)
++	if (ret < 0) {
++		if (mp->flags & MEMPOOL_F_DYNAMIC &&
++		    mp->populated_size < mp->size) {
++			int work;
++
++			work = rte_atomic32_cmpset(&mp->flags,
++				      mp->flags & ~MEMPOOL_F_DYNAMIC_NOW,
++				      mp->flags | MEMPOOL_F_DYNAMIC_NOW);
++			if (work) {
++				int more;
++
++				more = rte_mempool_populate_default(mp);
++				mp->flags &= ~MEMPOOL_F_DYNAMIC_NOW;
++				if (more > 0)
++					goto ring_dequeue;
++			} else {
++				/* mempool is populating, try again */
++				goto ring_dequeue;
++			}
++		}
+ 		__MEMPOOL_STAT_ADD(mp, get_fail, n);
+-	else
++	} else
+ 		__MEMPOOL_STAT_ADD(mp, get_success, n);
+ 
+ 	return ret;
+-- 
+2.17.1
+

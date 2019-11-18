@@ -1,0 +1,16 @@
+diff --git a/llvm_mode/afl-llvm-rt.o.c b/llvm_mode/afl-llvm-rt.o.c
+index debde20..69e2e4c 100644
+--- a/llvm_mode/afl-llvm-rt.o.c
++++ b/llvm_mode/afl-llvm-rt.o.c
+@@ -39,9 +39,9 @@
+    the LLVM-generated runtime initialization pass, not before. */
+ 
+ #ifdef USE_TRACE_PC
+-#  define CONST_PRIO 5
++#  define CONST_PRIO 2005
+ #else
+-#  define CONST_PRIO 0
++#  define CONST_PRIO 2000
+ #endif /* ^USE_TRACE_PC */
+ 
+ #include <sys/mman.h>

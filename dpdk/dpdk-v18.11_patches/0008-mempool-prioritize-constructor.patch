@@ -1,0 +1,30 @@
+From cd36895a4a7bfc342915b42e3856bd233452f0bd Mon Sep 17 00:00:00 2001
+From: Jianfeng Tan <henry.tjf@antfin.com>
+Date: Fri, 13 Jul 2018 15:25:22 +0800
+Subject: [PATCH 1/9] mempool: prioritize constructor
+
+---
+ lib/librte_mempool/rte_mempool.h | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/lib/librte_mempool/rte_mempool.h b/lib/librte_mempool/rte_mempool.h
+index 7c9cd9a2f..bdc32d583 100644
+--- a/lib/librte_mempool/rte_mempool.h
++++ b/lib/librte_mempool/rte_mempool.h
+@@ -833,10 +833,10 @@ int rte_mempool_register_ops(const struct rte_mempool_ops *ops);
+  * more than RTE_MEMPOOL_MAX_OPS_IDX is registered.
+  */
+ #define MEMPOOL_REGISTER_OPS(ops)					\
+-	void mp_hdlr_init_##ops(void);					\
+-	void __attribute__((constructor, used)) mp_hdlr_init_##ops(void)\
++	static void __attribute__((constructor(101), used))		\
++	mp_hdlr_init_##ops(void)					\
+ 	{								\
+-		rte_mempool_register_ops(&ops);			\
++		rte_mempool_register_ops(&ops);				\
+ 	}
+ 
+ /**
+-- 
+2.17.1
+

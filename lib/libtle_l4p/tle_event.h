@@ -43,7 +43,7 @@ struct tle_event {
 	struct tle_evq *head;
 	const void *data;
 	enum tle_ev_state state;
-} __rte_cache_aligned;
+};
 
 struct tle_evq {
 	rte_spinlock_t lock;
