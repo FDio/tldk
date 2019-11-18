@@ -68,9 +68,28 @@ tcp_txq_set_nxt_head(struct tle_tcp_stream *s, uint32_t num)
 static inline void
 tcp_txq_rst_nxt_head(struct tle_tcp_stream *s)
 {
-	struct rte_ring *r;
+	struct rte_ring *r = s->tx.q;
+	struct rte_mbuf *m;
+	uint32_t offset, data_len;
 
-	r = s->tx.q;
+	if (s->tcb.snd.nxt_pkt != NULL) {
+		s->tcb.snd.nxt_offset = 0;
+		s->tcb.snd.nxt_pkt = NULL;
+	}
+
+	offset = s->tcb.snd.una_offset;
+	if (offset) {
+		m = (struct rte_mbuf *)(_rte_ring_get_data(r)[r->cons.tail & r->mask]);
+		data_len = m->data_len - PKT_L234_HLEN(m);
+		while (offset >= data_len) {
+			offset -= data_len;
+			m = m->next;
+			data_len = m->data_len;
+		}
+		s->tcb.snd.nxt_pkt = m;
+		s->tcb.snd.nxt_offset = offset;
+	}
+
 	r->cons.head = r->cons.tail;
 }
 
@@ -110,9 +129,13 @@ static inline uint32_t
 txs_dequeue_bulk(struct tle_ctx *ctx, struct tle_tcp_stream *s[], uint32_t num)
 {
 	struct rte_ring *r;
+	uint32_t n, i;
 
 	r = CTX_TCP_TSQ(ctx);
-	return _rte_ring_dequeue_burst(r, (void **)s, num);
+	n = _rte_ring_dequeue_burst(r, (void **)s, num);
+	for (i = 0; i < n; i++)
+		rte_atomic32_clear(&s[i]->tx.arm);
+	return n;
 }
 
 #ifdef __cplusplus

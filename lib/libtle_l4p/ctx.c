@@ -21,8 +21,13 @@
 #include <rte_ip.h>
 
 #include "stream.h"
+#include "stream_table.h"
 #include "misc.h"
 #include <halfsiphash.h>
+
+struct tle_mib default_mib;
+
+RTE_DEFINE_PER_LCORE(struct tle_mib *, mib) = &default_mib;
 
 #define	LPORT_START	0x8000
 #define	LPORT_END	MAX_PORT_NUM
@@ -103,6 +108,16 @@ tle_ctx_create(const struct tle_ctx_param *ctx_prm)
 
 	ctx->prm = *ctx_prm;
 
+	rc = bhash_init(ctx);
+	if (rc != 0) {
+		UDP_LOG(ERR, "create bhash table (ctx=%p, proto=%u) failed "
+			"with error code: %d;\n",
+			ctx, ctx_prm->proto, rc);
+		tle_ctx_destroy(ctx);
+		rte_errno = -rc;
+		return NULL;
+	}
+
 	rc = tle_stream_ops[ctx_prm->proto].init_streams(ctx);
 	if (rc != 0) {
 		UDP_LOG(ERR, "init_streams(ctx=%p, proto=%u) failed "
@@ -114,9 +129,10 @@ tle_ctx_create(const struct tle_ctx_param *ctx_prm)
 	}
 
 	for (i = 0; i != RTE_DIM(ctx->use); i++)
-		tle_pbm_init(ctx->use + i, LPORT_START_BLK);
+		tle_psm_init(ctx->use + i);
 
-	ctx->streams.nb_free = ctx->prm.max_streams;
+	ctx->streams.nb_free = ctx->prm.min_streams;
+	ctx->streams.nb_cur = ctx->prm.min_streams;
 
 	/* Initialization of siphash state is done here to speed up the
 	 * fastpath processing.
@@ -124,6 +140,11 @@ tle_ctx_create(const struct tle_ctx_param *ctx_prm)
 	if (ctx->prm.hash_alg == TLE_SIPHASH)
 		siphash_initialization(&ctx->prm.secret_key,
 					&ctx->prm.secret_key);
+
+	rte_spinlock_init(&ctx->dev_lock);
+	rte_spinlock_init(&ctx->bhash_lock[TLE_V4]);
+	rte_spinlock_init(&ctx->bhash_lock[TLE_V6]);
+
 	return ctx;
 }
 
@@ -137,6 +158,8 @@ tle_ctx_destroy(struct tle_ctx *ctx)
 		return;
 	}
 
+	bhash_fini(ctx);
+
 	for (i = 0; i != RTE_DIM(ctx->dev); i++)
 		tle_del_dev(ctx->dev + i);
 
@@ -148,37 +171,6 @@ void
 tle_ctx_invalidate(struct tle_ctx *ctx)
 {
 	RTE_SET_USED(ctx);
-}
-
-static void
-fill_pbm(struct tle_pbm *pbm, const struct tle_bl_port *blp)
-{
-	uint32_t i;
-
-	for (i = 0; i != blp->nb_port; i++)
-		tle_pbm_set(pbm, blp->port[i]);
-}
-
-static int
-init_dev_proto(struct tle_dev *dev, uint32_t idx, int32_t socket_id,
-	const struct tle_bl_port *blp)
-{
-	size_t sz;
-
-	sz = sizeof(*dev->dp[idx]);
-	dev->dp[idx] = rte_zmalloc_socket(NULL, sz, RTE_CACHE_LINE_SIZE,
-		socket_id);
-
-	if (dev->dp[idx] == NULL) {
-		UDP_LOG(ERR, "allocation of %zu bytes on "
-			"socket %d for %u-th device failed\n",
-			sz, socket_id, idx);
-		return ENOMEM;
-	}
-
-	tle_pbm_init(&dev->dp[idx]->use, LPORT_START_BLK);
-	fill_pbm(&dev->dp[idx]->use, blp);
-	return 0;
 }
 
 static struct tle_dev *
@@ -214,27 +206,8 @@ tle_add_dev(struct tle_ctx *ctx, const struct tle_dev_param *dev_prm)
 		return NULL;
 	rc = 0;
 
-	/* device can handle IPv4 traffic */
-	if (dev_prm->local_addr4.s_addr != INADDR_ANY) {
-		rc = init_dev_proto(dev, TLE_V4, ctx->prm.socket_id,
-			&dev_prm->bl4);
-		if (rc == 0)
-			fill_pbm(&ctx->use[TLE_V4], &dev_prm->bl4);
-	}
-
-	/* device can handle IPv6 traffic */
-	if (rc == 0 && memcmp(&dev_prm->local_addr6, &tle_ipv6_any,
-			sizeof(tle_ipv6_any)) != 0) {
-		rc = init_dev_proto(dev, TLE_V6, ctx->prm.socket_id,
-			&dev_prm->bl6);
-		if (rc == 0)
-			fill_pbm(&ctx->use[TLE_V6], &dev_prm->bl6);
-	}
-
 	if (rc != 0) {
 		/* cleanup and return an error. */
-		rte_free(dev->dp[TLE_V4]);
-		rte_free(dev->dp[TLE_V6]);
 		rte_errno = rc;
 		return NULL;
 	}
@@ -246,16 +219,19 @@ tle_add_dev(struct tle_ctx *ctx, const struct tle_dev_param *dev_prm)
 
 	if ((dev_prm->tx_offload & DEV_TX_OFFLOAD_UDP_CKSUM) != 0 &&
 			ctx->prm.proto == TLE_PROTO_UDP) {
-		dev->tx.ol_flags[TLE_V4] |= PKT_TX_IPV4 | PKT_TX_UDP_CKSUM;
-		dev->tx.ol_flags[TLE_V6] |= PKT_TX_IPV6 | PKT_TX_UDP_CKSUM;
+		dev->tx.ol_flags[TLE_V4] |= PKT_TX_UDP_CKSUM;
+		dev->tx.ol_flags[TLE_V6] |= PKT_TX_UDP_CKSUM;
 	} else if ((dev_prm->tx_offload & DEV_TX_OFFLOAD_TCP_CKSUM) != 0 &&
 			ctx->prm.proto == TLE_PROTO_TCP) {
-		dev->tx.ol_flags[TLE_V4] |= PKT_TX_IPV4 | PKT_TX_TCP_CKSUM;
-		dev->tx.ol_flags[TLE_V6] |= PKT_TX_IPV6 | PKT_TX_TCP_CKSUM;
+		dev->tx.ol_flags[TLE_V4] |= PKT_TX_TCP_CKSUM;
+		dev->tx.ol_flags[TLE_V6] |= PKT_TX_TCP_CKSUM;
 	}
 
 	if ((dev_prm->tx_offload & DEV_TX_OFFLOAD_IPV4_CKSUM) != 0)
-		dev->tx.ol_flags[TLE_V4] |= PKT_TX_IPV4 | PKT_TX_IP_CKSUM;
+		dev->tx.ol_flags[TLE_V4] |= PKT_TX_IP_CKSUM;
+
+	dev->tx.ol_flags[TLE_V4] |= PKT_TX_IPV4;
+	dev->tx.ol_flags[TLE_V6] |= PKT_TX_IPV6;
 
 	dev->prm = *dev_prm;
 	dev->ctx = ctx;
@@ -300,220 +276,97 @@ tle_del_dev(struct tle_dev *dev)
 	ctx = dev->ctx;
 	p = dev - ctx->dev;
 
-	if (p >= RTE_DIM(ctx->dev) ||
-			(dev->dp[TLE_V4] == NULL &&
-			dev->dp[TLE_V6] == NULL))
+	if (p >= RTE_DIM(ctx->dev))
 		return -EINVAL;
 
 	/* emtpy TX queues. */
 	empty_dring(&dev->tx.dr, ctx->prm.proto);
 
-	rte_free(dev->dp[TLE_V4]);
-	rte_free(dev->dp[TLE_V6]);
 	memset(dev, 0, sizeof(*dev));
 	ctx->nb_dev--;
 	return 0;
-}
-
-static struct tle_dev *
-find_ipv4_dev(struct tle_ctx *ctx, const struct in_addr *addr)
-{
-	uint32_t i;
-
-	for (i = 0; i != RTE_DIM(ctx->dev); i++) {
-		if (ctx->dev[i].prm.local_addr4.s_addr == addr->s_addr &&
-				ctx->dev[i].dp[TLE_V4] != NULL)
-			return ctx->dev + i;
-	}
-
-	return NULL;
-}
-
-static struct tle_dev *
-find_ipv6_dev(struct tle_ctx *ctx, const struct in6_addr *addr)
-{
-	uint32_t i;
-
-	for (i = 0; i != RTE_DIM(ctx->dev); i++) {
-		if (memcmp(&ctx->dev[i].prm.local_addr6, addr,
-				sizeof(*addr)) == 0 &&
-				ctx->dev[i].dp[TLE_V6] != NULL)
-			return ctx->dev + i;
-	}
-
-	return NULL;
-}
-
-static int
-stream_fill_dev(struct tle_ctx *ctx, struct tle_stream *s,
-	const struct sockaddr *addr)
-{
-	struct tle_dev *dev;
-	struct tle_pbm *pbm;
-	const struct sockaddr_in *lin4;
-	const struct sockaddr_in6 *lin6;
-	uint32_t i, p, sp, t;
-
-	if (addr->sa_family == AF_INET) {
-		lin4 = (const struct sockaddr_in *)addr;
-		t = TLE_V4;
-		p = lin4->sin_port;
-	} else if (addr->sa_family == AF_INET6) {
-		lin6 = (const struct sockaddr_in6 *)addr;
-		t = TLE_V6;
-		p = lin6->sin6_port;
-	} else
-		return EINVAL;
-
-	p = ntohs(p);
-
-	/* if local address is not wildcard, find device it belongs to. */
-	if (t == TLE_V4 && lin4->sin_addr.s_addr != INADDR_ANY) {
-		dev = find_ipv4_dev(ctx, &lin4->sin_addr);
-		if (dev == NULL)
-			return ENODEV;
-	} else if (t == TLE_V6 && memcmp(&tle_ipv6_any, &lin6->sin6_addr,
-			sizeof(tle_ipv6_any)) != 0) {
-		dev = find_ipv6_dev(ctx, &lin6->sin6_addr);
-		if (dev == NULL)
-			return ENODEV;
-	} else
-		dev = NULL;
-
-	if (dev != NULL)
-		pbm = &dev->dp[t]->use;
-	else
-		pbm = &ctx->use[t];
-
-	/* try to acquire local port number. */
-	if (p == 0) {
-		p = tle_pbm_find_range(pbm, pbm->blk, LPORT_END_BLK);
-		if (p == 0 && pbm->blk > LPORT_START_BLK)
-			p = tle_pbm_find_range(pbm, LPORT_START_BLK, pbm->blk);
-	} else if (tle_pbm_check(pbm, p) != 0)
-		return EEXIST;
-
-	if (p == 0)
-		return ENFILE;
-
-	/* fill socket's dst port and type */
-
-	sp = htons(p);
-	s->type = t;
-	s->port.dst = sp;
-
-	/* mark port as in-use */
-
-	tle_pbm_set(&ctx->use[t], p);
-	if (dev != NULL) {
-		tle_pbm_set(pbm, p);
-		dev->dp[t]->streams[sp] = s;
-	} else {
-		for (i = 0; i != RTE_DIM(ctx->dev); i++) {
-			if (ctx->dev[i].dp[t] != NULL) {
-				tle_pbm_set(&ctx->dev[i].dp[t]->use, p);
-				ctx->dev[i].dp[t]->streams[sp] = s;
-			}
-		}
-	}
-
-	return 0;
-}
-
-static int
-stream_clear_dev(struct tle_ctx *ctx, const struct tle_stream *s)
-{
-	struct tle_dev *dev;
-	uint32_t i, p, sp, t;
-
-	t = s->type;
-	sp = s->port.dst;
-	p = ntohs(sp);
-
-	/* if local address is not wildcard, find device it belongs to. */
-	if (t == TLE_V4 && s->ipv4.addr.dst != INADDR_ANY) {
-		dev = find_ipv4_dev(ctx,
-			(const struct in_addr *)&s->ipv4.addr.dst);
-		if (dev == NULL)
-			return ENODEV;
-	} else if (t == TLE_V6 && memcmp(&tle_ipv6_any, &s->ipv6.addr.dst,
-			sizeof(tle_ipv6_any)) != 0) {
-		dev = find_ipv6_dev(ctx,
-			(const struct in6_addr *)&s->ipv6.addr.dst);
-		if (dev == NULL)
-			return ENODEV;
-	} else
-		dev = NULL;
-
-	tle_pbm_clear(&ctx->use[t], p);
-	if (dev != NULL) {
-		if (dev->dp[t]->streams[sp] == s) {
-			tle_pbm_clear(&dev->dp[t]->use, p);
-			dev->dp[t]->streams[sp] = NULL;
-		}
-	} else {
-		for (i = 0; i != RTE_DIM(ctx->dev); i++) {
-			if (ctx->dev[i].dp[t] != NULL &&
-					ctx->dev[i].dp[t]->streams[sp] == s) {
-				tle_pbm_clear(&ctx->dev[i].dp[t]->use, p);
-				ctx->dev[i].dp[t]->streams[sp] = NULL;
-			}
-		}
-	}
-
-	return 0;
-}
-
-static void
-fill_ipv4_am(const struct sockaddr_in *in, uint32_t *addr, uint32_t *mask)
-{
-	*addr = in->sin_addr.s_addr;
-	*mask = (*addr == INADDR_ANY) ? INADDR_ANY : INADDR_NONE;
-}
-
-static void
-fill_ipv6_am(const struct sockaddr_in6 *in, rte_xmm_t *addr, rte_xmm_t *mask)
-{
-	const struct in6_addr *pm;
-
-	memcpy(addr, &in->sin6_addr, sizeof(*addr));
-	if (memcmp(&tle_ipv6_any, addr, sizeof(*addr)) == 0)
-		pm = &tle_ipv6_any;
-	else
-		pm = &tle_ipv6_none;
-
-	memcpy(mask, pm, sizeof(*mask));
 }
 
 int
 stream_fill_ctx(struct tle_ctx *ctx, struct tle_stream *s,
 	const struct sockaddr *laddr, const struct sockaddr *raddr)
 {
-	const struct sockaddr_in *rin;
-	int32_t rc;
+	struct sockaddr_storage addr;
+	int32_t rc = 0;
 
-	/* setup ports and port mask fields (except dst port). */
-	rin = (const struct sockaddr_in *)raddr;
-	s->port.src = rin->sin_port;
-	s->pmsk.src = (s->port.src == 0) ? 0 : UINT16_MAX;
-	s->pmsk.dst = UINT16_MAX;
+	if (laddr->sa_family == AF_INET) {
+		s->type = TLE_V4;
+	} else if (laddr->sa_family == AF_INET6) {
+		s->type = TLE_V6;
+	}
 
-	/* setup src and dst addresses. */
+	uint16_t p = ((const struct sockaddr_in *)laddr)->sin_port;
+	p = ntohs(p);
+	struct tle_psm *psm = &ctx->use[s->type];
+	/* try to acquire local port number. */
+	rte_spinlock_lock(&ctx->dev_lock);
+	if (p == 0) {
+		if (s->type == TLE_V6 && is_empty_addr(laddr) && !s->option.ipv6only)
+			p = tle_psm_alloc_dual_port(&ctx->use[TLE_V4], psm);
+		else
+			p = tle_psm_alloc_port(psm);
+		if (p == 0) {
+			rte_spinlock_unlock(&ctx->dev_lock);
+			return ENFILE;
+		}
+		rte_memcpy(&addr, laddr, sizeof(struct sockaddr_storage));
+		((struct sockaddr_in *)&addr)->sin_port = htons(p);
+		laddr = (const struct sockaddr*)&addr;
+	}
+
+	if (tle_psm_set(psm, p, s->option.reuseport) != 0) {
+		rte_spinlock_unlock(&ctx->dev_lock);
+		return EADDRINUSE;
+	}
+
+	if (is_empty_addr(laddr)) {
+		if (s->type == TLE_V6 && !s->option.ipv6only) {
+			rc = tle_psm_set(&ctx->use[TLE_V4], p, s->option.reuseport);
+			if (rc != 0) {
+				tle_psm_clear(psm, p);
+				rte_spinlock_unlock(&ctx->dev_lock);
+				return EADDRINUSE;
+			}
+		}
+	}
+
+	if (is_empty_addr(raddr))
+		rc = bhash_add_entry(ctx, laddr, s);
+
+	if (rc) {
+		tle_psm_clear(psm, p);
+	}
+
+	rte_spinlock_unlock(&ctx->dev_lock);
+	/* fill socket's dst (src actually) port */
+	s->port.dst = htons(p);
+
+	if (rc)
+		return rc;
+
+	/* setup src, dst addresses, and src port. */
 	if (laddr->sa_family == AF_INET) {
 		fill_ipv4_am((const struct sockaddr_in *)laddr,
 			&s->ipv4.addr.dst, &s->ipv4.mask.dst);
 		fill_ipv4_am((const struct sockaddr_in *)raddr,
 			&s->ipv4.addr.src, &s->ipv4.mask.src);
+		s->port.src = ((const struct sockaddr_in *)raddr)->sin_port;
 	} else if (laddr->sa_family == AF_INET6) {
 		fill_ipv6_am((const struct sockaddr_in6 *)laddr,
 			&s->ipv6.addr.dst, &s->ipv6.mask.dst);
 		fill_ipv6_am((const struct sockaddr_in6 *)raddr,
 			&s->ipv6.addr.src, &s->ipv6.mask.src);
+		s->port.src = ((const struct sockaddr_in6 *)raddr)->sin6_port;
 	}
 
-	rte_spinlock_lock(&ctx->dev_lock);
-	rc = stream_fill_dev(ctx, s, laddr);
-	rte_spinlock_unlock(&ctx->dev_lock);
+	/* setup port mask fields. */
+	s->pmsk.src = (s->port.src == 0) ? 0 : UINT16_MAX;
+	s->pmsk.dst = UINT16_MAX;
 
 	return rc;
 }
@@ -522,11 +375,41 @@ stream_fill_ctx(struct tle_ctx *ctx, struct tle_stream *s,
 int
 stream_clear_ctx(struct tle_ctx *ctx, struct tle_stream *s)
 {
-	int32_t rc;
+	bool is_any = false;
+	struct sockaddr_storage addr;
+	struct sockaddr_in *addr4;
+	struct sockaddr_in6 *addr6;
+
+	if (s->type == TLE_V4) {
+		if (s->ipv4.addr.src == INADDR_ANY) {
+			is_any = true;
+			addr4 = (struct sockaddr_in *)&addr;
+			addr4->sin_addr.s_addr = s->ipv4.addr.dst;
+			addr4->sin_port = s->port.dst;
+			addr.ss_family = AF_INET;
+			bhash_del_entry(ctx, s, (struct sockaddr*)&addr);
+		}
+	} else {
+		if (IN6_IS_ADDR_UNSPECIFIED(&s->ipv6.addr.src)) {
+			is_any = true;
+			addr6 = (struct sockaddr_in6 *)&addr;
+			memcpy(&addr6->sin6_addr, &s->ipv6.addr.dst,
+					sizeof(tle_ipv6_any));
+			addr6->sin6_port = s->port.dst;
+			addr.ss_family = AF_INET6;
+			bhash_del_entry(ctx, s, (struct sockaddr*)&addr);
+		}
+	}
 
 	rte_spinlock_lock(&ctx->dev_lock);
-	rc = stream_clear_dev(ctx, s);
+	/* strange behaviour to match linux stack */
+	if (is_any) {
+		if (s->type == TLE_V6 && !s->option.ipv6only)
+			tle_psm_clear(&ctx->use[TLE_V4], ntohs(s->port.dst));
+	}
+
+	tle_psm_clear(&ctx->use[s->type], ntohs(s->port.dst));
 	rte_spinlock_unlock(&ctx->dev_lock);
 
-	return rc;
+	return 0;
 }

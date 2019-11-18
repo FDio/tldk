@@ -45,6 +45,7 @@ SYMLINK-y-include += tle_ctx.h
 SYMLINK-y-include += tle_event.h
 SYMLINK-y-include += tle_tcp.h
 SYMLINK-y-include += tle_udp.h
+SYMLINK-y-include += tle_stats.h
 
 # this lib dependencies
 DEPDIRS-y += lib/libtle_misc

@@ -32,6 +32,8 @@
 #include "test_common.h"
 
 #define MAX_STREAMS          0x100
+#define MIN_STREAMS          0x10
+#define DELTA_STREAMS        0x20
 #define MAX_STREAM_RBUFS     0x100
 #define MAX_STREAM_SBUFS     0x100
 #define RX_NO_OFFLOAD        0x0
@@ -41,6 +43,8 @@ static struct tle_ctx_param ctx_prm_tmpl = {
 	.socket_id = SOCKET_ID_ANY,
 	.proto = TLE_PROTO_TCP,
 	.max_streams = MAX_STREAMS,
+	.min_streams = MIN_STREAMS,
+	.delta_streams = DELTA_STREAMS,
 	.max_stream_rbufs = MAX_STREAM_RBUFS,
 	.max_stream_sbufs = MAX_STREAM_SBUFS,
 };

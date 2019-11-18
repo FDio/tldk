@@ -1,0 +1,42 @@
+commit 470acd1b108f20ae12b1216c9f6157b78655bcc7
+Author: Jianfeng Tan <henry.tjf@antfin.com>
+Date:   Wed Dec 12 02:14:03 2018 +0000
+
+    net/virtio: fill desc limit
+    
+    We shall fill desc limit accordingly, or APIs, such as
+    rte_eth_dev_adjust_nb_rx_tx_desc, will not give correct desc
+    information.
+    
+    Signed-off-by: Jianfeng Tan <henry.tjf@antfin.com>
+
+diff --git a/drivers/net/virtio/virtio_ethdev.c b/drivers/net/virtio/virtio_ethdev.c
+index dbfa6865c..d369d5ce8 100644
+--- a/drivers/net/virtio/virtio_ethdev.c
++++ b/drivers/net/virtio/virtio_ethdev.c
+@@ -2172,6 +2172,7 @@ virtio_dev_info_get(struct rte_eth_dev *dev, struct rte_eth_dev_info *dev_info)
+ {
+ 	uint64_t tso_mask, host_features;
+ 	struct virtio_hw *hw = dev->data->dev_private;
++	struct virtqueue *vq;
+ 
+ 	dev_info->speed_capa = ETH_LINK_SPEED_10G; /* fake value */
+ 
+@@ -2209,6 +2210,17 @@ virtio_dev_info_get(struct rte_eth_dev *dev, struct rte_eth_dev_info *dev_info)
+ 		(1ULL << VIRTIO_NET_F_HOST_TSO6);
+ 	if ((host_features & tso_mask) == tso_mask)
+ 		dev_info->tx_offload_capa |= DEV_TX_OFFLOAD_TCP_TSO;
++
++
++	if (hw->vqs) {
++		vq = hw->vqs[VTNET_SQ_RQ_QUEUE_IDX];
++		dev_info->rx_desc_lim.nb_max = vq->vq_nentries;
++		dev_info->rx_desc_lim.nb_min = 256;
++
++		vq = hw->vqs[VTNET_SQ_TQ_QUEUE_IDX];
++		dev_info->tx_desc_lim.nb_max = vq->vq_nentries;
++		dev_info->tx_desc_lim.nb_min = 256;
++	}
+ }
+ 
+ /*

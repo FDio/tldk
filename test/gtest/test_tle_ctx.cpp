@@ -32,6 +32,7 @@ TEST(ctx_create, create_invalid_socket)
 	memset(&prm, 0, sizeof(prm));
 	prm.socket_id = SOCKET_ID_ANY;
 	prm.max_streams = 0x10;
+	prm.min_streams = 0x10;
 	prm.max_stream_rbufs = 0x100;
 	prm.max_stream_sbufs = 0x100;
 

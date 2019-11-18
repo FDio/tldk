@@ -1,7 +1,5 @@
 1. OVERVIEW
 
-   TLDK project scope is as follows:
-
    1) To implement a set of libraries for L4 protocol processing (UDP, TCP etc.)
    for both IPv4 and IPv6.
 
@@ -16,8 +14,7 @@
    code for setup, manage and perform actual IO over underlying devices are
    all out of scope of these libraries.
 
-   The only information these libraries need to know about the 
-   underlying devices:
+   The only information these libraries need about the underlying devices:
    - supported HW offloads
    - MTU and L3/L2 addresses
    That allows the libraries to fill L2/L3 headers and mbuf metadata
@@ -36,12 +33,22 @@
    The library uses siphash logic from the below source
    https://github.com/veorq/SipHash
 
+2. APIs
 
-2. INSTALLATION GUIDE
+   TLDK provides three series of APIs:
+   - TLDK native APIs, provided by libtle_l4p.
+   - Posix APIs, provided by libtle_glue with PRELOAD compile macro.
+   - Posix APIs with changed symbol names, provided by libtle_glue without PRELOAD macro.
+
+
+3. INSTALLATION GUIDE
+
+   - Original guide
+   ----------------
 
    1) Obtain latest supported DPDK version and build it.
    (refer to http://dpdk.org for information how to download and build it).
-   Currently supported(tested) DPDK versions: 18.11 LTS.
+   Currently supported(tested) DPDK versions: 16.11 LTS, 17.11 LTS, 18.02.
    2) Make sure that RTE_SDK and RTE_TARGET DPDK related environment variables
    are setup correctly.
    3) Go to the TLDK root directory and type: 'make all'.
@@ -57,6 +64,29 @@
    cd tldk
    make all
    ./x86_64-native-linuxapp-gcc/app/l4fwd ...
+
+
+   - For preload use
+   -----------------
+
+   Debug:
+
+     $ make DPDK_DEBUG=y EXTRA_CFLAGS="-g -O0 -fPIC -DPRELOAD" all
+
+   Release:
+
+     $ make EXTRA_CFLAGS="-g -fPIC -DPRELOAD" all
+
+   - For TLDK API use
+   ------------------
+
+   Debug:
+
+     $ make DPDK_DEBUG=y EXTRA_CFLAGS="-g -O0 -fPIC" all
+
+   Release:
+
+     $ make EXTRA_CFLAGS="-g -O3 -fPIC" all
 
 3. CONTENTS
 
@@ -74,6 +104,8 @@
    |      +--libtle_l4p - implementation of the TCP/UDP packet processing
    |      |
    |      +--libtle_timer - implementation of the timer library
+   |      |
+   |      +--libtle_glue - socket glue layer with arp, icmp, epoll, etc
    |
    +----examples
    |      |
@@ -88,3 +120,159 @@
    |      |     (googletest)
    |      |
    |      +--timer - UT for libtle_timer (standalone app)
+   |      |
+   |      +--packetdrill - UT for stack (standalone app)
+
+
+5. Features
+
+   Done:
+   - posix interface
+   - loopback device
+   - regression test
+   - multi-thread
+   - lightweight mem
+   - tcp_info (paritial)
+   - fd management
+   - arp request/reply
+   - icmp reply
+   - interrupt mode
+   - blocking recv/send
+   - TSO
+   - UFO
+
+   TODO:
+   - fuzzing
+   - SACK
+   - RACK
+   - zerocopy APIs
+   - batching APIs
+   - multi-process
+   - numa awareness
+   - context recycle on thread exit
+
+5. Thread model
+
+   - Multi-process is still not fully supported.
+
+   - Symmetric multi-thread
+
+     (app thread)         (app thread)          (app thread)
+           \                    \                     \
+           /                    /                     /
+           \                    \                     \
+      --------------------------------------------------------
+      |            FD management, Socket APIs (FE)           |
+      --------------------------------------------------------
+
+      -----------           -----------           -----------
+      |         |           |         |           |         |
+      |   ctx   |           |   ctx   |           |   ctx   |
+      |         |           |         |           |         |
+      -----------           -----------           -----------
+            \__                  |                   __/
+               \__               |                __/
+                  \__            |             __/
+                     \__         |          __/
+                       -------------------------
+                       |    (RSS) NIC (FDIR)   |
+                       -------------------------
+
+   - Lookaside multi-thread
+
+      (app thread)         (app thread)          (io thread)
+           \                     \                    \
+           /                     /                    /
+           \                     \                    \
+      ------------------------------------------------------
+      |            FD management, Socket APIs (FE)         |
+      ------------------------------------------------------
+                                                      /
+                                                      \
+                                                      /
+      ------------------------------------------------------
+      |                                                    |
+      |                        ctx                         |
+      |                                                    |
+      ------------------------------------------------------
+                                |
+                                |
+                    -------------------------
+                    |          NIC          |
+                    -------------------------
+
+6. How to run
+
+   We have two setups which need their own preparation.
+
+    - virtio-user: test with virtio-user + vhost-kernel;
+    - physical NIC: test with physical NIC bound to vfio.
+
+   If you are using physical NIC:
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+   a. Set Linux boot options (Only needed if you will use physical NIC)
+     a1. Add below configuration into GRUB_CMDLINE_LINUX in /etc/default/grub
+       "intel_iommu=on iommu=pt"
+
+     a2. Update grub
+       $ sudo grub2-mkconfig -o /boot/grub2/grub.cfg
+
+     If you want to use 1GB hugepages, you can also add below content in the
+     boot cmdline:
+       "default_hugepagesz=1G hugepagesz=1G hugepages=2"
+
+   b. Adjust RLIMIT_MEMLOCK (Only needed if you will use physical NIC)
+     Add below two lines into /etc/security/limits.conf
+       "* soft memlock 4194304
+        * hard memlock 4194304"
+
+   c. Reboot system
+
+   d. Bind NIC to vfio-pci
+
+     $ sudo modprobe vfio-pci
+     $ sudo ./usertools/dpdk-devbind.py -b vfio-pci 0000:01:00.1
+     $ sudo chmod 666 /dev/vfio/16 (16 is just an example)
+
+   If you are using virtio-user:
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+   a. Prepare vhost-kernel
+
+     $ sudo modprobe vhost-net
+     (if you don't have those modules, have to compile by yourself)
+     $ sudo chmod 666 /dev/vhost-net
+     $ sudo tunctl -u <your username>
+
+   b. Prepare the vNIC
+
+     $ export DPDK_VNIC="--vdev=virtio_user0,path=/dev/vhost-net,queue_size=1024,iface=tap0"
+
+   For both cases, we need to:
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+     $ sudo chmod 777 /dev/hugepages
+     $ export DPDK_IP=1.1.1.1
+
+   Note: for specific test example, you can refer to the example commit log.
+
+7. How to run packetdrill tests:
+
+  Compile it in LOOK_ASIDE_BACKEND mode:
+
+    $ make PACKETDRILL=y EXTRA_CFLAGS="-g -O0 -fPIC -march=native -DLOOK_ASIDE_BACKEND " all
+
+  To run it:
+
+    $ test/packetdrill/packetdrill --local_ip=192.168.0.2 \
+        --remote_ip=192.0.2.1 --so_filename=`pwd`/libtldk.so \
+        test/packetdrill/tests/tldk/fast_retransmit/fr-4pkt-tldk.pkt
+
+8. Tested Examples
+
+   - examples/client
+   - examples/server
+   - wget (epoll)
+   - curl (poll)
+   - haproxy (multi-thread mode)

@@ -379,6 +379,8 @@ test_tle_udp_gen_base::setup_ctx(void)
 	memset(&ctx_prm, 0, sizeof(ctx_prm));
 	ctx_prm.socket_id = SOCKET_ID_ANY;
 	ctx_prm.max_streams = 0x10;
+	ctx_prm.min_streams = 0x8;
+	ctx_prm.delta_streams = 0x8;
 	ctx_prm.max_stream_rbufs = CTX_MAX_RBUFS;
 	ctx_prm.max_stream_sbufs = CTX_MAX_SBUFS;
 	ctx_prm.lookup4 = lookup4_function;

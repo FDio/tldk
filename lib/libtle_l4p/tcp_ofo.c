@@ -12,7 +12,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include <rte_malloc.h>
 #include <rte_errno.h>
 
 #include "tcp_stream.h"
@@ -28,12 +27,6 @@
 #define OFO_OBJ_MAX	(OFODB_OBJ_MAX * OFO_DB_MAX)
 
 void
-tcp_ofo_free(struct ofo *ofo)
-{
-	rte_free(ofo);
-}
-
-static void
 calc_ofo_elems(uint32_t nbufs, uint32_t *nobj, uint32_t *ndb)
 {
 	uint32_t n, nd, no;
@@ -51,35 +44,3 @@ calc_ofo_elems(uint32_t nbufs, uint32_t *nobj, uint32_t *ndb)
 	*nobj = no;
 	*ndb = nd;
 }
-
-struct ofo *
-tcp_ofo_alloc(uint32_t nbufs, int32_t socket)
-{
-	uint32_t i, ndb, nobj;
-	size_t dsz, osz, sz;
-	struct ofo *ofo;
-	struct rte_mbuf **obj;
-
-	calc_ofo_elems(nbufs, &nobj, &ndb);
-	osz = sizeof(*ofo) + sizeof(ofo->db[0]) * ndb;
-	dsz = sizeof(ofo->db[0].obj[0]) * nobj * ndb;
-	sz = osz + dsz;
-
-	ofo = rte_zmalloc_socket(NULL, sz, RTE_CACHE_LINE_SIZE, socket);
-	if (ofo == NULL) {
-		TCP_LOG(ERR, "%s: allocation of %zu bytes on socket %d "
-			"failed with error code: %d\n",
-			__func__, sz, socket, rte_errno);
-		return NULL;
-	}
-
-	obj = (struct rte_mbuf **)&ofo->db[ndb];
-	for (i = 0; i != ndb; i++) {
-		ofo->db[i].nb_max = nobj;
-		ofo->db[i].obj = obj + i * nobj;
-	}
-
-	ofo->nb_max = ndb;
-	return ofo;
-}
-

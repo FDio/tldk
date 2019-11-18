@@ -134,6 +134,30 @@ put_timer(struct tle_timer_list *list, struct tle_timer_elmt *e)
 	list->num++;
 }
 
+static inline struct tle_timer_elmt *
+get_free_timer(struct tle_timer_wheel *tw)
+{
+	unsigned i, n;
+	struct tle_timer_elmt *e;
+
+	e = LIST_FIRST(&tw->free.head);
+	if (e == NULL) {
+		n = 128;
+		n = RTE_MIN(n, tw->prm.max_timer - tw->free.num);
+		for (i = 0; i < n; i++) {
+			e = rte_zmalloc_socket(NULL, sizeof(*e),
+					sizeof(e), tw->prm.socket_id);
+			if (e != NULL)
+				put_timer(&tw->free, e);
+			else
+				rte_panic("Failed to allocate timer");
+		}
+	}
+
+	e = get_timer(&tw->free);
+	return e;
+}
+
 static inline void
 rem_timer(struct tle_timer_list *list, struct tle_timer_elmt *e)
 {
@@ -149,8 +173,6 @@ tle_timer_create(struct tle_timer_wheel_args *prm, uint64_t now)
 	uint32_t i, j;
 	size_t sz;
 	struct tle_timer_wheel *tw;
-	struct tle_timer_elmt *e;
-	struct tle_timer_elmt *timers;
 
 	if (prm == NULL) {
 		rte_errno = -EINVAL;
@@ -169,7 +191,7 @@ tle_timer_create(struct tle_timer_wheel_args *prm, uint64_t now)
 		return NULL;
 	}
 
-	sz = sizeof(*tw) + prm->max_timer * sizeof(struct tle_timer_elmt);
+	sz = sizeof(*tw);
 
 	/* allocate memory */
 	tw = rte_zmalloc_socket(NULL, sz, RTE_CACHE_LINE_SIZE,
@@ -182,16 +204,10 @@ tle_timer_create(struct tle_timer_wheel_args *prm, uint64_t now)
 
 	tw->last_run_time = now;
 	tw->prm = *prm;
-	timers = (struct tle_timer_elmt *)(tw + 1);
 
 	/* initialize the lists */
 	LIST_INIT(&tw->free.head);
 	LIST_INIT(&tw->expired.head);
-
-	for (i = 0; i < prm->max_timer; i++) {
-		e = timers + i;
-		put_timer(&tw->free, e);
-	}
 
 	for (i = 0; i < TW_N_RINGS; i++)
 		for (j = 0; j < TW_SLOTS_PER_RING; j++)
@@ -223,11 +239,6 @@ tle_timer_start(struct tle_timer_wheel *tw, void *obj, uint64_t interval)
 		return NULL;
 	}
 
-	if (tw->free.num == 0) {
-		rte_errno = ENOMEM;
-		return NULL;
-	}
-
 	nb_tick = interval / tw->prm.tick_size;
 
 	fast_ring_index = nb_tick & TW_RING_MASK;
@@ -248,7 +259,7 @@ tle_timer_start(struct tle_timer_wheel *tw, void *obj, uint64_t interval)
 		slow_ring_index %= TW_SLOTS_PER_RING;
 		ts = &tw->w[TW_RING_SLOW][slow_ring_index];
 
-		e = get_timer(&tw->free);
+		e = get_free_timer(tw);
 		e->obj = obj;
 		e->fast_index = fast_ring_index;
 		put_timer(ts, e);
@@ -260,7 +271,7 @@ tle_timer_start(struct tle_timer_wheel *tw, void *obj, uint64_t interval)
 	/* Timer expires less than 51.2 seconds from now */
 	ts = &tw->w[TW_RING_FAST][fast_ring_index];
 
-	e = get_timer(&tw->free);
+	e = get_free_timer(tw);
 	e->obj = obj;
 	put_timer(ts, e);
 

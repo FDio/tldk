@@ -20,8 +20,6 @@
 extern "C" {
 #endif
 
-#include <stdbool.h>
-
 struct ofodb {
 	uint32_t nb_elem;
 	uint32_t nb_max;
@@ -103,7 +101,7 @@ _ofo_insert_mbuf(struct ofo* ofo, uint32_t pos, union seqlen* sl,
 		db->obj[k + i] = mb[i];
 	}
 	if (tcp_seq_lt(end, seq))
-		rte_pktmbuf_trim(mb[i - 1], seq - end);
+		_rte_pktmbuf_trim(mb[i - 1], seq - end);
 
 	db->nb_elem += i;
 	db->sl.len += tcp_seq_min(seq, end) - sl->seq;
@@ -157,7 +155,7 @@ _ofo_insert_right(struct ofo *ofo, uint32_t pos, union seqlen *sl,
 		plen = mb[i]->pkt_len;
 		if (n < plen) {
 			/* adjust partially overlapped packet. */
-			rte_pktmbuf_adj(mb[i], n);
+			mb[i] = _rte_pktmbuf_adj(mb[i], n);
 			break;
 		}
 	}
@@ -258,7 +256,7 @@ static inline uint32_t
 _ofodb_enqueue(struct rte_ring *r, const struct ofodb *db, uint32_t *seq)
 {
 	uint32_t i, n, num, begin, end;
-	struct rte_mbuf *pkt;
+	struct rte_mbuf* pkt;
 
 	n = 0;
 	num = db->nb_elem;
@@ -289,11 +287,7 @@ _ofodb_enqueue(struct rte_ring *r, const struct ofodb *db, uint32_t *seq)
 	return num - n;
 }
 
-struct ofo *
-tcp_ofo_alloc(uint32_t nbufs, int32_t socket);
-
-void
-tcp_ofo_free(struct ofo *ofo);
+void calc_ofo_elems(uint32_t nbufs, uint32_t *nobj, uint32_t *ndb);
 
 #ifdef __cplusplus
 }

@@ -22,6 +22,7 @@ endif
 
 RTE_TARGET ?= x86_64-native-linuxapp-gcc
 
+DIRS-y += dpdk
 DIRS-y += lib
 DIRS-y += examples
 DIRS-y += test
@@ -32,11 +33,18 @@ MAKEFLAGS += --no-print-directory
 O ?= $(TLDK_ROOT)/${RTE_TARGET}
 BASE_OUTPUT ?= $(abspath $(O))
 
+DPDK_LIBS_PATH := $(TLDK_ROOT)/dpdk/install/lib
+TLDK_LIBS_PATH := $(TLDK_ROOT)/$(RTE_TARGET)/lib
+LIBS :=
+
 .PHONY: all
 all: $(DIRS-y)
 
 .PHONY: clean
-clean: $(DIRS-y)
+clean:
+	@make clean -C test/packetdrill
+	@rm -rf $(RTE_TARGET)
+	@rm -rf libtldk.so libtldk.a
 
 .PHONY: $(DIRS-y)
 $(DIRS-y): $(RTE_SDK)/mk/rte.vars.mk
@@ -48,7 +56,36 @@ $(DIRS-y): $(RTE_SDK)/mk/rte.vars.mk
 		CUR_SUBDIR=$(CUR_SUBDIR)/$(@) \
 		S=$(CURDIR)/$(@) \
 		RTE_TARGET=$(RTE_TARGET) \
+		EXTRA_CFLAGS="-fPIC" \
 		$(filter-out $(DIRS-y),$(MAKECMDGOALS))
+
+test: libtldk.a libtldk.so
+
+libtldk.so: lib
+	$(eval LIBS = $(wildcard $(DPDK_LIBS_PATH)/librte*.a $(TLDK_LIBS_PATH)/*.a))
+	@gcc -shared -o libtldk.so -L$(DPDK_LIBS_PATH) -L$(TLDK_LIBS_PATH) \
+		-Wl,--whole-archive $(LIBS) -Wl,--no-whole-archive \
+		-lpthread -ldl -lnuma
+
+define repack
+@echo -- repack $1 ---
+@rm -rf tmpxyz; rm -f $1; mkdir tmpxyz; cd tmpxyz;	\
+	for f in $(LIBS) ; do				\
+		fn=$$(basename $$f) ;			\
+		echo $$fn ;				\
+		mkdir $$fn"_obj" ;			\
+		cd $$fn"_obj" ;				\
+		ar x $$f ;				\
+		cd .. ;					\
+	done;						\
+ar cru ../$1 $$(find */*.o | paste -sd " " -); cd ..; rm -rf tmpxyz
+endef
+
+libtldk.a: lib
+	$(eval LIBS = $(wildcard $(DPDK_LIBS_PATH)/librte*.a))
+	$(call repack,libdpdk.a)
+	$(eval LIBS = $(wildcard $(DPDK_LIBS_PATH)/librte*.a $(TLDK_LIBS_PATH)/*.a))
+	$(call repack,libtldk.a)
 
 $(RTE_SDK)/mk/rte.vars.mk:
 ifeq ($(RTE_SDK),$(LOCAL_RTE_SDK))

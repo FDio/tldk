@@ -24,6 +24,7 @@ TEST(udp_destroy_null, udp_destroy_null)
 TEST_F(udp_destroy, udp_destroy_positive)
 {
 	int rc;
+	rte_errno = 0;
 	tle_ctx_destroy(ctx);
 	ASSERT_EQ(rte_errno, 0);
 }

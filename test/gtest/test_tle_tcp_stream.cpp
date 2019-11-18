@@ -86,7 +86,7 @@ TEST_F(test_tle_tcp_stream, tcp_stream_test_open_duplicate_ipv4)
 	stream_dup = tle_tcp_stream_open(ctx,
 			(const struct tle_tcp_stream_param*)&stream_prm);
 	ASSERT_EQ(stream_dup, nullptr);
-	ASSERT_EQ(rte_errno, EEXIST);
+	ASSERT_EQ(rte_errno, EADDRINUSE);
 
 	ret = tle_tcp_stream_close(stream);
 	ASSERT_EQ(ret, 0);
@@ -103,7 +103,7 @@ TEST_F(test_tle_tcp_stream, tcp_stream_test_open_duplicate_ipv6)
 	stream_dup = tle_tcp_stream_open(ctx,
 			(const struct tle_tcp_stream_param*)&stream_prm6);
 	ASSERT_EQ(stream_dup, nullptr);
-	ASSERT_EQ(rte_errno, EEXIST);
+	ASSERT_EQ(rte_errno, EADDRINUSE);
 
 	ret = tle_tcp_stream_close(stream6);
 	ASSERT_EQ(ret, 0);
