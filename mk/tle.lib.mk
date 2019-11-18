@@ -13,6 +13,10 @@
 
 EXTLIB_BUILD := y
 
+ifneq ($(HACK_CC),)
+CC = $(HACK_CC)
+endif
+
 # we must create the output dir first and recall the same Makefile
 # from this directory
 ifeq ($(NOT_FIRST_CALL),)
@@ -32,5 +36,6 @@ all:
 	$(Q)$(MAKE) -C $(BDIR) -f $(RTE_EXTMK) $@ \
 		S=$(RTE_SRCDIR) O=$(RTE_OUTPUT) SRCDIR=$(RTE_SRCDIR)
 else
+CFLAGS += -fPIC
 include $(RTE_SDK)/mk/rte.lib.mk
 endif

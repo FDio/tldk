@@ -30,7 +30,7 @@ extern "C" {
  * of protocol related data.
  */
 
-#define	TCP_WSCALE_DEFAULT	7
+#define	TCP_WSCALE_DEFAULT	10
 #define	TCP_WSCALE_NONE		0
 
 #define	TCP_TX_HDR_MAX	(sizeof(struct tcp_hdr) + TCP_TX_OPT_LEN_MAX)
@@ -70,27 +70,6 @@ extern "C" {
 
 /* TCP flags mask. */
 #define	TCP_FLAG_MASK	UINT8_MAX
-
-union typflg {
-	uint16_t raw;
-	struct {
-		uint8_t type;  /* TLE_V4/TLE_V6 */
-		uint8_t flags; /* TCP header flags */
-	};
-};
-
-union pkt_info {
-	rte_xmm_t raw;
-	struct {
-		union typflg tf;
-		uint16_t csf;  /* checksum flags */
-		union l4_ports port;
-		union {
-			union ipv4_addrs addr4;
-			const union ipv6_addrs *addr6;
-		};
-	};
-};
 
 union seg_info {
 	rte_xmm_t raw;
@@ -226,7 +205,7 @@ struct dack_info {
 };
 
 /* get current timestamp in ms */
-static inline uint32_t
+static inline uint64_t
 tcp_get_tms(uint32_t mshift)
 {
 	uint64_t ts;
@@ -344,7 +323,9 @@ fill_syn_opts(void *p, const struct syn_opts *so)
 		opt = (struct tcpopt *)to;
 	}
 
-	to[0] = TCP_OPT_KIND_EOL;
+	to[0] = TCP_OPT_KIND_NOP;
+	to[1] = TCP_OPT_KIND_NOP;
+	to[2] = TCP_OPT_KIND_NOP;
 }
 
 /*
@@ -390,6 +371,8 @@ get_tms_opts(uintptr_t p, uint32_t len)
 		else if (kind == TCP_OPT_KIND_NOP)
 			i += sizeof(to->kl.kind);
 		else {
+			if (to->kl.len == 0)
+				break;
 			i += to->kl.len;
 			if (i <= len && to->kl.raw == TCP_OPT_KL_TMS) {
 				ts.val = rte_be_to_cpu_32(to->ts.val);
@@ -449,7 +432,6 @@ get_pkt_info(const struct rte_mbuf *m, union pkt_info *pi, union seg_info *si)
 		((uintptr_t)tcph + offsetof(struct tcp_hdr, src_port));
 	pi->tf.flags = tcph->tcp_flags;
 	pi->tf.type = type;
-	pi->csf = m->ol_flags & (PKT_RX_IP_CKSUM_MASK | PKT_RX_L4_CKSUM_MASK);
 	pi->port.raw = prt->raw;
 
 	get_seg_info(tcph, si);
@@ -462,7 +444,7 @@ tcp_mbuf_seq_free(struct rte_mbuf *mb[], uint32_t num)
 
 	len = 0;
 	for (i = 0; i != num; i++) {
-		len += mb[i]->pkt_len;
+		len += PKT_L4_PLEN(mb[i]);
 		rte_pktmbuf_free(mb[i]);
 	}
 

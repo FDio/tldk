@@ -54,6 +54,43 @@ extern "C" {
 struct tle_ctx;
 struct tle_dev;
 
+typedef union tle_stream_options {
+	struct {
+		uint32_t reuseaddr:   1;
+		uint32_t reuseport:   1;
+		uint32_t keepalive:   1;
+		uint32_t ipv6only:    1;
+		uint32_t oobinline:   1;
+		uint32_t tcpcork:     1;
+		uint32_t tcpnodelay:  1;
+		uint32_t mulloop:     1;
+		uint32_t timestamp:   1;
+		uint32_t reserve:     3;
+		uint32_t tcpquickack: 4;
+		uint32_t multtl:      8;
+		uint32_t keepcnt:     8;
+		uint16_t keepidle;
+		uint16_t keepintvl;
+	};
+	uint64_t raw;
+} tle_stream_options_t;
+
+static inline void
+tle_set_timestamp(struct msghdr *msg, struct rte_mbuf *m)
+{
+	struct timeval *tv;
+	struct cmsghdr *cmsg;
+
+	cmsg = CMSG_FIRSTHDR(msg);
+	cmsg->cmsg_level = SOL_SOCKET;
+	cmsg->cmsg_type = SO_TIMESTAMP;
+	cmsg->cmsg_len = CMSG_LEN(sizeof(struct timeval));
+	msg->msg_controllen = cmsg->cmsg_len;
+	tv = (struct timeval*)CMSG_DATA(cmsg);
+	tv->tv_sec = m->timestamp >> 20;
+	tv->tv_usec = m->timestamp & 0xFFFFFUL;
+}
+
 /**
  * Blocked L4 ports info.
  */
@@ -112,6 +149,8 @@ struct tle_ctx_param {
 	int32_t socket_id;         /**< socket ID to allocate memory for. */
 	uint32_t proto;            /**< L4 proto to handle. */
 	uint32_t max_streams;      /**< max number of streams in context. */
+	uint32_t min_streams;      /**< min number of streams at init. */
+	uint32_t delta_streams;    /**< delta of streams of each allocation. */
 	uint32_t max_stream_rbufs; /**< max recv mbufs per stream. */
 	uint32_t max_stream_sbufs; /**< max send mbufs per stream. */
 	uint32_t send_bulk_size;   /**< expected # of packets per send call. */
@@ -144,6 +183,8 @@ struct tle_ctx_param {
  * use default TIMEWAIT timeout value.
  */
 #define	TLE_TCP_TIMEWAIT_DEFAULT	UINT32_MAX
+
+#define TLE_TCP_FINWAIT_TIMEOUT                60000
 
 /**
  * create L4 processing context.

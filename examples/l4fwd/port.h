@@ -177,20 +177,9 @@ port_init(struct netbe_port *uprt, uint32_t proto)
 	}
 
 	port_conf = port_conf_default;
-	if ((uprt->rx_offload & RX_CSUM_OFFLOAD) != 0) {
-		RTE_LOG(ERR, USER1, "%s(%u): enabling RX csum offload;\n",
-			__func__, uprt->id);
-		port_conf.rxmode.offloads |= uprt->rx_offload & RX_CSUM_OFFLOAD;
-	}
-	port_conf.rxmode.max_rx_pkt_len = uprt->mtu + ETHER_CRC_LEN;
-	if (port_conf.rxmode.max_rx_pkt_len > ETHER_MAX_LEN)
-		port_conf.rxmode.offloads |= DEV_RX_OFFLOAD_JUMBO_FRAME;
-
 	rc = update_rss_conf(uprt, &dev_info, &port_conf, proto);
 	if (rc != 0)
 		return rc;
-
-	port_conf.txmode.offloads = uprt->tx_offload;
 
 	rc = rte_eth_dev_configure(uprt->id, uprt->nb_lcore, uprt->nb_lcore,
 			&port_conf);

@@ -1,0 +1,33 @@
+From 1416ff5de58922dc32eb2fb9ce2b9b970282136c Mon Sep 17 00:00:00 2001
+From: Jianfeng Tan <henry.tjf@antfin.com>
+Date: Wed, 29 Aug 2018 14:18:13 +0000
+Subject: [PATCH 3/9] mbuf: add single linked list
+
+---
+ lib/librte_mbuf/rte_mbuf.h | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/lib/librte_mbuf/rte_mbuf.h b/lib/librte_mbuf/rte_mbuf.h
+index 9ce5d76d7..0081bd6d7 100644
+--- a/lib/librte_mbuf/rte_mbuf.h
++++ b/lib/librte_mbuf/rte_mbuf.h
+@@ -593,6 +593,8 @@ struct rte_mbuf {
+ 	 */
+ 	struct rte_mbuf_ext_shared_info *shinfo;
+ 
++	struct rte_mbuf *next_pkt;
++
+ } __rte_cache_aligned;
+ 
+ /**
+@@ -1237,6 +1239,7 @@ static inline void rte_pktmbuf_reset_headroom(struct rte_mbuf *m)
+ static inline void rte_pktmbuf_reset(struct rte_mbuf *m)
+ {
+ 	m->next = NULL;
++	m->next_pkt = NULL;
+ 	m->pkt_len = 0;
+ 	m->tx_offload = 0;
+ 	m->vlan_tci = 0;
+-- 
+2.17.1
+

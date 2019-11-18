@@ -1,0 +1,25 @@
+From 7fe32567994a8ce782fa8406613bade1d2100dca Mon Sep 17 00:00:00 2001
+From: Jianfeng Tan <henry.tjf@antfin.com>
+Date: Wed, 29 Aug 2018 14:14:09 +0000
+Subject: [PATCH 2/9] eal: prioritize constructor
+
+---
+ lib/librte_eal/common/include/rte_common.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/lib/librte_eal/common/include/rte_common.h b/lib/librte_eal/common/include/rte_common.h
+index 069c13ec7..a635f5be4 100644
+--- a/lib/librte_eal/common/include/rte_common.h
++++ b/lib/librte_eal/common/include/rte_common.h
+@@ -84,7 +84,7 @@ typedef uint16_t unaligned_uint16_t;
+ #define RTE_PRIORITY_LOG 101
+ #define RTE_PRIORITY_BUS 110
+ #define RTE_PRIORITY_CLASS 120
+-#define RTE_PRIORITY_LAST 65535
++#define RTE_PRIORITY_LAST 130
+ 
+ #define RTE_PRIO(prio) \
+ 	RTE_PRIORITY_ ## prio
+-- 
+2.17.1
+

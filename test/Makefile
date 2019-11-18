@@ -25,4 +25,8 @@ DIRS-y += dring
 DIRS-y += gtest
 DIRS-y += timer
 
+ifeq ($(PACKETDRILL),y)
+DIRS-y += packetdrill
+endif
+
 include $(TLDK_ROOT)/mk/tle.subdir.mk
