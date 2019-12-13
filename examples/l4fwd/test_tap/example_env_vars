@@ -1,0 +1,9 @@
+#! /bin/bash
+
+# ENV VARIABLES
+
+export L4FWD_PATH=/opt/home/md/Projects/tldk/BuildForTLDK/app/l4fwd
+export L4FWD_FECORE=5 #optional
+export L4FWD_BECORE=6 #optional
+
+# ENV VARIABLES end
