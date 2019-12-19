@@ -235,7 +235,7 @@ EOF
 l4fwd_stop()
 {
 	# kill runnning l4fwd app
-	kill ${L4FWD_PID}
+	kill -s SIGINT ${L4FWD_PID}
 
 	# remove temporary files
 	rm -f ${L4FWD_EXEC_FILE}
