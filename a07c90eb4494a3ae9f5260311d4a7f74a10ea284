@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "4cfec3cb_c3b43fd8",
+        "filename": "README",
+        "patchSetId": 1
+      },
+      "lineNbr": 83,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2019-12-30T14:21:03Z",
+      "side": 1,
+      "message": "isn\u0027t that from previous commit?",
+      "revId": "a07c90eb4494a3ae9f5260311d4a7f74a10ea284",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    }
+  ]
+}
