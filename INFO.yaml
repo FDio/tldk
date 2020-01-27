@@ -4,11 +4,11 @@ project_creation_date: '2016-05-19'
 project_category: ''
 lifecycle_state: 'Incubation'
 project_lead: &tldk_ptl
-    name: 'n/a'
+    name: ''
     email: ''
     id: ''
     company: ''
-    timezone: ''
+    timezone: 'Unknown/Unknown'
 primary_contact: *tldk_ptl
 issue_tracking:
     type: 'jira'
@@ -23,13 +23,13 @@ realtime_discussion:
     server: 'freenode'
     channel: 'fdio-tldk'
 meetings:
-    - type: 'n/a'
+    - type: ''
       agenda: ''
       url: 'https://wiki.fd.io/view/TLDK/Meeting'
-      server: 'n/a'
-      channel: 'n/a'
-      repeats: 'n/a'
-      time: 'n/a'
+      server: ''
+      channel: ''
+      repeats: ''
+      time: ''
 repositories:
     - 'tldk'
 committers:
@@ -55,12 +55,8 @@ committers:
       id: 'konstantin_ananyev'
       timezone: 'Atlantis/Shangri-la'
 tsc:
-    # yamllint disable rule:line-length
-    approval: ''
+    approval: 'https://wiki.fd.io/view/TSC/Meeting_Minutes'
     changes:
-        - type: 'removal'
-          name: ''
-          link: ''
-        - type: 'promotion'
+        - type: ''
           name: ''
           link: ''
