@@ -2,12 +2,19 @@
 
 # ENV VARIABLES
 
-export REMOTE_HOST=root@10.237.214.104
-export REMOTE_IFACE=enp138s0f0
-export LOCAL_MAC="68:05:ca:04:47:02"
+# configuration for tap interface
+export ETH_DEV="tap"
 export L4FWD_PATH=/opt/home/md/Projects/tldk/BuildForTLDK/app/l4fwd
 export L4FWD_FECORE=5 #optional
 export L4FWD_BECORE=6 #optional
-export ETH_DEV="-w 8a:00.0"
+
+# configuration for real NIC
+#export ETH_DEV="-w 8a:00.0"
+#export L4FWD_PATH=/opt/home/md/Projects/tldk/BuildForTLDK/app/l4fwd
+#export REMOTE_HOST=root@10.237.214.104 #required for real NIC only
+#export REMOTE_IFACE=enp138s0f0 #required for real NIC only
+#export LOCAL_MAC="68:05:ca:04:47:02" #required for real NIC only
+#export L4FWD_FECORE=5 #optional
+#export L4FWD_BECORE=6 #optional
 
 # ENV VARIABLES end

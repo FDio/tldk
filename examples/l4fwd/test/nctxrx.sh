@@ -8,41 +8,54 @@
 # script with -h (help)
 #
 # User needs to specify following environment variables:
-#  ETH_DEV	- ethernet device to be used on SUT by DPDK
+#  L4FWD_PATH	- path to l4fwd app binary
+#  ETH_DEV	- for real NIC usage - ethernet device to be used on SUT by DPDK
+#		- for tap interface - tap
+#
+# User needs to set following enviroment variables in case of real NIC usage:
 #  REMOTE_HOST	- ip/hostname of DUT
 #  REMOTE_IFACE	- interface name for the test-port on DUT
 #  LOCAL_MAC	- MAC address used by DPDK
-#  L4FWD_PATH	- path to l4fwd app binary
+#
 # Optional envirenment variables:
 #  L4FWD_FECORE	- core on which l4fwd frontend should run
 #  L4FWD_BECORE	- core on which l4fwd backend should run
 #
-# The purpose of the script is to automate validation tests for l4fwd app
-# where packets are out of order/lost. It expects l4fwd application being
-# run on local linux system (SUT). Script is operating on remote linux
-# machine (DUT) with use of ssh. SUT and DUT are connected via NIC. On SUT
-# network traffic is managed by DPDK and on DUT by linux. On DUT netcat is
-# used to send test data via TCP to TLDK on SUT, which is set to echo mode
-# (sends back the same data). Depending on test specified, TCP segments are
-# artificially changed in sending buffer of DUT, so they are lost in some
-# percentage or sent out of order. If specified, report is sent from DUT
-# to SUT after all tests were performed.
+# The purpose of the script is to automate validation tests for l4fwd app where
+# packets are out of order/lost. Script is operating on local linux machine only
+# or on local and remote machine (depending on enviroment variables).
 #
-# Example traffic visualisation:
-# DUT --(TCP out of order)--> SUT --(TCP with correct order)--> DUT(validation)
+# For local machine only, l4fwd application is being run by the script, which
+# sets up the tap interface. Created interface is serving a connection for l4fwd
+# and netcat within the same OS.
+#
+# For local/remote linux machine mode, script uses real NIC specified in
+# enviroment variable. Connection with remote machine is made via ssh. L4fwd app
+# is being run on local machine, while interface and netcat are being set on
+# remote side (operated by linux).
+#
+# Netcat is used to send test data via TCP to l4fwd, which is set to echo mode
+# (sends back the same data). Depending on test specified, TCP segments are
+# artificially changed inside sending buffer, so they are lost in some
+# percentage or sent out of order. Report is printed after all tests were
+# performed.
+#
+# Example of traffic visualisation
+# Netcat(TAP/NIC) --(TCP out of order)--> (TAP/NIC)L4FWD(TAP/NIC) --
+#	--(TCP with correct order)--> (TAP/NIC)Netcat(validation)
 
 # options which can be changed by the user if needed---------------------------
 
 # timeout in [s] for calling nc (in case traffic stuck)
 timeout=600
 
-# delay for netem (50 [ms] is default value when reorder option used)
+# delay for netem (20 [ms] is default value when reorder option used)
 delay=0
 
 # default loss of packets [%] value
 loss=0
 
-# default probability [%] of not losing burst of packets
+# default probability [%] of not loosing burst of packets
 loss_burst=80
 
 # variables used by script-----------------------------------------------------
@@ -55,7 +68,7 @@ rmresults=""
 set_netem=0
 
 # flag to check if default files should to be used (default 1)
-# default files are generated with urandom (couple of sizes)
+# default files are generated with urandom
 default_file=1
 
 # IP protocol version
@@ -160,7 +173,7 @@ done
 # load configuration
 . $(dirname $0)/config.sh
 
-# send file with results to local machine
+# send file with results to local machine when in real NIC mode
 send_results()
 {
 	if_verbose echo -e "Sending result file to local"
@@ -185,7 +198,7 @@ run_test()
 		# -q 0 -> wait 0 seconds after EOF and quit
 		# timeout to deal with hanging connection when sth went wrong
 		# feed netcat with {of} file to send
-		# receiving end is redirected to out/...out files
+		# receiving end is redirected to out/...out file
 		# 'exec' for redirecting nc err output to not mess result
 		cmd="exec 4>&2
 \$({ time timeout ${timeout} nc ${nc_ipv6} -q 0 ${nc_addr} ${TCP_PORT} \
@@ -195,13 +208,18 @@ run_test()
 exec 4>&-"
 
 		# create temporary file for nc command to execute
-		xf=$(ssh ${REMOTE_HOST} mktemp -p ${REMOTE_DIR})
+		xf=$(use_ssh mktemp -p ${REMOTE_DIR})
 
 		# store command from {cmd} into temporaty file
-		echo "${cmd}" | ssh ${REMOTE_HOST} "cat > ${xf}"
+		if [[ ${USE_TAP} -eq 0 ]]
+		then
+			echo "${cmd}" | ssh ${REMOTE_HOST} "cat > ${xf}"
+		else
+			echo "${cmd}" | cat > ${xf}
+		fi
 
 		# execute nc command in the background
-		ssh ${REMOTE_HOST} /bin/bash ${xf} &
+		use_ssh /bin/bash ${xf} &
 
 		pids="${pids} $!"
 
@@ -219,7 +237,7 @@ exec 4>&-"
 	wait ${pids}
 
 	# remove temporary files
-	ssh ${REMOTE_HOST} rm -f ${rmxf}
+	use_ssh rm -f ${rmxf}
 
 	# visual break
 	if_verbose echo -e "\nNetstat:"
@@ -227,13 +245,13 @@ exec 4>&-"
 	# prints network information for given {TCP_PORT} number
 	# -n -> show numeric addresses
 	# -a -> show all (both listening and non-listening sockets)
-	if_verbose ssh ${REMOTE_HOST} netstat -na | grep ${TCP_PORT}
+	if_verbose use_ssh netstat -na | grep ${TCP_PORT}
 
 	# visual break
 	if_verbose echo -e "\nJobs:"
 
 	# display status of jobs in the current session (this bash script)
-	if_verbose ssh ${REMOTE_HOST} jobs -l
+	if_verbose use_ssh jobs -l
 
 	# visual break
 	if_verbose echo -e "\nNetcat processes:"
@@ -242,7 +260,7 @@ exec 4>&-"
 	# -e -> show all processes
 	# -f -> do full format listing (more info)
 	# grep -v -> get rid of the following word match from grep output
-	if_verbose ssh ${REMOTE_HOST} ps -ef | grep "nc " | grep -v grep
+	if_verbose use_ssh ps -ef | grep "nc " | grep -v grep
 
 	# visual break
 	if_verbose echo -e "\nRunning validation"
@@ -252,13 +270,12 @@ exec 4>&-"
 	while [[ ${i} -lt ${num} ]]
 	do
 		# prints checksum of sent and received file
-		if_verbose ssh ${REMOTE_HOST} cksum ${REMOTE_DIR}/${of} \
+		if_verbose use_ssh cksum ${REMOTE_DIR}/${of} \
 			${REMOTE_OUTDIR}/${of}.out.${i}
 
 		# compares sent and received files if they match
 		# compare {of} and {out/of.out.i} line by line
-		ssh ${REMOTE_HOST} diff ${REMOTE_DIR}/${of} \
-			${REMOTE_OUTDIR}/${of}.out.${i}
+		use_ssh diff ${REMOTE_DIR}/${of} ${REMOTE_OUTDIR}/${of}.out.${i}
 
 		# capture the result of diff command above
 		rc=$?
@@ -280,15 +297,15 @@ exec 4>&-"
 		fi
 
 		# remove received file from out/ directory
-		ssh ${REMOTE_HOST} rm -f ${REMOTE_OUTDIR}/${of}.out.${i}
+		use_ssh rm -f ${REMOTE_OUTDIR}/${of}.out.${i}
 
 		i=$(expr $i + 1)
 	done
 
 	# remove temporary results
-	ssh ${REMOTE_HOST} rm -f ${rmresults}
+	use_ssh rm -f ${rmresults}
 
-	if [[ flag_error -eq 1 ]]
+	if [[ flag_error -ne 0 ]]
 	then
 		return ${flag_error}
 	fi
@@ -296,13 +313,17 @@ exec 4>&-"
 	if_verbose echo ""
 	echo -e "TEST SUCCESSFUL - ${of}"
 	if_verbose echo ""
+
 	return 0
 }
 
 # clean up after error or end of tests
 cleanup()
 {
-	send_results
+	if [[ ${USE_TAP} -eq 0 ]]
+	then
+		send_results
+	fi
 	restore_netem
 	l4fwd_stop
 	remove_directories
@@ -310,17 +331,20 @@ cleanup()
 
 # script start-----------------------------------------------------------------
 
-#configure remote machine
-configure_remote
-
 # start l4fwd app
 l4fwd_start
+
+#configure configure tap interfaces
+configure_interfaces
 
 # check if default files should be used
 if [[ ${default_file} -eq 0 ]]
 then
 	if_verbose echo -e "Sending test file to remote"
-	scp ${scp_suppress} ${file} ${REMOTE_HOST}:${REMOTE_DIR}
+	if [[ ${USE_TAP} -eq 0 ]]
+	then
+		scp ${scp_suppress} ${file} ${REMOTE_HOST}:${REMOTE_DIR}
+	fi
 	run_test ${file}
 
 	# check test outcome
@@ -330,17 +354,17 @@ then
 		cleanup
 		exit ${ret}
 	fi
-	ssh ${REMOTE_HOST} rm -f ${REMOTE_DIR}/${file}
+	use_ssh rm -f ${REMOTE_DIR}/${file}
 else
-	# use default files with size 16MB
-	for size in 16
+	# use default files with size 8MB
+	for size in 8
 	do
 		# generate file
-		if_verbose echo -e "Generating ${size}MB file for test"
-		x=$(ssh ${REMOTE_HOST} mktemp $(basename $0).${size}MB.XXX \
+		if_verbose echo -e "\nGenerating ${size}MB file for test"
+		x=$(use_ssh mktemp $(basename $0).${size}MB.XXX \
 			-p ${REMOTE_DIR})
 
-			ssh ${REMOTE_HOST} dd if=/dev/urandom of=${x} bs=1M \
+		use_ssh dd if=/dev/urandom of=${x} bs=1M \
 				count=${size} ${dd_suppress}
 
 		# run test over generated file
@@ -355,7 +379,7 @@ else
 		fi
 
 		# remove generated file only if test successful
-		ssh ${REMOTE_HOST} rm -f ${x}
+		use_ssh rm -f ${x}
 	done
 fi
 

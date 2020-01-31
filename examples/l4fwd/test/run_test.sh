@@ -2,18 +2,22 @@
 
 # readme section---------------------------------------------------------------
 
-# usage: /bin/bash run_test.sh [-46lrh]
+# usage: /bin/bash run_test.sh [-46alrh]
 #
 # Run all tests using nctxrx.sh. Report stored and printed
 # after tests were done. For details about options run
 # script with -h (help)
 #
 # User needs to specify following environment variables:
-#  ETH_DEV	- ethernet device to be used on SUT by DPDK
+#  L4FWD_PATH	- path to l4fwd app binary
+#  ETH_DEV	- for real NIC usage - ethernet device to be used on SUT by DPDK
+#		- for tap interface - tap
+#
+# User needs to set following enviroment variables in case of real NIC usage:
 #  REMOTE_HOST	- ip/hostname of DUT
 #  REMOTE_IFACE	- interface name for the test-port on DUT
 #  LOCAL_MAC	- MAC address used by DPDK
-#  L4FWD_PATH	- path to l4fwd app binary
+#
 # Optional envirenment variables:
 #  L4FWD_FECORE	- core on which l4fwd frontend should run
 #  L4FWD_BECORE	- core on which l4fwd backend should run
@@ -203,7 +207,7 @@ do
 			then
 				echo -e "\nTest for reorder: ${reorder}\t[OK]"
 			else
-				echo -e "\nTest for reorder: $reorder}\t[FAIL]"
+				echo -e "\nTest for reorder: ${reorder}\t[FAIL]"
 				error_count=$(expr ${error_count} + 1)
 			fi
 
@@ -274,5 +278,5 @@ else
 fi
 
 # print report after all tests were done
-echo -e "Report\n"
+echo -e "Report:\n"
 cat ${result}
