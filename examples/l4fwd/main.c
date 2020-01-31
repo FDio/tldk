@@ -66,11 +66,7 @@ static struct rte_mempool *mpool[RTE_MAX_NUMA_NODES + 1];
 static struct rte_mempool *frag_mpool[RTE_MAX_NUMA_NODES + 1];
 static char proto_name[3][10] = {"udp", "tcp", ""};
 
-static const struct rte_eth_conf port_conf_default = {
-	.rxmode = {
-		.offloads = DEV_RX_OFFLOAD_VLAN_STRIP,
-	},
-};
+static const struct rte_eth_conf port_conf_default;
 
 struct tx_content tx_content = {
 	.sz = 0,
