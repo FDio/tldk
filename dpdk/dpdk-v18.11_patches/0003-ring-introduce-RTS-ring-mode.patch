@@ -1,0 +1,822 @@
+From 2fb572519c9b7780739df214d8d8c98506a2834b Mon Sep 17 00:00:00 2001
+From: Konstantin Ananyev <konstantin.ananyev@intel.com>
+Date: Tue, 18 Feb 2020 18:21:11 +0000
+Subject: [RFC 3/6] ring: introduce RTS ring mode
+
+Introduce relaxed tail sync (RTS) mode for MT ring synchronization.
+Aim to reduce stall times in case when ring is used on
+overcommited cpus (multiple active threads on the same cpu).
+The main difference from original MP/MC algorithm is that
+tail value is increased not by every thread that finished enqueue/dequeue,
+but only by the last one.
+That allows threads to avoid spinning on ring tail value,
+leaving actual tail value change to the last thread in the update queue.
+
+Signed-off-by: Konstantin Ananyev <konstantin.ananyev@intel.com>
+---
+ lib/librte_ring/Makefile               |   3 +-
+ lib/librte_ring/meson.build            |   5 +-
+ lib/librte_ring/rte_ring.c             |  67 +++++-
+ lib/librte_ring/rte_ring.h             | 301 +++++++++++++++++++++++--
+ lib/librte_ring/rte_ring_rts_generic.h | 240 ++++++++++++++++++++
+ 5 files changed, 595 insertions(+), 21 deletions(-)
+ create mode 100644 lib/librte_ring/rte_ring_rts_generic.h
+
+diff --git a/lib/librte_ring/Makefile b/lib/librte_ring/Makefile
+index 21a36770d..88b61f018 100644
+--- a/lib/librte_ring/Makefile
++++ b/lib/librte_ring/Makefile
+@@ -19,6 +19,7 @@ SRCS-$(CONFIG_RTE_LIBRTE_RING) := rte_ring.c
+ # install includes
+ SYMLINK-$(CONFIG_RTE_LIBRTE_RING)-include := rte_ring.h \
+ 					rte_ring_generic.h \
+-					rte_ring_c11_mem.h
++					rte_ring_c11_mem.h \
++					rte_ring_rts_generic.h
+ 
+ include $(RTE_SDK)/mk/rte.lib.mk
+diff --git a/lib/librte_ring/meson.build b/lib/librte_ring/meson.build
+index ab8b0b469..0124cf78f 100644
+--- a/lib/librte_ring/meson.build
++++ b/lib/librte_ring/meson.build
+@@ -5,4 +5,7 @@ version = 2
+ sources = files('rte_ring.c')
+ headers = files('rte_ring.h',
+ 		'rte_ring_c11_mem.h',
+-		'rte_ring_generic.h')
++		'rte_ring_generic.h',
++		'rte_ring_rts_generic.h')
++
++allow_experimental_apis = true
+diff --git a/lib/librte_ring/rte_ring.c b/lib/librte_ring/rte_ring.c
+index b393e4863..8b8cd5179 100644
+--- a/lib/librte_ring/rte_ring.c
++++ b/lib/librte_ring/rte_ring.c
+@@ -43,6 +43,9 @@ EAL_REGISTER_TAILQ(rte_ring_tailq)
+ /* true if x is a power of 2 */
+ #define POWEROF2(x) ((((x)-1) & (x)) == 0)
+ 
++/* by default set head/tail distance as 1/8 of ring capacity */
++#define HTD_MAX_DEF	8
++
+ /* return the size of memory occupied by a ring */
+ ssize_t
+ rte_ring_get_memsize(unsigned count)
+@@ -62,6 +65,50 @@ rte_ring_get_memsize(unsigned count)
+ 	return sz;
+ }
+ 
++/*
++ * helper function, calculates sync_type values for prod and cons
++ * based on input flags. Returns zero at success or negative
++ * errno value otherwise.
++ */
++static int
++get_sync_type(uint32_t flags, uint32_t *prod_st, uint32_t *cons_st)
++{
++	static const uint32_t prod_st_flags =
++		(RING_F_SP_ENQ | RING_F_MP_RTS_ENQ);
++	static const uint32_t cons_st_flags =
++		(RING_F_SC_DEQ | RING_F_MC_RTS_DEQ);
++
++	switch (flags & prod_st_flags) {
++	case 0:
++		*prod_st = RTE_RING_SYNC_MT;
++		break;
++	case RING_F_SP_ENQ:
++		*prod_st = RTE_RING_SYNC_ST;
++		break;
++	case RING_F_MP_RTS_ENQ:
++		*prod_st = RTE_RING_SYNC_MT_RTS;
++		break;
++	default:
++		return -EINVAL;
++	}
++
++	switch (flags & cons_st_flags) {
++	case 0:
++		*cons_st = RTE_RING_SYNC_MT;
++		break;
++	case RING_F_SC_DEQ:
++		*cons_st = RTE_RING_SYNC_ST;
++		break;
++	case RING_F_MC_RTS_DEQ:
++		*cons_st = RTE_RING_SYNC_MT_RTS;
++		break;
++	default:
++		return -EINVAL;
++	}
++
++	return 0;
++}
++
+ int
+ rte_ring_init(struct rte_ring *r, const char *name, unsigned count,
+ 	unsigned flags)
+@@ -76,16 +123,20 @@ rte_ring_init(struct rte_ring *r, const char *name, unsigned count,
+ 	RTE_BUILD_BUG_ON((offsetof(struct rte_ring, prod) &
+ 			  RTE_CACHE_LINE_MASK) != 0);
+ 
++	RTE_BUILD_BUG_ON(offsetof(struct rte_ring_headtail, sync_type) !=
++		offsetof(struct rte_ring_rts_headtail, sync_type));
++	RTE_BUILD_BUG_ON(offsetof(struct rte_ring_headtail, tail) !=
++		offsetof(struct rte_ring_rts_headtail, tail.val.pos));
++
+ 	/* init the ring structure */
+ 	memset(r, 0, sizeof(*r));
+ 	ret = snprintf(r->name, sizeof(r->name), "%s", name);
+ 	if (ret < 0 || ret >= (int)sizeof(r->name))
+ 		return -ENAMETOOLONG;
+ 	r->flags = flags;
+-	r->prod.sync_type = (flags & RING_F_SP_ENQ) ?
+-		RTE_RING_SYNC_ST : RTE_RING_SYNC_MT;
+-	r->cons.sync_type = (flags & RING_F_SC_DEQ) ?
+-		RTE_RING_SYNC_ST : RTE_RING_SYNC_MT;
++	ret = get_sync_type(flags, &r->prod.sync_type, &r->cons.sync_type);
++	if (ret != 0)
++		return ret;
+ 
+ 	if (flags & RING_F_EXACT_SZ) {
+ 		r->size = rte_align32pow2(count + 1);
+@@ -102,8 +153,12 @@ rte_ring_init(struct rte_ring *r, const char *name, unsigned count,
+ 		r->mask = count - 1;
+ 		r->capacity = r->mask;
+ 	}
+-	r->prod.head = r->cons.head = 0;
+-	r->prod.tail = r->cons.tail = 0;
++
++	/* set default values for head-tail distance */
++	if (flags & RING_F_MP_RTS_ENQ)
++		rte_ring_set_prod_htd_max(r, r->capacity / HTD_MAX_DEF);
++	if (flags & RING_F_MC_RTS_DEQ)
++		rte_ring_set_cons_htd_max(r, r->capacity / HTD_MAX_DEF);
+ 
+ 	return 0;
+ }
+diff --git a/lib/librte_ring/rte_ring.h b/lib/librte_ring/rte_ring.h
+index b00329c86..2c61ea382 100644
+--- a/lib/librte_ring/rte_ring.h
++++ b/lib/librte_ring/rte_ring.h
+@@ -48,6 +48,7 @@ extern "C" {
+ #include <rte_branch_prediction.h>
+ #include <rte_memzone.h>
+ #include <rte_pause.h>
++#include <rte_debug.h>
+ 
+ #define RTE_TAILQ_RING_NAME "RTE_RING"
+ 
+@@ -67,13 +68,15 @@ struct rte_memzone; /* forward declaration, so as not to require memzone.h */
+ enum {
+ 	RTE_RING_SYNC_MT,     /**< multi-thread safe (default mode) */
+ 	RTE_RING_SYNC_ST,     /**< single thread only */
++	RTE_RING_SYNC_MT_RTS, /**< multi-thread relaxed tail sync */
+ };
+ 
+ /**
+  * structure to hold a pair of head/tail values and other metadata.
+  * used by RTE_RING_SYNC_MT, RTE_RING_SYNC_ST sync types.
+- * Depending on sync_type format of that structure might be different,
+- * but offset for *sync_type* and *tail* values should remain the same.
++ * Depending on sync_type format of that structure might differ
++ * depending on the sync mechanism selelcted, but offsets for
++ * *sync_type* and *tail* values should always remain the same.
+  */
+ struct rte_ring_headtail {
+ 	uint32_t sync_type;                      /**< sync type of prod/cons */
+@@ -81,6 +84,21 @@ struct rte_ring_headtail {
+ 	volatile uint32_t head;                  /**< prod/consumer head. */
+ };
+ 
++union rte_ring_ht_poscnt {
++	uint64_t raw;
++	struct {
++		uint32_t pos; /**< head/tail position */
++		uint32_t cnt; /**< head/tail reference counter */
++	} val;
++};
++
++struct rte_ring_rts_headtail {
++	uint32_t sync_type; /**< sync type of prod/cons */
++	uint32_t htd_max;   /**< max allowed distance between head/tail */
++	volatile union rte_ring_ht_poscnt tail;
++	volatile union rte_ring_ht_poscnt head;
++};
++
+ /**
+  * An RTE ring structure.
+  *
+@@ -108,11 +126,21 @@ struct rte_ring {
+ 	char pad0 __rte_cache_aligned; /**< empty cache line */
+ 
+ 	/** Ring producer status. */
+-	struct rte_ring_headtail prod __rte_cache_aligned;
++	RTE_STD_C11
++	union {
++		struct rte_ring_headtail prod;
++		struct rte_ring_rts_headtail rts_prod;
++	}  __rte_cache_aligned;
++
+ 	char pad1 __rte_cache_aligned; /**< empty cache line */
+ 
+ 	/** Ring consumer status. */
+-	struct rte_ring_headtail cons __rte_cache_aligned;
++	RTE_STD_C11
++	union {
++		struct rte_ring_headtail cons;
++		struct rte_ring_rts_headtail rts_cons;
++	}  __rte_cache_aligned;
++
+ 	char pad2 __rte_cache_aligned; /**< empty cache line */
+ };
+ 
+@@ -129,6 +157,9 @@ struct rte_ring {
+ #define RING_F_EXACT_SZ 0x0004
+ #define RTE_RING_SZ_MASK  (0x7fffffffU) /**< Ring size mask */
+ 
++#define RING_F_MP_RTS_ENQ 0x0008 /**< The default enqueue is "MP RTS". */
++#define RING_F_MC_RTS_DEQ 0x0010 /**< The default dequeue is "MC RTS". */
++
+ #define __IS_SP RTE_RING_SYNC_ST
+ #define __IS_MP RTE_RING_SYNC_MT
+ #define __IS_SC RTE_RING_SYNC_ST
+@@ -408,6 +439,82 @@ __rte_ring_do_dequeue(struct rte_ring *r, void **obj_table,
+ 	return n;
+ }
+ 
++#include <rte_ring_rts_generic.h>
++
++/**
++ * @internal Enqueue several objects on the RTS ring.
++ *
++ * @param r
++ *   A pointer to the ring structure.
++ * @param obj_table
++ *   A pointer to a table of void * pointers (objects).
++ * @param n
++ *   The number of objects to add in the ring from the obj_table.
++ * @param behavior
++ *   RTE_RING_QUEUE_FIXED:    Enqueue a fixed number of items from a ring
++ *   RTE_RING_QUEUE_VARIABLE: Enqueue as many items as possible from ring
++ * @param free_space
++ *   returns the amount of space after the enqueue operation has finished
++ * @return
++ *   Actual number of objects enqueued.
++ *   If behavior == RTE_RING_QUEUE_FIXED, this will be 0 or n only.
++ */
++static __rte_always_inline unsigned int
++__rte_ring_do_rts_enqueue(struct rte_ring *r, void * const *obj_table,
++		uint32_t n, enum rte_ring_queue_behavior behavior,
++		uint32_t *free_space)
++{
++	uint32_t free, head;
++
++	n =  __rte_ring_rts_move_prod_head(r, n, behavior, &head, &free);
++
++	if (n != 0) {
++		ENQUEUE_PTRS(r, &r[1], head, obj_table, n, void *);
++		__rte_ring_rts_update_tail(&r->rts_prod);
++	}
++
++	if (free_space != NULL)
++		*free_space = free - n;
++	return n;
++}
++
++/**
++ * @internal Dequeue several objects from the RTS ring.
++ *
++ * @param r
++ *   A pointer to the ring structure.
++ * @param obj_table
++ *   A pointer to a table of void * pointers (objects).
++ * @param n
++ *   The number of objects to pull from the ring.
++ * @param behavior
++ *   RTE_RING_QUEUE_FIXED:    Dequeue a fixed number of items from a ring
++ *   RTE_RING_QUEUE_VARIABLE: Dequeue as many items as possible from ring
++ * @param available
++ *   returns the number of remaining ring entries after the dequeue has finished
++ * @return
++ *   - Actual number of objects dequeued.
++ *     If behavior == RTE_RING_QUEUE_FIXED, this will be 0 or n only.
++ */
++static __rte_always_inline unsigned int
++__rte_ring_do_rts_dequeue(struct rte_ring *r, void **obj_table,
++		unsigned int n, enum rte_ring_queue_behavior behavior,
++		unsigned int *available)
++{
++	uint32_t entries, head;
++
++	n = __rte_ring_rts_move_cons_head(r, n, behavior, &head, &entries);
++
++	if (n != 0) {
++		DEQUEUE_PTRS(r, &r[1], head, obj_table, n, void *);
++		__rte_ring_rts_update_tail(&r->rts_cons);
++	}
++
++	if (available != NULL)
++		*available = entries - n;
++	return n;
++}
++
+ /**
+  * Enqueue several objects on the ring (multi-producers safe).
+  *
+@@ -457,6 +564,29 @@ rte_ring_sp_enqueue_bulk(struct rte_ring *r, void * const *obj_table,
+ 			RTE_RING_SYNC_ST, free_space);
+ }
+ 
++/**
++ * Enqueue several objects on the RTS ring (multi-producers safe).
++ *
++ * @param r
++ *   A pointer to the ring structure.
++ * @param obj_table
++ *   A pointer to a table of void * pointers (objects).
++ * @param n
++ *   The number of objects to add in the ring from the obj_table.
++ * @param free_space
++ *   if non-NULL, returns the amount of space in the ring after the
++ *   enqueue operation has finished.
++ * @return
++ *   The number of objects enqueued, either 0 or n
++ */
++static __rte_always_inline unsigned int
++rte_ring_rts_enqueue_bulk(struct rte_ring *r, void * const *obj_table,
++			 unsigned int n, unsigned int *free_space)
++{
++	return __rte_ring_do_rts_enqueue(r, obj_table, n, RTE_RING_QUEUE_FIXED,
++			free_space);
++}
++
+ /**
+  * Enqueue several objects on a ring.
+  *
+@@ -480,8 +610,18 @@ static __rte_always_inline unsigned int
+ rte_ring_enqueue_bulk(struct rte_ring *r, void * const *obj_table,
+ 		      unsigned int n, unsigned int *free_space)
+ {
+-	return __rte_ring_do_enqueue(r, obj_table, n, RTE_RING_QUEUE_FIXED,
+-			r->prod.sync_type, free_space);
++	switch (r->prod.sync_type) {
++	case RTE_RING_SYNC_MT:
++		return rte_ring_mp_enqueue_bulk(r, obj_table, n, free_space);
++	case RTE_RING_SYNC_ST:
++		return rte_ring_sp_enqueue_bulk(r, obj_table, n, free_space);
++	case RTE_RING_SYNC_MT_RTS:
++		return rte_ring_rts_enqueue_bulk(r, obj_table, n, free_space);
++	}
++
++	/* valid ring should never reach this point */
++	RTE_ASSERT(0);
++	return 0;
+ }
+ 
+ /**
+@@ -592,6 +732,29 @@ rte_ring_sc_dequeue_bulk(struct rte_ring *r, void **obj_table,
+ 			RTE_RING_SYNC_ST, available);
+ }
+ 
++/**
++ * Dequeue several objects from an RTS ring (multi-consumers safe).
++ *
++ * @param r
++ *   A pointer to the ring structure.
++ * @param obj_table
++ *   A pointer to a table of void * pointers (objects) that will be filled.
++ * @param n
++ *   The number of objects to dequeue from the ring to the obj_table.
++ * @param available
++ *   If non-NULL, returns the number of remaining ring entries after the
++ *   dequeue has finished.
++ * @return
++ *   The number of objects dequeued, either 0 or n
++ */
++static __rte_always_inline unsigned int
++rte_ring_rts_dequeue_bulk(struct rte_ring *r, void **obj_table,
++		unsigned int n, unsigned int *available)
++{
++	return __rte_ring_do_rts_dequeue(r, obj_table, n, RTE_RING_QUEUE_FIXED,
++			available);
++}
++
+ /**
+  * Dequeue several objects from a ring.
+  *
+@@ -615,8 +778,18 @@ static __rte_always_inline unsigned int
+ rte_ring_dequeue_bulk(struct rte_ring *r, void **obj_table, unsigned int n,
+ 		unsigned int *available)
+ {
+-	return __rte_ring_do_dequeue(r, obj_table, n, RTE_RING_QUEUE_FIXED,
+-				r->cons.sync_type, available);
++	switch (r->cons.sync_type) {
++	case RTE_RING_SYNC_MT:
++		return rte_ring_mc_dequeue_bulk(r, obj_table, n, available);
++	case RTE_RING_SYNC_ST:
++		return rte_ring_sc_dequeue_bulk(r, obj_table, n, available);
++	case RTE_RING_SYNC_MT_RTS:
++		return rte_ring_rts_dequeue_bulk(r, obj_table, n, available);
++	}
++
++	/* valid ring should never reach this point */
++	RTE_ASSERT(0);
++	return 0;
+ }
+ 
+ /**
+@@ -795,6 +968,42 @@ rte_ring_cons_single(const struct rte_ring *r)
+ 	return (rte_ring_get_cons_sync_type(r) == RTE_RING_SYNC_ST);
+ }
+ 
++static inline uint32_t
++rte_ring_get_prod_htd_max(const struct rte_ring *r)
++{
++	if (r->prod.sync_type == RTE_RING_SYNC_MT_RTS)
++		return r->rts_prod.htd_max;
++	return UINT32_MAX;
++}
++
++static inline int
++rte_ring_set_prod_htd_max(struct rte_ring *r, uint32_t v)
++{
++	if (r->prod.sync_type != RTE_RING_SYNC_MT_RTS)
++		return -ENOTSUP;
++
++	r->rts_prod.htd_max = v;
++	return 0;
++}
++
++static inline uint32_t
++rte_ring_get_cons_htd_max(const struct rte_ring *r)
++{
++	if (r->cons.sync_type == RTE_RING_SYNC_MT_RTS)
++		return r->rts_prod.htd_max;
++	return UINT32_MAX;
++}
++
++static inline int
++rte_ring_set_cons_htd_max(struct rte_ring *r, uint32_t v)
++{
++	if (r->cons.sync_type != RTE_RING_SYNC_MT_RTS)
++		return -ENOTSUP;
++
++	r->rts_cons.htd_max = v;
++	return 0;
++}
++
+ /**
+  * Dump the status of all rings on the console
+  *
+@@ -864,6 +1073,29 @@ rte_ring_sp_enqueue_burst(struct rte_ring *r, void * const *obj_table,
+ 			RTE_RING_QUEUE_VARIABLE, RTE_RING_SYNC_ST, free_space);
+ }
+ 
++/**
++ * Enqueue several objects on the RTS ring (multi-producers safe).
++ *
++ * @param r
++ *   A pointer to the ring structure.
++ * @param obj_table
++ *   A pointer to a table of void * pointers (objects).
++ * @param n
++ *   The number of objects to add in the ring from the obj_table.
++ * @param free_space
++ *   if non-NULL, returns the amount of space in the ring after the
++ *   enqueue operation has finished.
++ * @return
++ *   - n: Actual number of objects enqueued.
++ */
++static __rte_always_inline unsigned
++rte_ring_rts_enqueue_burst(struct rte_ring *r, void * const *obj_table,
++			 unsigned int n, unsigned int *free_space)
++{
++	return __rte_ring_do_rts_enqueue(r, obj_table, n,
++			RTE_RING_QUEUE_VARIABLE, free_space);
++}
++
+ /**
+  * Enqueue several objects on a ring.
+  *
+@@ -887,8 +1119,18 @@ static __rte_always_inline unsigned
+ rte_ring_enqueue_burst(struct rte_ring *r, void * const *obj_table,
+ 		      unsigned int n, unsigned int *free_space)
+ {
+-	return __rte_ring_do_enqueue(r, obj_table, n, RTE_RING_QUEUE_VARIABLE,
+-			r->prod.sync_type, free_space);
++	switch (r->prod.sync_type) {
++	case RTE_RING_SYNC_MT:
++		return rte_ring_mp_enqueue_burst(r, obj_table, n, free_space);
++	case RTE_RING_SYNC_ST:
++		return rte_ring_sp_enqueue_burst(r, obj_table, n, free_space);
++	case RTE_RING_SYNC_MT_RTS:
++		return rte_ring_rts_enqueue_burst(r, obj_table, n, free_space);
++	}
++
++	/* valid ring should never reach this point */
++	RTE_ASSERT(0);
++	return 0;
+ }
+ 
+ /**
+@@ -944,6 +1186,30 @@ rte_ring_sc_dequeue_burst(struct rte_ring *r, void **obj_table,
+ 			RTE_RING_QUEUE_VARIABLE, RTE_RING_SYNC_ST, available);
+ }
+ 
++/**
++ * Dequeue several objects from an RTS  ring (multi-consumers safe).
++ * When the requested objects are more than the available objects,
++ * only dequeue the actual number of objects.
++ *
++ * @param r
++ *   A pointer to the ring structure.
++ * @param obj_table
++ *   A pointer to a table of void * pointers (objects) that will be filled.
++ * @param n
++ *   The number of objects to dequeue from the ring to the obj_table.
++ * @param available
++ *   If non-NULL, returns the number of remaining ring entries after the
++ *   dequeue has finished.
++ * @return
++ *   - n: Actual number of objects dequeued, 0 if ring is empty
++ */
++static __rte_always_inline unsigned
++rte_ring_rts_dequeue_burst(struct rte_ring *r, void **obj_table,
++		unsigned int n, unsigned int *available)
++{
++	return __rte_ring_do_rts_dequeue(r, obj_table, n,
++			RTE_RING_QUEUE_VARIABLE, available);
++}
+ /**
+  * Dequeue multiple objects from a ring up to a maximum number.
+  *
+@@ -967,9 +1233,18 @@ static __rte_always_inline unsigned
+ rte_ring_dequeue_burst(struct rte_ring *r, void **obj_table,
+ 		unsigned int n, unsigned int *available)
+ {
+-	return __rte_ring_do_dequeue(r, obj_table, n,
+-				RTE_RING_QUEUE_VARIABLE,
+-				r->cons.sync_type, available);
++	switch (r->cons.sync_type) {
++	case RTE_RING_SYNC_MT:
++		return rte_ring_mc_dequeue_burst(r, obj_table, n, available);
++	case RTE_RING_SYNC_ST:
++		return rte_ring_sc_dequeue_burst(r, obj_table, n, available);
++	case RTE_RING_SYNC_MT_RTS:
++		return rte_ring_rts_dequeue_burst(r, obj_table, n, available);
++	}
++
++	/* valid ring should never reach this point */
++	RTE_ASSERT(0);
++	return 0;
+ }
+ 
+ #ifdef __cplusplus
+diff --git a/lib/librte_ring/rte_ring_rts_generic.h b/lib/librte_ring/rte_ring_rts_generic.h
+new file mode 100644
+index 000000000..add8630b2
+--- /dev/null
++++ b/lib/librte_ring/rte_ring_rts_generic.h
+@@ -0,0 +1,240 @@
++/* SPDX-License-Identifier: BSD-3-Clause
++ *
++ * Copyright (c) 2010-2017 Intel Corporation
++ * Copyright (c) 2007-2009 Kip Macy kmacy@freebsd.org
++ * All rights reserved.
++ * Derived from FreeBSD's bufring.h
++ * Used as BSD-3 Licensed with permission from Kip Macy.
++ */
++
++#ifndef _RTE_RING_RTS_GENERIC_H_
++#define _RTE_RING_RTS_GENERIC_H_
++
++/**
++ * @file rte_ring_rts_generic.h
++ * It is not recommended to include this file directly,
++ * include <rte_ring.h> instead.
++ * Contains internal helper functions for Relaxed Tail Sync (RTS) ring mode.
++ * The main idea remains the same as for our original MP/MC synchronization
++ * mechanism.
++ * The main difference is that tail value is increased not
++ * by every thread that finished enqueue/dequeue,
++ * but only by the last one doing enqueue/dequeue.
++ * That allows threads to skip spinning on tail value,
++ * leaving actual tail value change to last thread in the update queue.
++ * RTS requires 2 64-bit CAS for each enqueue(/dequeue) operation:
++ * one for head update, second for tail update.
++ * As a gain it allows thread to avoid spinning/waiting on tail value.
++ * In comparision original MP/MC algorithm requires one 32-bit CAS
++ * for head update and waiting/spinning on tail value.
++ *
++ * Brief outline:
++ *  - introduce refcnt for both head and tail.
++ *  - increment head.refcnt for each head.value update
++ *  - write head:value and head:refcnt atomically (64-bit CAS)
++ *  - move tail.value ahead only when tail.refcnt + 1 == head.refcnt
++ *  - increment tail.refcnt when each enqueue/dequeue op finishes
++ *    (no matter is tail:value going to change or not)
++ *  - write tail.value and tail.recnt atomically (64-bit CAS)
++ *
++ * To avoid head/tail starvation:
++ *  - limit max allowed distance between head and tail value (HTD_MAX).
++ *    I.E. thread is allowed to proceed with changing head.value,
++ *    only when:  head.value - tail.value <= HTD_MAX
++ * HTD_MAX is an optional parameter.
++ * With HTD_MAX == 0 we'll have ring with fully synchronized
++ * head/tail (like HTS).
++ * With HTD_MAX == UINT32_MAX - no limitation.
++ * By default HTD_MAX == ring.capacity / 8.
++ */
++
++/**
++ * @internal This function updates tail values.
++ */
++static __rte_always_inline void
++__rte_ring_rts_update_tail(struct rte_ring_rts_headtail *ht)
++{
++	union rte_ring_ht_poscnt h, ot, nt;
++
++	/*
++	 * If there are other enqueues/dequeues in progress that
++	 * might preceded us, then don't update tail with new value.
++	 */
++
++	do {
++		ot.raw = ht->tail.raw;
++		rte_smp_rmb();
++
++		/* on 32-bit systems we have to do atomic read here */
++		h.raw = rte_atomic64_read((rte_atomic64_t *)
++			(uintptr_t)&ht->head.raw);
++
++		nt.raw = ot.raw;
++		if (++nt.val.cnt == h.val.cnt)
++			nt.val.pos = h.val.pos;
++
++	} while (rte_atomic64_cmpset(&ht->tail.raw, ot.raw, nt.raw) == 0);
++}
++
++/**
++ * @internal This function waits till head/tail distance wouldn't
++ * exceed pre-defined max value.
++ */
++static __rte_always_inline void
++__rte_ring_rts_head_wait(const struct rte_ring_rts_headtail *ht,
++	union rte_ring_ht_poscnt *h)
++{
++	uint32_t max;
++
++	max = ht->htd_max;
++	h->raw = ht->head.raw;
++	rte_smp_rmb();
++
++	while (h->val.pos - ht->tail.val.pos > max) {
++		rte_pause();
++		h->raw = ht->head.raw;
++		rte_smp_rmb();
++	}
++}
++
++/**
++ * @internal This function updates the producer head for enqueue.
++ *
++ * @param r
++ *   A pointer to the ring structure
++ * @param is_sp
++ *   Indicates whether multi-producer path is needed or not
++ * @param n
++ *   The number of elements we will want to enqueue, i.e. how far should the
++ *   head be moved
++ * @param behavior
++ *   RTE_RING_QUEUE_FIXED:    Enqueue a fixed number of items from a ring
++ *   RTE_RING_QUEUE_VARIABLE: Enqueue as many items as possible from ring
++ * @param old_head
++ *   Returns head value as it was before the move, i.e. where enqueue starts
++ * @param new_head
++ *   Returns the current/new head value i.e. where enqueue finishes
++ * @param free_entries
++ *   Returns the amount of free space in the ring BEFORE head was moved
++ * @return
++ *   Actual number of objects enqueued.
++ *   If behavior == RTE_RING_QUEUE_FIXED, this will be 0 or n only.
++ */
++static __rte_always_inline uint32_t
++__rte_ring_rts_move_prod_head(struct rte_ring *r, uint32_t num,
++	enum rte_ring_queue_behavior behavior, uint32_t *old_head,
++	uint32_t *free_entries)
++{
++	uint32_t n;
++	union rte_ring_ht_poscnt nh, oh;
++
++	const uint32_t capacity = r->capacity;
++
++	do {
++		/* Reset n to the initial burst count */
++		n = num;
++
++		/* read prod head (may spin on prod tail) */
++		__rte_ring_rts_head_wait(&r->rts_prod, &oh);
++
++		/* add rmb barrier to avoid load/load reorder in weak
++		 * memory model. It is noop on x86
++		 */
++		rte_smp_rmb();
++
++		/*
++		 *  The subtraction is done between two unsigned 32bits value
++		 * (the result is always modulo 32 bits even if we have
++		 * *old_head > cons_tail). So 'free_entries' is always between 0
++		 * and capacity (which is < size).
++		 */
++		*free_entries = capacity + r->cons.tail - oh.val.pos;
++
++		/* check that we have enough room in ring */
++		if (unlikely(n > *free_entries))
++			n = (behavior == RTE_RING_QUEUE_FIXED) ?
++					0 : *free_entries;
++
++		if (n == 0)
++			return 0;
++
++		nh.val.pos = oh.val.pos + n;
++		nh.val.cnt = oh.val.cnt + 1;
++
++	} while (rte_atomic64_cmpset(&r->rts_prod.head.raw,
++			oh.raw, nh.raw) == 0);
++
++	*old_head = oh.val.pos;
++	return n;
++}
++
++/**
++ * @internal This function updates the consumer head for dequeue
++ *
++ * @param r
++ *   A pointer to the ring structure
++ * @param is_sc
++ *   Indicates whether multi-consumer path is needed or not
++ * @param n
++ *   The number of elements we will want to enqueue, i.e. how far should the
++ *   head be moved
++ * @param behavior
++ *   RTE_RING_QUEUE_FIXED:    Dequeue a fixed number of items from a ring
++ *   RTE_RING_QUEUE_VARIABLE: Dequeue as many items as possible from ring
++ * @param old_head
++ *   Returns head value as it was before the move, i.e. where dequeue starts
++ * @param new_head
++ *   Returns the current/new head value i.e. where dequeue finishes
++ * @param entries
++ *   Returns the number of entries in the ring BEFORE head was moved
++ * @return
++ *   - Actual number of objects dequeued.
++ *     If behavior == RTE_RING_QUEUE_FIXED, this will be 0 or n only.
++ */
++static __rte_always_inline unsigned int
++__rte_ring_rts_move_cons_head(struct rte_ring *r, uint32_t num,
++	enum rte_ring_queue_behavior behavior, uint32_t *old_head,
++	uint32_t *entries)
++{
++	uint32_t n;
++	union rte_ring_ht_poscnt nh, oh;
++
++	/* move cons.head atomically */
++	do {
++		/* Restore n as it may change every loop */
++		n = num;
++
++		/* read cons head (may spin on cons tail) */
++		__rte_ring_rts_head_wait(&r->rts_cons, &oh);
++
++
++		/* add rmb barrier to avoid load/load reorder in weak
++		 * memory model. It is noop on x86
++		 */
++		rte_smp_rmb();
++
++		/* The subtraction is done between two unsigned 32bits value
++		 * (the result is always modulo 32 bits even if we have
++		 * cons_head > prod_tail). So 'entries' is always between 0
++		 * and size(ring)-1.
++		 */
++		*entries = r->prod.tail - oh.val.pos;
++
++		/* Set the actual entries for dequeue */
++		if (n > *entries)
++			n = (behavior == RTE_RING_QUEUE_FIXED) ? 0 : *entries;
++
++		if (unlikely(n == 0))
++			return 0;
++
++		nh.val.pos = oh.val.pos + n;
++		nh.val.cnt = oh.val.cnt + 1;
++
++	} while (rte_atomic64_cmpset(&r->rts_cons.head.raw,
++			oh.raw, nh.raw) == 0);
++
++	*old_head = oh.val.pos;
++	return n;
++}
++
++#endif /* _RTE_RING_RTS_GENERIC_H_ */
+-- 
+2.17.1
+

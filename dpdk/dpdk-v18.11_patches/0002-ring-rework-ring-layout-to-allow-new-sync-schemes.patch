@@ -1,0 +1,315 @@
+From be7d234acbbb426a61b0ad32712f87788c678859 Mon Sep 17 00:00:00 2001
+From: Konstantin Ananyev <konstantin.ananyev@intel.com>
+Date: Tue, 18 Feb 2020 11:22:31 +0000
+Subject: [RFC 2/6] ring: rework ring layout to allow new sync schemes
+
+Change from *single* to *sync_type* to allow different
+synchronisation schemes to be applied.
+Change layout to make sure that *sync_type* and *tail*
+will always reside on same offsets.
+
+Signed-off-by: Konstantin Ananyev <konstantin.ananyev@intel.com>
+---
+ lib/librte_eventdev/rte_event_ring.h |  8 +--
+ lib/librte_pdump/rte_pdump.c         |  2 +-
+ lib/librte_port/rte_port_ring.c      | 12 ++---
+ lib/librte_ring/rte_ring.c           |  6 ++-
+ lib/librte_ring/rte_ring.h           | 76 ++++++++++++++++++++--------
+ 5 files changed, 70 insertions(+), 34 deletions(-)
+
+diff --git a/lib/librte_eventdev/rte_event_ring.h b/lib/librte_eventdev/rte_event_ring.h
+index 827a3209e..a28f648bb 100644
+--- a/lib/librte_eventdev/rte_event_ring.h
++++ b/lib/librte_eventdev/rte_event_ring.h
+@@ -91,7 +91,7 @@ rte_event_ring_enqueue_burst(struct rte_event_ring *r,
+ 	uint32_t prod_head, prod_next;
+ 	uint32_t free_entries;
+ 
+-	n = __rte_ring_move_prod_head(&r->r, r->r.prod.single, n,
++	n = __rte_ring_move_prod_head(&r->r, r->r.prod.sync_type, n,
+ 			RTE_RING_QUEUE_VARIABLE,
+ 			&prod_head, &prod_next, &free_entries);
+ 	if (n == 0)
+@@ -99,7 +99,7 @@ rte_event_ring_enqueue_burst(struct rte_event_ring *r,
+ 
+ 	ENQUEUE_PTRS(&r->r, &r[1], prod_head, events, n, struct rte_event);
+ 
+-	update_tail(&r->r.prod, prod_head, prod_next, r->r.prod.single, 1);
++	update_tail(&r->r.prod, prod_head, prod_next, r->r.prod.sync_type, 1);
+ end:
+ 	if (free_space != NULL)
+ 		*free_space = free_entries - n;
+@@ -132,7 +132,7 @@ rte_event_ring_dequeue_burst(struct rte_event_ring *r,
+ 	uint32_t cons_head, cons_next;
+ 	uint32_t entries;
+ 
+-	n = __rte_ring_move_cons_head(&r->r, r->r.cons.single, n,
++	n = __rte_ring_move_cons_head(&r->r, r->r.cons.sync_type, n,
+ 			RTE_RING_QUEUE_VARIABLE,
+ 			&cons_head, &cons_next, &entries);
+ 	if (n == 0)
+@@ -140,7 +140,7 @@ rte_event_ring_dequeue_burst(struct rte_event_ring *r,
+ 
+ 	DEQUEUE_PTRS(&r->r, &r[1], cons_head, events, n, struct rte_event);
+ 
+-	update_tail(&r->r.cons, cons_head, cons_next, r->r.cons.single, 0);
++	update_tail(&r->r.cons, cons_head, cons_next, r->r.cons.sync_type, 0);
+ 
+ end:
+ 	if (available != NULL)
+diff --git a/lib/librte_pdump/rte_pdump.c b/lib/librte_pdump/rte_pdump.c
+index 6c3a88581..ab881958b 100644
+--- a/lib/librte_pdump/rte_pdump.c
++++ b/lib/librte_pdump/rte_pdump.c
+@@ -434,7 +434,7 @@ pdump_validate_ring_mp(struct rte_ring *ring, struct rte_mempool *mp)
+ 		rte_errno = EINVAL;
+ 		return -1;
+ 	}
+-	if (ring->prod.single || ring->cons.single) {
++	if (rte_ring_prod_single(ring) || rte_ring_cons_single(ring)) {
+ 		RTE_LOG(ERR, PDUMP, "ring with either SP or SC settings"
+ 		" is not valid for pdump, should have MP and MC settings\n");
+ 		rte_errno = EINVAL;
+diff --git a/lib/librte_port/rte_port_ring.c b/lib/librte_port/rte_port_ring.c
+index 47fcdd06a..2f6c050fa 100644
+--- a/lib/librte_port/rte_port_ring.c
++++ b/lib/librte_port/rte_port_ring.c
+@@ -44,8 +44,8 @@ rte_port_ring_reader_create_internal(void *params, int socket_id,
+ 	/* Check input parameters */
+ 	if ((conf == NULL) ||
+ 		(conf->ring == NULL) ||
+-		(conf->ring->cons.single && is_multi) ||
+-		(!(conf->ring->cons.single) && !is_multi)) {
++		(rte_ring_cons_single(conf->ring) && is_multi) ||
++		(!rte_ring_cons_single(conf->ring) && !is_multi)) {
+ 		RTE_LOG(ERR, PORT, "%s: Invalid Parameters\n", __func__);
+ 		return NULL;
+ 	}
+@@ -171,8 +171,8 @@ rte_port_ring_writer_create_internal(void *params, int socket_id,
+ 	/* Check input parameters */
+ 	if ((conf == NULL) ||
+ 		(conf->ring == NULL) ||
+-		(conf->ring->prod.single && is_multi) ||
+-		(!(conf->ring->prod.single) && !is_multi) ||
++		(rte_ring_prod_single(conf->ring) && is_multi) ||
++		(!rte_ring_prod_single(conf->ring) && !is_multi) ||
+ 		(conf->tx_burst_sz > RTE_PORT_IN_BURST_SIZE_MAX)) {
+ 		RTE_LOG(ERR, PORT, "%s: Invalid Parameters\n", __func__);
+ 		return NULL;
+@@ -440,8 +440,8 @@ rte_port_ring_writer_nodrop_create_internal(void *params, int socket_id,
+ 	/* Check input parameters */
+ 	if ((conf == NULL) ||
+ 		(conf->ring == NULL) ||
+-		(conf->ring->prod.single && is_multi) ||
+-		(!(conf->ring->prod.single) && !is_multi) ||
++		(rte_ring_prod_single(conf->ring) && is_multi) ||
++		(!rte_ring_prod_single(conf->ring) && !is_multi) ||
+ 		(conf->tx_burst_sz > RTE_PORT_IN_BURST_SIZE_MAX)) {
+ 		RTE_LOG(ERR, PORT, "%s: Invalid Parameters\n", __func__);
+ 		return NULL;
+diff --git a/lib/librte_ring/rte_ring.c b/lib/librte_ring/rte_ring.c
+index 550549db3..b393e4863 100644
+--- a/lib/librte_ring/rte_ring.c
++++ b/lib/librte_ring/rte_ring.c
+@@ -82,8 +82,10 @@ rte_ring_init(struct rte_ring *r, const char *name, unsigned count,
+ 	if (ret < 0 || ret >= (int)sizeof(r->name))
+ 		return -ENAMETOOLONG;
+ 	r->flags = flags;
+-	r->prod.single = (flags & RING_F_SP_ENQ) ? __IS_SP : __IS_MP;
+-	r->cons.single = (flags & RING_F_SC_DEQ) ? __IS_SC : __IS_MC;
++	r->prod.sync_type = (flags & RING_F_SP_ENQ) ?
++		RTE_RING_SYNC_ST : RTE_RING_SYNC_MT;
++	r->cons.sync_type = (flags & RING_F_SC_DEQ) ?
++		RTE_RING_SYNC_ST : RTE_RING_SYNC_MT;
+ 
+ 	if (flags & RING_F_EXACT_SZ) {
+ 		r->size = rte_align32pow2(count + 1);
+diff --git a/lib/librte_ring/rte_ring.h b/lib/librte_ring/rte_ring.h
+index e265e9479..b00329c86 100644
+--- a/lib/librte_ring/rte_ring.h
++++ b/lib/librte_ring/rte_ring.h
+@@ -63,11 +63,22 @@ enum rte_ring_queue_behavior {
+ 
+ struct rte_memzone; /* forward declaration, so as not to require memzone.h */
+ 
+-/* structure to hold a pair of head/tail values and other metadata */
++/** prod/cons sync types */
++enum {
++	RTE_RING_SYNC_MT,     /**< multi-thread safe (default mode) */
++	RTE_RING_SYNC_ST,     /**< single thread only */
++};
++
++/**
++ * structure to hold a pair of head/tail values and other metadata.
++ * used by RTE_RING_SYNC_MT, RTE_RING_SYNC_ST sync types.
++ * Depending on sync_type format of that structure might be different,
++ * but offset for *sync_type* and *tail* values should remain the same.
++ */
+ struct rte_ring_headtail {
+-	volatile uint32_t head;  /**< Prod/consumer head. */
+-	volatile uint32_t tail;  /**< Prod/consumer tail. */
+-	uint32_t single;         /**< True if single prod/cons */
++	uint32_t sync_type;                      /**< sync type of prod/cons */
++	volatile uint32_t tail __rte_aligned(8); /**< prod/consumer tail. */
++	volatile uint32_t head;                  /**< prod/consumer head. */
+ };
+ 
+ /**
+@@ -118,11 +129,10 @@ struct rte_ring {
+ #define RING_F_EXACT_SZ 0x0004
+ #define RTE_RING_SZ_MASK  (0x7fffffffU) /**< Ring size mask */
+ 
+-/* @internal defines for passing to the enqueue dequeue worker functions */
+-#define __IS_SP 1
+-#define __IS_MP 0
+-#define __IS_SC 1
+-#define __IS_MC 0
++#define __IS_SP RTE_RING_SYNC_ST
++#define __IS_MP RTE_RING_SYNC_MT
++#define __IS_SC RTE_RING_SYNC_ST
++#define __IS_MC RTE_RING_SYNC_MT
+ 
+ /**
+  * Calculate the memory size needed for a ring
+@@ -421,7 +431,7 @@ rte_ring_mp_enqueue_bulk(struct rte_ring *r, void * const *obj_table,
+ 			 unsigned int n, unsigned int *free_space)
+ {
+ 	return __rte_ring_do_enqueue(r, obj_table, n, RTE_RING_QUEUE_FIXED,
+-			__IS_MP, free_space);
++			RTE_RING_SYNC_MT, free_space);
+ }
+ 
+ /**
+@@ -444,7 +454,7 @@ rte_ring_sp_enqueue_bulk(struct rte_ring *r, void * const *obj_table,
+ 			 unsigned int n, unsigned int *free_space)
+ {
+ 	return __rte_ring_do_enqueue(r, obj_table, n, RTE_RING_QUEUE_FIXED,
+-			__IS_SP, free_space);
++			RTE_RING_SYNC_ST, free_space);
+ }
+ 
+ /**
+@@ -471,7 +481,7 @@ rte_ring_enqueue_bulk(struct rte_ring *r, void * const *obj_table,
+ 		      unsigned int n, unsigned int *free_space)
+ {
+ 	return __rte_ring_do_enqueue(r, obj_table, n, RTE_RING_QUEUE_FIXED,
+-			r->prod.single, free_space);
++			r->prod.sync_type, free_space);
+ }
+ 
+ /**
+@@ -555,7 +565,7 @@ rte_ring_mc_dequeue_bulk(struct rte_ring *r, void **obj_table,
+ 		unsigned int n, unsigned int *available)
+ {
+ 	return __rte_ring_do_dequeue(r, obj_table, n, RTE_RING_QUEUE_FIXED,
+-			__IS_MC, available);
++			RTE_RING_SYNC_MT, available);
+ }
+ 
+ /**
+@@ -579,7 +589,7 @@ rte_ring_sc_dequeue_bulk(struct rte_ring *r, void **obj_table,
+ 		unsigned int n, unsigned int *available)
+ {
+ 	return __rte_ring_do_dequeue(r, obj_table, n, RTE_RING_QUEUE_FIXED,
+-			__IS_SC, available);
++			RTE_RING_SYNC_ST, available);
+ }
+ 
+ /**
+@@ -606,7 +616,7 @@ rte_ring_dequeue_bulk(struct rte_ring *r, void **obj_table, unsigned int n,
+ 		unsigned int *available)
+ {
+ 	return __rte_ring_do_dequeue(r, obj_table, n, RTE_RING_QUEUE_FIXED,
+-				r->cons.single, available);
++				r->cons.sync_type, available);
+ }
+ 
+ /**
+@@ -761,6 +771,30 @@ rte_ring_get_capacity(const struct rte_ring *r)
+ 	return r->capacity;
+ }
+ 
++static inline uint32_t
++rte_ring_get_prod_sync_type(const struct rte_ring *r)
++{
++	return r->prod.sync_type;
++}
++
++static inline int
++rte_ring_prod_single(const struct rte_ring *r)
++{
++	return (rte_ring_get_prod_sync_type(r) == RTE_RING_SYNC_ST);
++}
++
++static inline uint32_t
++rte_ring_get_cons_sync_type(const struct rte_ring *r)
++{
++	return r->cons.sync_type;
++}
++
++static inline int
++rte_ring_cons_single(const struct rte_ring *r)
++{
++	return (rte_ring_get_cons_sync_type(r) == RTE_RING_SYNC_ST);
++}
++
+ /**
+  * Dump the status of all rings on the console
+  *
+@@ -804,7 +838,7 @@ rte_ring_mp_enqueue_burst(struct rte_ring *r, void * const *obj_table,
+ 			 unsigned int n, unsigned int *free_space)
+ {
+ 	return __rte_ring_do_enqueue(r, obj_table, n,
+-			RTE_RING_QUEUE_VARIABLE, __IS_MP, free_space);
++			RTE_RING_QUEUE_VARIABLE, RTE_RING_SYNC_MT, free_space);
+ }
+ 
+ /**
+@@ -827,7 +861,7 @@ rte_ring_sp_enqueue_burst(struct rte_ring *r, void * const *obj_table,
+ 			 unsigned int n, unsigned int *free_space)
+ {
+ 	return __rte_ring_do_enqueue(r, obj_table, n,
+-			RTE_RING_QUEUE_VARIABLE, __IS_SP, free_space);
++			RTE_RING_QUEUE_VARIABLE, RTE_RING_SYNC_ST, free_space);
+ }
+ 
+ /**
+@@ -854,7 +888,7 @@ rte_ring_enqueue_burst(struct rte_ring *r, void * const *obj_table,
+ 		      unsigned int n, unsigned int *free_space)
+ {
+ 	return __rte_ring_do_enqueue(r, obj_table, n, RTE_RING_QUEUE_VARIABLE,
+-			r->prod.single, free_space);
++			r->prod.sync_type, free_space);
+ }
+ 
+ /**
+@@ -882,7 +916,7 @@ rte_ring_mc_dequeue_burst(struct rte_ring *r, void **obj_table,
+ 		unsigned int n, unsigned int *available)
+ {
+ 	return __rte_ring_do_dequeue(r, obj_table, n,
+-			RTE_RING_QUEUE_VARIABLE, __IS_MC, available);
++			RTE_RING_QUEUE_VARIABLE, RTE_RING_SYNC_MT, available);
+ }
+ 
+ /**
+@@ -907,7 +941,7 @@ rte_ring_sc_dequeue_burst(struct rte_ring *r, void **obj_table,
+ 		unsigned int n, unsigned int *available)
+ {
+ 	return __rte_ring_do_dequeue(r, obj_table, n,
+-			RTE_RING_QUEUE_VARIABLE, __IS_SC, available);
++			RTE_RING_QUEUE_VARIABLE, RTE_RING_SYNC_ST, available);
+ }
+ 
+ /**
+@@ -935,7 +969,7 @@ rte_ring_dequeue_burst(struct rte_ring *r, void **obj_table,
+ {
+ 	return __rte_ring_do_dequeue(r, obj_table, n,
+ 				RTE_RING_QUEUE_VARIABLE,
+-				r->cons.single, available);
++				r->cons.sync_type, available);
+ }
+ 
+ #ifdef __cplusplus
+-- 
+2.17.1
+

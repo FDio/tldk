@@ -1,0 +1,76 @@
+From 944ee6d24a92351921a6eec70cde2a792c63acd2 Mon Sep 17 00:00:00 2001
+From: Konstantin Ananyev <konstantin.ananyev@intel.com>
+Date: Fri, 21 Feb 2020 16:35:04 +0000
+Subject: [RFC 6/6] test/ring: add contention stress test for HTS ring
+
+Introduce new test case to test HTS ring mode under contention.
+
+Signed-off-by: Konstantin Ananyev <konstantin.ananyev@intel.com>
+---
+ test/test/Makefile               |  1 +
+ test/test/meson.build            |  1 +
+ test/test/test_ring_hts_stress.c | 28 ++++++++++++++++++++++++++++
+ 3 files changed, 30 insertions(+)
+ create mode 100644 test/test/test_ring_hts_stress.c
+
+diff --git a/test/test/Makefile b/test/test/Makefile
+index 0df8169f8..914d05dfe 100644
+--- a/test/test/Makefile
++++ b/test/test/Makefile
+@@ -75,6 +75,7 @@ SRCS-y += test_external_mem.c
+ 
+ SRCS-y += test_ring.c
+ SRCS-y += test_ring_perf.c
++SRCS-y += test_ring_hts_stress.c
+ SRCS-y += test_ring_rts_stress.c
+ SRCS-y += test_ring_stress.c
+ SRCS-y += test_pmd_perf.c
+diff --git a/test/test/meson.build b/test/test/meson.build
+index 9bb99f039..fa25e6bd4 100644
+--- a/test/test/meson.build
++++ b/test/test/meson.build
+@@ -86,6 +86,7 @@ test_sources = files('commands.c',
+ 	'test_red.c',
+ 	'test_reorder.c',
+ 	'test_ring.c',
++	'test_ring_hts_stress.c',
+ 	'test_ring_perf.c',
+ 	'test_ring_rts_stress.c',
+ 	'test_ring_stress.c',
+diff --git a/test/test/test_ring_hts_stress.c b/test/test/test_ring_hts_stress.c
+new file mode 100644
+index 000000000..b7f2d21fc
+--- /dev/null
++++ b/test/test/test_ring_hts_stress.c
+@@ -0,0 +1,28 @@
++/* SPDX-License-Identifier: BSD-3-Clause
++ * Copyright(c) 2020 Intel Corporation
++ */
++
++#include "test_ring_stress.h"
++
++static inline uint32_t
++_st_ring_dequeue_bulk(struct rte_ring *r, void **obj, uint32_t n,
++	uint32_t *avail)
++{
++	return rte_ring_hts_dequeue_bulk(r, obj, n, avail);
++}
++
++static inline uint32_t
++_st_ring_enqueue_bulk(struct rte_ring *r, void * const *obj, uint32_t n,
++	uint32_t *free)
++{
++	return rte_ring_hts_enqueue_bulk(r, obj, n, free);
++}
++
++static int
++_st_ring_init(struct rte_ring *r, const char *name, uint32_t num)
++{
++	return rte_ring_init(r, name, num,
++		RING_F_MP_HTS_ENQ | RING_F_MC_HTS_DEQ);
++}
++
++REGISTER_TEST_COMMAND(ring_stress_hts_autotest, test_ring_stress);
+-- 
+2.17.1
+
