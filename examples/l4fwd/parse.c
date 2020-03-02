@@ -45,6 +45,9 @@ static const struct {
 #define	OPT_SHORT_PROMISC	'P'
 #define	OPT_LONG_PROMISC	"promisc"
 
+#define	OPT_SHORT_MBUFNUM	'M'
+#define	OPT_LONG_MBUFNUM	"mbuf-num"
+
 #define	OPT_SHORT_RBUFS	'R'
 #define	OPT_LONG_RBUFS	"rbufs"
 
@@ -95,6 +98,7 @@ static const struct option long_opt[] = {
 	{OPT_LONG_SBULK, 1, 0, OPT_SHORT_SBULK},
 	{OPT_LONG_CTXFLAGS, 1, 0, OPT_SHORT_CTXFLAGS},
 	{OPT_LONG_PROMISC, 0, 0, OPT_SHORT_PROMISC},
+	{OPT_LONG_MBUFNUM, 1, 0, OPT_SHORT_MBUFNUM},
 	{OPT_LONG_RBUFS, 1, 0, OPT_SHORT_RBUFS},
 	{OPT_LONG_SBUFS, 1, 0, OPT_SHORT_SBUFS},
 	{OPT_LONG_BECFG, 1, 0, OPT_SHORT_BECFG},
@@ -816,7 +820,7 @@ parse_app_options(int argc, char **argv, struct netbe_cfg *cfg,
 
 	optind = 0;
 	optarg = NULL;
-	while ((opt = getopt_long(argc, argv, "aB:C:c:LPR:S:TUb:f:s:v:H:K:W:w:",
+	while ((opt = getopt_long(argc, argv, "aB:C:c:LPR:S:M:TUb:f:s:v:H:K:W:w:",
 			long_opt, &opt_idx)) != EOF) {
 		if (opt == OPT_SHORT_ARP) {
 			cfg->arp = 1;
@@ -834,7 +838,13 @@ parse_app_options(int argc, char **argv, struct netbe_cfg *cfg,
 					"for option: \'%c\'\n",
 					__func__, optarg, opt);
 			ctx_prm->flags = v;
-		} else if (opt == OPT_SHORT_PROMISC) {
+		} else if (opt == OPT_SHORT_MBUFNUM) {
+			rc = parse_uint_val(NULL, optarg, &v);
+			if (rc < 0)
+				rte_exit(EXIT_FAILURE, "%s: invalid value: %s "
+					"for option: \'%c\'\n",
+					__func__, optarg, opt);
+			cfg->mpool_buf_num = v;
 		} else if (opt == OPT_SHORT_PROMISC) {
 			cfg->promisc = 1;
 		} else if (opt == OPT_SHORT_RBUFS) {

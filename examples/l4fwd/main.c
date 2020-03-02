@@ -61,7 +61,7 @@ RTE_DEFINE_PER_LCORE(struct netfe_lcore *, _fe);
 
 static volatile int force_quit;
 
-static struct netbe_cfg becfg;
+static struct netbe_cfg becfg = {.mpool_buf_num=MPOOL_NB_BUF};
 static struct rte_mempool *mpool[RTE_MAX_NUMA_NODES + 1];
 static struct rte_mempool *frag_mpool[RTE_MAX_NUMA_NODES + 1];
 static char proto_name[3][10] = {"udp", "tcp", ""};

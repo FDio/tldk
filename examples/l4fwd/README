@@ -139,6 +139,7 @@
       -K | --seckey <string> /* 16 character long secret key used by */ \
                              /* hash algorithms to generate the */ \
                              /* sequence number. */ \
+      -M | --mbuf-num <num> /* other than default number of mbufs per pool. */ \
       <port0_params> <port1_params> ... <portN_params>
 
    Note that: options -U and -T cannot be used together.

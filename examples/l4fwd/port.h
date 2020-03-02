@@ -316,14 +316,14 @@ log_netbe_cfg(const struct netbe_cfg *ucfg)
 }
 
 static int
-pool_init(uint32_t sid)
+pool_init(uint32_t sid, uint32_t mpool_buf_num)
 {
 	int32_t rc;
 	struct rte_mempool *mp;
 	char name[RTE_MEMPOOL_NAMESIZE];
 
 	snprintf(name, sizeof(name), "MP%u", sid);
-	mp = rte_pktmbuf_pool_create(name, MPOOL_NB_BUF, MPOOL_CACHE_SIZE, 0,
+	mp = rte_pktmbuf_pool_create(name, mpool_buf_num, MPOOL_CACHE_SIZE, 0,
 		RTE_MBUF_DEFAULT_BUF_SIZE, sid - 1);
 	if (mp == NULL) {
 		rc = -rte_errno;
@@ -337,14 +337,14 @@ pool_init(uint32_t sid)
 }
 
 static int
-frag_pool_init(uint32_t sid)
+frag_pool_init(uint32_t sid, uint32_t mpool_buf_num)
 {
 	int32_t rc;
 	struct rte_mempool *frag_mp;
 	char frag_name[RTE_MEMPOOL_NAMESIZE];
 
 	snprintf(frag_name, sizeof(frag_name), "frag_MP%u", sid);
-	frag_mp = rte_pktmbuf_pool_create(frag_name, MPOOL_NB_BUF,
+	frag_mp = rte_pktmbuf_pool_create(frag_name, mpool_buf_num,
 		MPOOL_CACHE_SIZE, 0, FRAG_MBUF_BUF_SIZE, sid - 1);
 	if (frag_mp == NULL) {
 		rc = -rte_errno;
@@ -406,13 +406,13 @@ netbe_port_init(struct netbe_cfg *cfg)
 			assert(sid < RTE_DIM(mpool));
 
 			if (mpool[sid] == NULL) {
-				rc = pool_init(sid);
+				rc = pool_init(sid, cfg->mpool_buf_num);
 				if (rc != 0)
 					return rc;
 			}
 
 			if (frag_mpool[sid] == NULL) {
-				rc = frag_pool_init(sid);
+				rc = frag_pool_init(sid, cfg->mpool_buf_num);
 				if (rc != 0)
 					return rc;
 			}
