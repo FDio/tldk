@@ -25,7 +25,6 @@
 #define	TX_RING_SIZE	0x800
 
 #define	MPOOL_CACHE_SIZE	0x100
-#define	MPOOL_NB_BUF		0x20000
 
 #define FRAG_MBUF_BUF_SIZE	(RTE_PKTMBUF_HEADROOM + TLE_DST_MAX_HDR)
 #define FRAG_TTL		MS_PER_S
@@ -61,7 +60,7 @@ RTE_DEFINE_PER_LCORE(struct netfe_lcore *, _fe);
 
 static volatile int force_quit;
 
-static struct netbe_cfg becfg;
+static struct netbe_cfg becfg = { .mpool_buf_num=0x20000 };
 static struct rte_mempool *mpool[RTE_MAX_NUMA_NODES + 1];
 static struct rte_mempool *frag_mpool[RTE_MAX_NUMA_NODES + 1];
 static char proto_name[3][10] = {"udp", "tcp", ""};

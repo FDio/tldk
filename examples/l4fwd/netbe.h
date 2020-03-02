@@ -151,6 +151,7 @@ struct netbe_cfg {
 	uint32_t arp;
 	uint32_t prt_num;
 	uint32_t cpu_num;
+	uint32_t mpool_buf_num;
 	struct netbe_port *prt;
 	struct netbe_lcore *cpu;
 };
