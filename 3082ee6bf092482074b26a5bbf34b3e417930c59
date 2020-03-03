@@ -16,6 +16,24 @@
       "revId": "3082ee6bf092482074b26a5bbf34b3e417930c59",
       "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "420cb73c_ab990087",
+        "filename": "examples/l4fwd/main.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 28,
+      "author": {
+        "id": 1913
+      },
+      "writtenOn": "2020-03-03T14:19:44Z",
+      "side": 0,
+      "message": "You are right, I will change that",
+      "parentUuid": "bf3cde51_ee5e31de",
+      "revId": "3082ee6bf092482074b26a5bbf34b3e417930c59",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
     }
   ]
 }
