@@ -101,7 +101,7 @@ L4FWD_BECORE=${L4FWD_BECORE:-${L4FWD_FECORE}}
 # set file for l4fwd app output
 L4FWD_OUT_FILE=./l4fwd.out
 # set rbufs/sbufs/streams to open for l4fwd
-L4FWD_STREAMS='--rbufs 0x100 --sbufs 0x100 --streams 0x100'
+L4FWD_STREAMS='--mbuf-num 0x2000 --rbufs 0x100 --sbufs 0x100 --streams 0x100'
 
 # set lcores for DPDK to start
 if [[ ${L4FWD_FECORE} -ne ${L4FWD_BECORE} ]]
@@ -480,7 +480,10 @@ configure_interfaces()
 	fi
 
 	# create empty results file on remote
-	$(ssh ${REMOTE_HOST} "> ${common_result_file}")
+	if [[ ${USE_TAP} -eq 0 ]]
+	then
+		$(ssh ${REMOTE_HOST} "> ${common_result_file}")
+	fi
 }
 
 # restore netem settings to default
