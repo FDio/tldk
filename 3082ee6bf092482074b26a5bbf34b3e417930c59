@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "bf3cde51_ee5e31de",
+        "filename": "examples/l4fwd/main.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 28,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2020-03-03T12:39:00Z",
+      "side": 0,
+      "message": "as a nit, probably better to keep that macro, and then use in for default value:\n{.mpool_buf_num\u003dMPOOL_NB_NUM,};",
+      "revId": "3082ee6bf092482074b26a5bbf34b3e417930c59",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    }
+  ]
+}
