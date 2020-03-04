@@ -280,3 +280,10 @@ fi
 # print report after all tests were done
 echo -e "Report:\n"
 cat ${result}
+
+if [[ ${error_count} -eq 0 ]]
+then
+	exit 0
+else
+	exit 1
+fi
