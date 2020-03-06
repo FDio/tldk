@@ -57,21 +57,29 @@ struct memtank_stat {
 		uint64_t nb_req;
 		uint64_t nb_alloc;
 		uint64_t nb_cycle;
+		uint64_t max_cycle;
+		uint64_t min_cycle;
 	} alloc;
 	struct {
 		uint64_t nb_call;
 		uint64_t nb_free;
 		uint64_t nb_cycle;
+		uint64_t max_cycle;
+		uint64_t min_cycle;
 	} free;
 	struct {
 		uint64_t nb_call;
 		uint64_t nb_chunk;
 		uint64_t nb_cycle;
+		uint64_t max_cycle;
+		uint64_t min_cycle;
 	} grow;
 	struct {
 		uint64_t nb_call;
 		uint64_t nb_chunk;
 		uint64_t nb_cycle;
+		uint64_t max_cycle;
+		uint64_t min_cycle;
 	} shrink;
 };
 
@@ -86,6 +94,7 @@ struct worker_args {
 	uint32_t obj_size;
 	uint32_t alloc_flags;
 	uint32_t free_flags;
+	struct rte_ring *rng;
 };
 
 struct memtank_arg {
@@ -95,16 +104,16 @@ struct memtank_arg {
 		struct worker_args worker;
 	};
 	struct memtank_stat stats;
-};
+} __rte_cache_aligned;
 
 #define BULK_NUM	32
-#define	MAX_OBJ		0x100000
 
 #define	OBJ_SZ_MIN	1
 #define	OBJ_SZ_MAX	0x100000
 #define	OBJ_SZ_DEF	(4 * RTE_CACHE_LINE_SIZE + 1)
 
 #define TEST_TIME	10
+#define CLEANUP_TIME	3
 
 #define FREE_THRSH_MIN	0
 #define FREE_THRSH_MAX	100
@@ -129,7 +138,6 @@ static uint32_t wrk_cmd __rte_cache_aligned;
 static struct tle_memtank_prm mtnk_prm = {
 	.min_free = 4 * BULK_NUM,
 	.max_free = 32 * BULK_NUM,
-	.max_obj = MAX_OBJ,
 	.obj_size = OBJ_SZ_DEF,
 	.obj_align = RTE_CACHE_LINE_SIZE,
 	.nb_obj_chunk = BULK_NUM,
@@ -247,11 +255,73 @@ memstat_dump(FILE *f, struct memstat *ms)
 }
 
 static void
+memtank_stat_reset(struct memtank_stat *ms)
+{
+	static const struct memtank_stat init_stat = {
+		.alloc.min_cycle = UINT64_MAX,
+		.free.min_cycle = UINT64_MAX,
+		.grow.min_cycle = UINT64_MAX,
+		.shrink.min_cycle = UINT64_MAX,
+	};
+
+	*ms = init_stat;
+}
+
+static void
+memtank_stat_aggr(struct memtank_stat *as, const struct memtank_stat *ms)
+{
+	if (ms->alloc.nb_call != 0) {
+		as->alloc.nb_call += ms->alloc.nb_call;
+		as->alloc.nb_req += ms->alloc.nb_req;
+		as->alloc.nb_alloc += ms->alloc.nb_alloc;
+		as->alloc.nb_cycle += ms->alloc.nb_cycle;
+		as->alloc.max_cycle = RTE_MAX(as->alloc.max_cycle,
+					ms->alloc.max_cycle);
+		as->alloc.min_cycle = RTE_MIN(as->alloc.min_cycle,
+					ms->alloc.min_cycle);
+	}
+	if (ms->free.nb_call != 0) {
+		as->free.nb_call += ms->free.nb_call;
+		as->free.nb_free += ms->free.nb_free;
+		as->free.nb_cycle += ms->free.nb_cycle;
+		as->free.max_cycle = RTE_MAX(as->free.max_cycle,
+					ms->free.max_cycle);
+		as->free.min_cycle = RTE_MIN(as->free.min_cycle,
+					ms->free.min_cycle);
+	}
+	if (ms->grow.nb_call != 0) {
+		as->grow.nb_call += ms->grow.nb_call;
+		as->grow.nb_chunk += ms->grow.nb_chunk;
+		as->grow.nb_cycle += ms->grow.nb_cycle;
+		as->grow.max_cycle = RTE_MAX(as->grow.max_cycle,
+					ms->grow.max_cycle);
+		as->grow.min_cycle = RTE_MIN(as->grow.min_cycle,
+					ms->grow.min_cycle);
+	}
+	if (ms->shrink.nb_call != 0) {
+		as->shrink.nb_call += ms->shrink.nb_call;
+		as->shrink.nb_chunk += ms->shrink.nb_chunk;
+		as->shrink.nb_cycle += ms->shrink.nb_cycle;
+		as->shrink.max_cycle = RTE_MAX(as->shrink.max_cycle,
+					ms->shrink.max_cycle);
+		as->shrink.min_cycle = RTE_MIN(as->shrink.min_cycle,
+					ms->shrink.min_cycle);
+	}
+}
+
+static void
 memtank_stat_dump(FILE *f, uint32_t lc, const struct memtank_stat *ms)
 {
 	uint64_t t;
+	long double st;
 
-	fprintf(f, "%s(lc=%u)={\n", __func__, lc);
+	 st = (long double)rte_get_timer_hz() / US_PER_S;
+
+	if (lc == UINT32_MAX)
+		fprintf(f, "%s(AGGREGATE)={\n", __func__);
+	else
+		fprintf(f, "%s(lc=%u)={\n", __func__, lc);
+
 	fprintf(f, "\tnb_cycle=%" PRIu64 ",\n", ms->nb_cycle);
 	if (ms->alloc.nb_call != 0) {
 		fprintf(f, "\talloc={\n");
@@ -268,6 +338,13 @@ memtank_stat_dump(FILE *f, uint32_t lc, const struct memtank_stat *ms)
 		fprintf(f, "\t\tobj/call(avg): %.2Lf\n",
 			(long double)ms->alloc.nb_alloc /  ms->alloc.nb_call);
 
+		fprintf(f, "\t\tmax cycles/call=%" PRIu64 "(%.2Lf usec),\n",
+			ms->alloc.max_cycle,
+			(long double)ms->alloc.max_cycle / st);
+		fprintf(f, "\t\tmin cycles/call=%" PRIu64 "(%.2Lf usec),\n",
+			ms->alloc.min_cycle,
+			(long double)ms->alloc.min_cycle / st);
+
 		fprintf(f, "\t},\n");
 	}
 	if (ms->free.nb_call != 0) {
@@ -280,6 +357,13 @@ memtank_stat_dump(FILE *f, uint32_t lc, const struct memtank_stat *ms)
 			(long double)ms->free.nb_cycle / ms->free.nb_free);
 		fprintf(f, "\t\tobj/call(avg): %.2Lf\n",
 			(long double)ms->free.nb_free /  ms->free.nb_call);
+
+		fprintf(f, "\t\tmax cycles/call=%" PRIu64 "(%.2Lf usec),\n",
+			ms->free.max_cycle,
+			(long double)ms->free.max_cycle / st);
+		fprintf(f, "\t\tmin cycles/call=%" PRIu64 "(%.2Lf usec),\n",
+			ms->free.min_cycle,
+			(long double)ms->free.min_cycle / st);
 
 		fprintf(f, "\t},\n");
 	}
@@ -294,6 +378,13 @@ memtank_stat_dump(FILE *f, uint32_t lc, const struct memtank_stat *ms)
 		fprintf(f, "\t\tobj/call(avg): %.2Lf\n",
 			(long double)ms->grow.nb_chunk /  ms->grow.nb_call);
 
+		fprintf(f, "\t\tmax cycles/call=%" PRIu64 "(%.2Lf usec),\n",
+			ms->grow.max_cycle,
+			(long double)ms->grow.max_cycle / st);
+		fprintf(f, "\t\tmin cycles/call=%" PRIu64 "(%.2Lf usec),\n",
+			ms->grow.min_cycle,
+			(long double)ms->grow.min_cycle / st);
+
 		fprintf(f, "\t},\n");
 	}
 	if (ms->shrink.nb_call != 0) {
@@ -306,6 +397,13 @@ memtank_stat_dump(FILE *f, uint32_t lc, const struct memtank_stat *ms)
 			(long double)ms->shrink.nb_cycle / ms->shrink.nb_chunk);
 		fprintf(f, "\t\tobj/call(avg): %.2Lf\n",
 			(long double)ms->shrink.nb_chunk /  ms->shrink.nb_call);
+
+		fprintf(f, "\t\tmax cycles/call=%" PRIu64 "(%.2Lf usec),\n",
+			ms->shrink.max_cycle,
+			(long double)ms->shrink.max_cycle / st);
+		fprintf(f, "\t\tmin cycles/call=%" PRIu64 "(%.2Lf usec),\n",
+			ms->shrink.min_cycle,
+			(long double)ms->shrink.min_cycle / st);
 
 		fprintf(f, "\t},\n");
 	}
@@ -340,10 +438,74 @@ check_fill_objs(void *obj[], uint32_t sz, uint32_t num,
 }
 
 static int
-test_memtank_worker(void *arg)
+create_worker_ring(struct worker_args *wa, uint32_t lc)
 {
 	int32_t rc;
 	size_t sz;
+	struct rte_ring *ring;
+
+	sz = rte_ring_get_memsize(wa->max_obj);
+	ring = malloc(sz);
+	if (ring == NULL) {
+		printf("%s(%u): alloca(%zu) for FIFO with %u elems failed",
+			__func__, lc, sz, wa->max_obj);
+		return -ENOMEM;
+	}
+	rc = rte_ring_init(ring, "", wa->max_obj,
+		RING_F_SP_ENQ | RING_F_SC_DEQ);
+	if (rc != 0) {
+		printf("%s(%u): rte_ring_init(%p, %u) failed, error: %d(%s)\n",
+			__func__, lc, ring, wa->max_obj,
+			rc, strerror(-rc));
+		free(ring);
+		return rc;
+	}
+
+	wa->rng = ring;
+	return rc;
+}
+
+static int
+test_worker_cleanup(void *arg)
+{
+	void *obj[BULK_NUM];
+	int32_t rc;
+	uint32_t lc, n, num;
+	struct memtank_arg *ma;
+	struct rte_ring *ring;
+
+	ma = arg;
+	ring = ma->worker.rng;
+	lc = rte_lcore_id();
+
+	rc = 0;
+	for (n = rte_ring_count(ring); rc == 0 && n != 0; n -= num) {
+
+		num = rte_rand() % RTE_DIM(obj);
+		num = RTE_MIN(num, n);
+
+		if (num != 0) {
+			/* retrieve objects to free */
+			rte_ring_dequeue_bulk(ring, obj, num, NULL);
+
+			/* check and fill contents of freeing objects */
+			rc = check_fill_objs(obj, ma->worker.obj_size, num,
+				lc, 0);
+			if (rc == 0) {
+				tle_memtank_free(ma->mt, obj, num,
+					ma->worker.free_flags);
+				ma->stats.free.nb_free += num;
+			}
+		}
+	}
+
+	return rc;
+}
+
+static int
+test_memtank_worker(void *arg)
+{
+	int32_t rc;
 	uint32_t ft, lc, n, num;
 	uint64_t cl, tm0, tm1;
 	struct memtank_arg *ma;
@@ -353,24 +515,9 @@ test_memtank_worker(void *arg)
 	ma = arg;
 	lc = rte_lcore_id();
 
-	sz = rte_ring_get_memsize(ma->worker.max_obj);
-	ring = alloca(sz);
-	if (ring == NULL) {
-		printf("%s(%u): alloca(%zu) for FIFO with %u elems failed",
-			__func__, lc, sz, ma->worker.max_obj);
-		return -ENOMEM;
-	}
-	rc = rte_ring_init(ring, "", ma->worker.max_obj,
-		RING_F_SP_ENQ | RING_F_SC_DEQ);
-	if (rc != 0) {
-		printf("%s(%u): rte_ring_init(%p, %u) failed, error: %d(%s)\n",
-			__func__, lc, ring, ma->worker.max_obj,
-			rc, strerror(-rc));
-		return rc;
-	}
-
 	/* calculate free threshold */
 	ft = ma->worker.max_obj * global_cfg.wrk_free_thrsh / FREE_THRSH_MAX;
+	ring = ma->worker.rng;
 
 	while (wrk_cmd != WRK_CMD_RUN) {
 		rte_smp_rmb();
@@ -397,11 +544,17 @@ test_memtank_worker(void *arg)
 			if (rc != 0)
 				break;
 
+			tm1 = tm1 - tm0;
+
 			/* collect alloc stat */
 			ma->stats.alloc.nb_call++;
 			ma->stats.alloc.nb_req += num;
 			ma->stats.alloc.nb_alloc += n;
-			ma->stats.alloc.nb_cycle += tm1 - tm0;
+			ma->stats.alloc.nb_cycle += tm1;
+			ma->stats.alloc.max_cycle =
+				RTE_MAX(ma->stats.alloc.max_cycle, tm1);
+			ma->stats.alloc.min_cycle =
+				RTE_MIN(ma->stats.alloc.min_cycle, tm1);
 
 			/* store allocated objects */
 			rte_ring_enqueue_bulk(ring, obj, n, NULL);
@@ -429,10 +582,16 @@ test_memtank_worker(void *arg)
 				ma->worker.free_flags);
 			tm1 = rte_rdtsc_precise();
 
+			tm1 = tm1 - tm0;
+
 			/* collect free stat */
 			ma->stats.free.nb_call++;
 			ma->stats.free.nb_free += num;
-			ma->stats.free.nb_cycle += tm1 - tm0;
+			ma->stats.free.nb_cycle += tm1;
+			ma->stats.free.max_cycle =
+				RTE_MAX(ma->stats.free.max_cycle, tm1);
+			ma->stats.free.min_cycle =
+				RTE_MIN(ma->stats.free.min_cycle, tm1);
 		}
 
 		rte_smp_mb();
@@ -463,8 +622,17 @@ test_memtank_master(void *arg)
 			tm1 = rte_rdtsc_precise();
 			ma->stats.shrink.nb_call++;
 			ma->stats.shrink.nb_chunk += n;
-			if (n != 0)
-				ma->stats.shrink.nb_cycle += tm1 - tm0;
+			tm1 = tm1 - tm0;
+
+			if (n != 0) {
+				ma->stats.shrink.nb_cycle += tm1;
+				ma->stats.shrink.max_cycle =
+					RTE_MAX(ma->stats.shrink.max_cycle,
+						tm1);
+				ma->stats.shrink.min_cycle =
+					RTE_MIN(ma->stats.shrink.min_cycle,
+						tm1);
+			}
 		}
 
 		if (ma->master.flags & MASTER_FLAG_GROW) {
@@ -474,8 +642,17 @@ test_memtank_master(void *arg)
 			tm2 = rte_rdtsc_precise();
 			ma->stats.grow.nb_call++;
 			ma->stats.grow.nb_chunk += n;
-			if (n != 0)
-				ma->stats.grow.nb_cycle += tm2 - tm1;
+			tm2 = tm2 - tm1;
+
+			if (n != 0) {
+				ma->stats.grow.nb_cycle += tm2;
+				ma->stats.grow.max_cycle =
+					RTE_MAX(ma->stats.grow.max_cycle,
+						tm2);
+				ma->stats.grow.min_cycle =
+					RTE_MIN(ma->stats.grow.min_cycle,
+						tm2);
+			}
 		}
 
 		wrk_cmd = WRK_CMD_RUN;
@@ -493,14 +670,16 @@ test_memtank_master(void *arg)
 	return 0;
 }
 
-static void
+static int
 fill_worker_args(struct worker_args *wa, uint32_t alloc_flags,
-	uint32_t free_flags)
+	uint32_t free_flags, uint32_t lc)
 {
 	wa->max_obj = global_cfg.wrk_max_obj;
 	wa->obj_size = mtnk_prm.obj_size;
 	wa->alloc_flags = alloc_flags;
 	wa->free_flags = free_flags;
+
+	return create_worker_ring(wa, lc);
 }
 
 static void
@@ -515,21 +694,54 @@ fill_master_args(struct master_args *ma, uint32_t flags)
 	ma->flags = flags;
 }
 
+static int
+test_memtank_cleanup(struct tle_memtank *mt, struct memstat *ms,
+	struct memtank_arg arg[], const char *tname)
+{
+	int32_t rc;
+	uint32_t lc;
+
+	printf("%s(%s)\n", __func__, tname);
+
+	RTE_LCORE_FOREACH_SLAVE(lc)
+		rte_eal_remote_launch(test_worker_cleanup, &arg[lc], lc);
+
+	/* launch on master */
+	lc = rte_lcore_id();
+	arg[lc].master.run_cycles = CLEANUP_TIME * rte_get_timer_hz();
+	test_memtank_master(&arg[lc]);
+
+	ms->nb_alloc_obj = 0;
+	RTE_LCORE_FOREACH_SLAVE(lc) {
+		rc |= rte_eal_wait_lcore(lc);
+		ms->nb_alloc_obj += arg[lc].stats.alloc.nb_alloc -
+			arg[lc].stats.free.nb_free;
+	}
+
+	tle_memtank_dump(stdout, mt, TLE_MTANK_DUMP_STAT);
+
+	memstat_dump(stdout, ms);
+	rc = tle_memtank_sanity_check(mt, 0);
+
+	return rc;
+}
+
 /*
  * alloc/free by workers threads.
  * grow/shrink by master
  */
 static int
-test_memtank_mt1(void)
+test_memtank_mt(const char *tname, uint32_t alloc_flags, uint32_t free_flags)
 {
 	int32_t rc;
 	uint32_t lc;
 	struct tle_memtank *mt;
 	struct tle_memtank_prm prm;
 	struct memstat ms;
+	struct memtank_stat wrk_stats;
 	struct memtank_arg arg[RTE_MAX_LCORE];
 
-	printf("%s start\n", __func__);
+	printf("%s(%s) start\n", __func__, tname);
 
 	memset(&prm, 0, sizeof(prm));
 	memset(&ms, 0, sizeof(ms));
@@ -541,18 +753,34 @@ test_memtank_mt1(void)
 
 	mt = tle_memtank_create(&prm);
 	if (mt == NULL) {
-		printf("%s: memtank_create() failed\n", __func__);
+		printf("%s(%s): memtank_create() failed\n", __func__, tname);
 		return -ENOMEM;
 	}
 
+	/* dump initial memory stats */
+	memstat_dump(stdout, &ms);
+
+	rc = 0;
 	memset(arg, 0, sizeof(arg));
 
-	/* launch on all slaves */
+	/* prepare args on all slaves */
 	RTE_LCORE_FOREACH_SLAVE(lc) {
 		arg[lc].mt = mt;
-		fill_worker_args(&arg[lc].worker, 0, 0);
-		rte_eal_remote_launch(test_memtank_worker, &arg[lc], lc);
+		rc = fill_worker_args(&arg[lc].worker, alloc_flags,
+			free_flags, lc);
+		if (rc != 0)
+			break;
+		memtank_stat_reset(&arg[lc].stats);
 	}
+
+	if (rc != 0) {
+		tle_memtank_destroy(mt);
+		return rc;
+	}
+
+	/* launch on all slaves */
+	RTE_LCORE_FOREACH_SLAVE(lc)
+		rte_eal_remote_launch(test_memtank_worker, &arg[lc], lc);
 
 	/* launch on master */
 	lc = rte_lcore_id();
@@ -562,23 +790,43 @@ test_memtank_mt1(void)
 	test_memtank_master(&arg[lc]);
 
 	/* wait for slaves and collect stats. */
+
+	memtank_stat_reset(&wrk_stats);
+
 	rc = 0;
 	RTE_LCORE_FOREACH_SLAVE(lc) {
 		rc |= rte_eal_wait_lcore(lc);
 		memtank_stat_dump(stdout, lc, &arg[lc].stats);
+		memtank_stat_aggr(&wrk_stats, &arg[lc].stats);
 		ms.nb_alloc_obj += arg[lc].stats.alloc.nb_alloc -
 			arg[lc].stats.free.nb_free;
 	}
+
+	memtank_stat_dump(stdout, UINT32_MAX, &wrk_stats);
 
 	lc = rte_lcore_id();
 	memtank_stat_dump(stdout, lc, &arg[lc].stats);
 	tle_memtank_dump(stdout, mt, TLE_MTANK_DUMP_STAT);
 
 	memstat_dump(stdout, &ms);
-
 	rc |= tle_memtank_sanity_check(mt, 0);
+
+	/* run cleanup on all slave cores */
+	if (rc == 0)
+		rc = test_memtank_cleanup(mt, &ms, arg, tname);
+
 	tle_memtank_destroy(mt);
 	return rc;
+}
+
+/*
+ * alloc/free by workers threads.
+ * grow/shrink by master
+ */
+static int
+test_memtank_mt1(const char *tname)
+{
+	return test_memtank_mt(tname, 0, 0);
 }
 
 /*
@@ -586,68 +834,13 @@ test_memtank_mt1(void)
  * master does nothing
  */
 static int
-test_memtank_mt2(void)
+test_memtank_mt2(const char *tname)
 {
-	int32_t rc;
-	uint32_t lc;
-	struct tle_memtank *mt;
-	struct tle_memtank_prm prm;
-	struct memstat ms;
-	struct memtank_arg arg[RTE_MAX_LCORE];
-
 	const uint32_t alloc_flags = TLE_MTANK_ALLOC_CHUNK |
 				TLE_MTANK_ALLOC_GROW;
 	const uint32_t free_flags = TLE_MTANK_FREE_SHRINK;
 
-	printf("%s start\n", __func__);
-
-	memset(&prm, 0, sizeof(prm));
-	memset(&ms, 0, sizeof(ms));
-
-	prm = mtnk_prm;
-	prm.alloc = test_alloc1;
-	prm.free = test_free1;
-	prm.udata = &ms;
-
-	mt = tle_memtank_create(&prm);
-	if (mt == NULL) {
-		printf("%s: memtank_create() failed\n", __func__);
-		return -ENOMEM;
-	}
-
-	memset(arg, 0, sizeof(arg));
-
-	/* launch on all slaves */
-	RTE_LCORE_FOREACH_SLAVE(lc) {
-		arg[lc].mt = mt;
-		fill_worker_args(&arg[lc].worker, alloc_flags, free_flags);
-		rte_eal_remote_launch(test_memtank_worker, &arg[lc], lc);
-	}
-
-	/* launch on master */
-	lc = rte_lcore_id();
-	arg[lc].mt = mt;
-	fill_master_args(&arg[lc].master, 0);
-	test_memtank_master(&arg[lc]);
-
-	/* wait for slaves and collect stats. */
-	rc = 0;
-	RTE_LCORE_FOREACH_SLAVE(lc) {
-		rc |= rte_eal_wait_lcore(lc);
-		memtank_stat_dump(stdout, lc, &arg[lc].stats);
-		ms.nb_alloc_obj += arg[lc].stats.alloc.nb_alloc -
-			arg[lc].stats.free.nb_free;
-	}
-
-	lc = rte_lcore_id();
-	memtank_stat_dump(stdout, lc, &arg[lc].stats);
-	tle_memtank_dump(stdout, mt, TLE_MTANK_DUMP_STAT);
-
-	memstat_dump(stdout, &ms);
-
-	rc |= tle_memtank_sanity_check(mt, 0);
-	tle_memtank_destroy(mt);
-	return rc;
+	return test_memtank_mt(tname, alloc_flags, free_flags);
 }
 
 static int
@@ -749,7 +942,7 @@ main(int argc, char * argv[])
 
 	const struct {
 		const char *name;
-		int (*func)(void);
+		int (*func)(const char *);
 	} tests[] = {
 		{
 			.name = "MT1-WRK_ALLOC_FREE-MST_GROW_SHRINK",
@@ -774,11 +967,14 @@ main(int argc, char * argv[])
 			"%s: parse_op failed with error code: %d\n",
 			__func__, rc);
 
+	/* update global values based on provided user input */
+	mtnk_prm.max_obj = global_cfg.wrk_max_obj * rte_lcore_count();
+
 	for (i = 0, k = 0; i != RTE_DIM(tests); i++) {
 
 		printf("TEST %s START\n", tests[i].name);
 
-		rc = tests[i].func();
+		rc = tests[i].func(tests[i].name);
 		k += (rc == 0);
 
 		if (rc != 0)
