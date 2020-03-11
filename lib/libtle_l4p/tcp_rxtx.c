@@ -653,6 +653,10 @@ sync_ack(struct tle_tcp_stream *s, const union pkt_info *pi,
 		m->l2_len + m->l3_len);
 	get_syn_opts(&s->tcb.so, (uintptr_t)(th + 1), m->l4_len - sizeof(*th));
 
+	/* reset wscale option if timestamp is not present */
+	if (s->tcb.so.ts.val == 0)
+		s->tcb.so.wscale = 0;
+
 	s->tcb.rcv.nxt = si->seq + 1;
 	seq = sync_gen_seq(pi, s->tcb.rcv.nxt, ts, s->tcb.so.mss,
 				s->s.ctx->prm.hash_alg,
