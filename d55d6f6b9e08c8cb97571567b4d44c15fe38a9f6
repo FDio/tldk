@@ -16,6 +16,24 @@
       "revId": "d55d6f6b9e08c8cb97571567b4d44c15fe38a9f6",
       "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "9c2afd8b_c498f99e",
+        "filename": "lib/libtle_l4p/tcp_rxtx.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 656,
+      "author": {
+        "id": 1913
+      },
+      "writtenOn": "2020-03-11T14:43:11Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "dc9aedb6_d3b8e9e2",
+      "revId": "d55d6f6b9e08c8cb97571567b4d44c15fe38a9f6",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
     }
   ]
 }
