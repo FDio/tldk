@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "943bf318_606ae0b0",
+        "filename": "lib/libtle_l4p/tcp_rxtx.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 657,
+      "author": {
+        "id": 1754
+      },
+      "writtenOn": "2020-03-20T14:47:39Z",
+      "side": 1,
+      "message": "With wscale set to 0, snd is still restricted by limited snd buffer. Can we set it to some default value like 7?",
+      "revId": "71ba97fe8ee93aa2bb17e774c1d73c6e58c03b2b",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    }
+  ]
+}
