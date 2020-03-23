@@ -16,6 +16,24 @@
       "revId": "71ba97fe8ee93aa2bb17e774c1d73c6e58c03b2b",
       "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "b5949cef_975130d5",
+        "filename": "lib/libtle_l4p/tcp_rxtx.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 657,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2020-03-23T11:44:20Z",
+      "side": 1,
+      "message": "\u003eWith wscale set to 0, snd is still restricted by limited snd buffer.\nIn that case we\u0027ll behave as if TLDK doesn\u0027t support wscale at all,\nso for such connection snw.wnd \u003c\u003d UINT16_MAX.\nYes it might limit the conection thoughtput, but I think it is a safe one.\n\n\u003eCan we set it to some default value like 7?\nI don\u0027t think it is safe approach.\nBasically in tha situation we lost original wscale option that client sent to us.\nSetting it to some default value (7 or something different) - is sort of gambling. \nIf our guess is correct - we\u0027ll get some extra perfomance, if not\nthe conenction wouldn\u0027t work correctly.",
+      "parentUuid": "943bf318_606ae0b0",
+      "revId": "71ba97fe8ee93aa2bb17e774c1d73c6e58c03b2b",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
     }
   ]
 }
