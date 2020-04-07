@@ -95,6 +95,9 @@ void ipv4_dst_add(struct glue_ctx *ctx, const struct in_addr *addr,
 void ipv6_dst_add(struct glue_ctx *ctx, const struct in6_addr *addr,
 		  struct ether_addr *e_addr);
 
+int dev_rx_intr_ctl_q(uint16_t port_id, uint16_t queue_id, int efd,
+		      int op, int rx);
+
 #ifdef LOOK_ASIDE_BACKEND
 extern rte_atomic32_t flag_sleep;
 

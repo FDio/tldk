@@ -38,7 +38,7 @@
 /* We don't use rte_eth_dev_rx_intr_ctl_q as it has its
  * own way to specify event.data
  */
-static int
+int
 dev_rx_intr_ctl_q(uint16_t port_id, uint16_t queue_id, int efd, int op, int rx)
 {
 	int fd, ret;

@@ -56,7 +56,6 @@ $(DIRS-y): $(RTE_SDK)/mk/rte.vars.mk
 		CUR_SUBDIR=$(CUR_SUBDIR)/$(@) \
 		S=$(CURDIR)/$(@) \
 		RTE_TARGET=$(RTE_TARGET) \
-		EXTRA_CFLAGS="-fPIC" \
 		$(filter-out $(DIRS-y),$(MAKECMDGOALS))
 
 test: libtldk.a libtldk.so

@@ -22,6 +22,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include <rte_interrupts.h>
+
 #include "fd.h"
 #include "ctx.h"
 #include "sym.h"
@@ -165,6 +167,11 @@ PRE(select)(int nfds, fd_set *readfds, fd_set *writefds,
 		to = timeout->tv_sec * 1000 + timeout->tv_usec / 1000;
 	else
 		to = -1;
+
+	if (dev_rx_intr_ctl_q(get_ctx()->port_id, get_ctx()->queue_id,
+			      efd, RTE_INTR_EVENT_ADD, 0) < 0)
+		rte_panic("Failed to epoll_ctl rxq interrupt fd");
+
 	total = poll_common(ctx, events, max, to, efd);
 
 	k_close(efd);
