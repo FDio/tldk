@@ -14,7 +14,7 @@
 # Scripts require non-POSIX parts of bash
 SHELL := /bin/bash
 
-DPDK_VERSION          ?= v18.11
+DPDK_VERSION          ?= v18.11.11
 DPDK_BUILD_DIR        ?= $(CURDIR)/_build
 DPDK_INSTALL_DIR      ?= $(DPDK_BUILD_DIR)/dpdk/$(RTE_TARGET)
 DPDK_PKTMBUF_HEADROOM ?= 128
@@ -24,7 +24,7 @@ DPDK_DEBUG            ?= n
 
 B := $(DPDK_BUILD_DIR)
 I := $(DPDK_INSTALL_DIR)
-DPDK_GIT_REPO ?= http://dpdk.org/git/dpdk
+DPDK_GIT_REPO ?= http://dpdk.org/git/dpdk-stable
 DPDK_SOURCE := $(B)/dpdk
 
 ifneq (,$(findstring clang,$(CC)))
