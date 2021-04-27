@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "157d60f2_6d6d701d",
+        "filename": "dpdk/Makefile",
+        "patchSetId": 1
+      },
+      "lineNbr": 44,
+      "author": {
+        "id": 29
+      },
+      "writtenOn": "2021-04-27T17:22:50Z",
+      "side": 1,
+      "message": "I added these as well, but maybe not required now.\n\n+DPDK_CPU_CFLAGS +\u003d -Wno-address-of-packed-member -Wno-stringop-overflow -Wno-format-overflow\n+DPDK_CPU_CFLAGS +\u003d -Wno-maybe-uninitialized -Wno-zero-length-bounds -Wno-zero-length-bounds -Wno-implicit-fallthrough",
+      "revId": "d73db12f9ce054c43227e682ce39bd53a49987b4",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    }
+  ]
+}
