@@ -357,31 +357,31 @@ fill_dst(struct tle_dest *dst, struct netbe_dev *bed,
 	const struct netbe_dest *bdp, uint16_t l3_type, int32_t sid,
 	uint8_t proto_id)
 {
-	struct ether_hdr *eth;
-	struct ipv4_hdr *ip4h;
-	struct ipv6_hdr *ip6h;
+	struct rte_ether_hdr *eth;
+	struct rte_ipv4_hdr *ip4h;
+	struct rte_ipv6_hdr *ip6h;
 
 	dst->dev = bed->dev;
 	dst->head_mp = frag_mpool[sid + 1];
 	dst->mtu = RTE_MIN(bdp->mtu, bed->port.mtu);
 	dst->l2_len = sizeof(*eth);
 
-	eth = (struct ether_hdr *)dst->hdr;
+	eth = (struct rte_ether_hdr *)dst->hdr;
 
-	ether_addr_copy(&bed->port.mac, &eth->s_addr);
-	ether_addr_copy(&bdp->mac, &eth->d_addr);
+	rte_ether_addr_copy(&bed->port.mac, &eth->s_addr);
+	rte_ether_addr_copy(&bdp->mac, &eth->d_addr);
 	eth->ether_type = rte_cpu_to_be_16(l3_type);
 
-	if (l3_type == ETHER_TYPE_IPv4) {
+	if (l3_type == RTE_ETHER_TYPE_IPV4) {
 		dst->l3_len = sizeof(*ip4h);
-		ip4h = (struct ipv4_hdr *)(eth + 1);
+		ip4h = (struct rte_ipv4_hdr *)(eth + 1);
 		ip4h->version_ihl = 4 << 4 |
-			sizeof(*ip4h) / IPV4_IHL_MULTIPLIER;
+			sizeof(*ip4h) / RTE_IPV4_IHL_MULTIPLIER;
 		ip4h->time_to_live = 64;
 		ip4h->next_proto_id = proto_id;
-	} else if (l3_type == ETHER_TYPE_IPv6) {
+	} else if (l3_type == RTE_ETHER_TYPE_IPV6) {
 		dst->l3_len = sizeof(*ip6h);
-		ip6h = (struct ipv6_hdr *)(eth + 1);
+		ip6h = (struct rte_ipv6_hdr *)(eth + 1);
 		ip6h->vtc_flow = 6 << 4;
 		ip6h->proto = proto_id;
 		ip6h->hop_limits = 64;
@@ -402,12 +402,12 @@ netbe_add_dest(struct netbe_lcore *lc, uint32_t dev_idx, uint16_t family,
 		n = lc->dst4_num;
 		dp = lc->dst4 + n;
 		m = RTE_DIM(lc->dst4);
-		l3_type = ETHER_TYPE_IPv4;
+		l3_type = RTE_ETHER_TYPE_IPV4;
 	} else {
 		n = lc->dst6_num;
 		dp = lc->dst6 + n;
 		m = RTE_DIM(lc->dst6);
-		l3_type = ETHER_TYPE_IPv6;
+		l3_type = RTE_ETHER_TYPE_IPV6;
 	}
 
 	if (n + dnum >= m) {
@@ -441,21 +441,21 @@ netbe_add_dest(struct netbe_lcore *lc, uint32_t dev_idx, uint16_t family,
 static inline void
 fill_arp_reply(struct netbe_dev *dev, struct rte_mbuf *m)
 {
-	struct ether_hdr *eth;
-	struct arp_hdr *ahdr;
-	struct arp_ipv4 *adata;
+	struct rte_ether_hdr *eth;
+	struct rte_arp_hdr *ahdr;
+	struct rte_arp_ipv4 *adata;
 	uint32_t tip;
 
 	/* set up the ethernet data */
-	eth = rte_pktmbuf_mtod(m, struct ether_hdr *);
+	eth = rte_pktmbuf_mtod(m, struct rte_ether_hdr *);
 	eth->d_addr = eth->s_addr;
 	eth->s_addr = dev->port.mac;
 
 	/* set up the arp data */
-	ahdr = rte_pktmbuf_mtod_offset(m, struct arp_hdr *, m->l2_len);
+	ahdr = rte_pktmbuf_mtod_offset(m, struct rte_arp_hdr *, m->l2_len);
 	adata = &ahdr->arp_data;
 
-	ahdr->arp_op = rte_cpu_to_be_16(ARP_OP_REPLY);
+	ahdr->arp_opcode = rte_cpu_to_be_16(RTE_ARP_OP_REPLY);
 
 	tip = adata->arp_tip;
 	adata->arp_tip = adata->arp_sip;

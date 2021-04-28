@@ -38,7 +38,7 @@ union parse_val {
 			struct in6_addr addr6;
 		};
 	} in;
-	struct ether_addr mac;
+	struct rte_ether_addr mac;
 	rte_cpuset_t cpuset;
 };
 
@@ -163,7 +163,7 @@ tldk_port_parse(ngx_conf_t *cf, struct tldk_port_conf *prt)
 	union parse_val pvl[RTE_DIM(kh)];
 
 	memset(pvl, 0, sizeof(pvl));
-	pvl[1].u64 = ETHER_MAX_LEN - ETHER_CRC_LEN;
+	pvl[1].u64 = RTE_ETHER_MAX_LEN - RTE_ETHER_CRC_LEN;
 
 	if (cf->args->nelts % 2 != 0)
 		return NGX_CONF_ERROR;
@@ -286,7 +286,7 @@ tldk_dest_parse(ngx_conf_t *cf, struct tldk_dest_conf *dst)
 	union parse_val pvl[RTE_DIM(kh)];
 
 	memset(pvl, 0, sizeof(pvl));
-	pvl[1].u64 = ETHER_MAX_LEN - ETHER_CRC_LEN;
+	pvl[1].u64 = RTE_ETHER_MAX_LEN - RTE_ETHER_CRC_LEN;
 
 	if (cf->args->nelts % 2 != 1 || cf->args->nelts == 1)
 		return NGX_CONF_ERROR;

@@ -64,7 +64,7 @@ void
 fill_pkt_hdr_len(struct rte_mbuf *m, uint32_t l2, uint32_t l3, uint32_t l4);
 
 int
-is_ipv4_frag(const struct ipv4_hdr *iph);
+is_ipv4_frag(const struct rte_ipv4_hdr *iph);
 
 void
 fill_ipv4_hdr_len(struct rte_mbuf *m, uint32_t l2, uint32_t proto,

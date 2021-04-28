@@ -252,25 +252,25 @@ static inline void
 netfe_pkt_addr(const struct rte_mbuf *m, struct sockaddr_storage *ps,
 	uint16_t family)
 {
-	const struct ipv4_hdr *ip4h;
-	const struct ipv6_hdr *ip6h;
-	const struct udp_hdr *udph;
+	const struct rte_ipv4_hdr *ip4h;
+	const struct rte_ipv6_hdr *ip6h;
+	const struct rte_udp_hdr *udph;
 	struct sockaddr_in *in4;
 	struct sockaddr_in6 *in6;
 
 	NETFE_PKT_DUMP(m);
 
-	udph = rte_pktmbuf_mtod_offset(m, struct udp_hdr *, -m->l4_len);
+	udph = rte_pktmbuf_mtod_offset(m, struct rte_udp_hdr *, -m->l4_len);
 
 	if (family == AF_INET) {
 		in4 = (struct sockaddr_in *)ps;
-		ip4h = rte_pktmbuf_mtod_offset(m, struct ipv4_hdr *,
+		ip4h = rte_pktmbuf_mtod_offset(m, struct rte_ipv4_hdr *,
 			-(m->l4_len + m->l3_len));
 		in4->sin_port = udph->src_port;
 		in4->sin_addr.s_addr = ip4h->src_addr;
 	} else {
 		in6 = (struct sockaddr_in6 *)ps;
-		ip6h = rte_pktmbuf_mtod_offset(m, struct ipv6_hdr *,
+		ip6h = rte_pktmbuf_mtod_offset(m, struct rte_ipv6_hdr *,
 			-(m->l4_len + m->l3_len));
 		in6->sin6_port = udph->src_port;
 		rte_memcpy(&in6->sin6_addr, ip6h->src_addr,

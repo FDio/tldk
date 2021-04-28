@@ -65,8 +65,8 @@ static int
 lookup4_function(void *opaque, const struct in_addr *addr, struct tle_dest *res)
 {
 	struct in_addr route;
-	struct ether_hdr *eth;
-	struct ipv4_hdr *ip4h;
+	struct rte_ether_hdr *eth;
+	struct rte_ipv4_hdr *ip4h;
 	auto routes = static_cast<map<string, tle_dev *> *>(opaque);
 
 	/* Check all routes added in map for a match with dest *addr */
@@ -81,11 +81,11 @@ lookup4_function(void *opaque, const struct in_addr *addr, struct tle_dest *res)
 			res->l2_len = sizeof(*eth);
 			res->l3_len = sizeof(*ip4h);
 			res->head_mp = mbuf_pool;
-			eth = (struct ether_hdr *)res->hdr;
-			eth->ether_type = rte_cpu_to_be_16(ETHER_TYPE_IPv4);
-			ip4h = (struct ipv4_hdr *)(eth + 1);
+			eth = (struct rte_ether_hdr *)res->hdr;
+			eth->ether_type = rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4);
+			ip4h = (struct rte_ipv4_hdr *)(eth + 1);
 			ip4h->version_ihl = (4 << 4) |
-				(sizeof(*ip4h) / IPV4_IHL_MULTIPLIER);
+				(sizeof(*ip4h) / RTE_IPV4_IHL_MULTIPLIER);
 			ip4h->time_to_live = 64;
 			ip4h->next_proto_id = IPPROTO_UDP;
 			ip4h->fragment_offset = 0;
@@ -101,8 +101,8 @@ static int
 lookup6_function(void *opaque, const struct in6_addr *addr,
 	struct tle_dest *res)
 {
-	struct ether_hdr *eth;
-	struct ipv6_hdr *ip6h;
+	struct rte_ether_hdr *eth;
+	struct rte_ipv6_hdr *ip6h;
 	struct in6_addr route;
 	auto routes = static_cast<map<string, tle_dev *> *>(opaque);
 
@@ -118,9 +118,9 @@ lookup6_function(void *opaque, const struct in6_addr *addr,
 			res->l2_len = sizeof(*eth);
 			res->l3_len = sizeof(*ip6h);
 			res->head_mp = mbuf_pool;
-			eth = (struct ether_hdr *)res->hdr;
-			eth->ether_type = rte_cpu_to_be_16(ETHER_TYPE_IPv6);
-			ip6h = (struct ipv6_hdr *)(eth + 1);
+			eth = (struct rte_ether_hdr *)res->hdr;
+			eth->ether_type = rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV6);
+			ip6h = (struct rte_ipv6_hdr *)(eth + 1);
 			ip6h->vtc_flow = 6 << 4;
 			ip6h->proto = IPPROTO_UDP;
 			ip6h->hop_limits = 64;

@@ -151,13 +151,13 @@ stream_get_dest(struct tle_stream *s, const void *dst_addr,
 	dst->ol_flags = dev->tx.ol_flags[s->type];
 
 	if (s->type == TLE_V4) {
-		struct ipv4_hdr *l3h;
-		l3h = (struct ipv4_hdr *)(dst->hdr + dst->l2_len);
+		struct rte_ipv4_hdr *l3h;
+		l3h = (struct rte_ipv4_hdr *)(dst->hdr + dst->l2_len);
 		l3h->src_addr = dev->prm.local_addr4.s_addr;
 		l3h->dst_addr = d4->s_addr;
 	} else {
-		struct ipv6_hdr *l3h;
-		l3h = (struct ipv6_hdr *)(dst->hdr + dst->l2_len);
+		struct rte_ipv6_hdr *l3h;
+		l3h = (struct rte_ipv6_hdr *)(dst->hdr + dst->l2_len);
 		rte_memcpy(l3h->src_addr, &dev->prm.local_addr6,
 			sizeof(l3h->src_addr));
 		rte_memcpy(l3h->dst_addr, d6, sizeof(l3h->dst_addr));

@@ -27,7 +27,7 @@ port_init(dpdk_port_t port, struct rte_mempool *mbuf_pool)
 	socket_id = rte_eth_dev_socket_id(port);
 
 	memset(&port_conf, 0, sizeof(struct rte_eth_conf));
-	port_conf.rxmode.max_rx_pkt_len = ETHER_MAX_LEN;
+	port_conf.rxmode.max_rx_pkt_len = RTE_ETHER_MAX_LEN;
 
 	/* Configure the Ethernet device. */
 	retval = rte_eth_dev_configure(port, rx_rings, tx_rings, &port_conf);
@@ -77,9 +77,9 @@ fill_pkt_hdr_len(struct rte_mbuf *m, uint32_t l2, uint32_t l3, uint32_t l4)
 }
 
 int
-is_ipv4_frag(const struct ipv4_hdr *iph)
+is_ipv4_frag(const struct rte_ipv4_hdr *iph)
 {
-	const uint16_t mask = rte_cpu_to_be_16(~IPV4_HDR_DF_FLAG);
+	const uint16_t mask = rte_cpu_to_be_16(~RTE_IPV4_HDR_DF_FLAG);
 
 	return ((mask & iph->fragment_offset) != 0);
 }
@@ -88,14 +88,14 @@ void
 fill_ipv4_hdr_len(struct rte_mbuf *m, uint32_t l2, uint32_t proto,
 	uint32_t frag)
 {
-	const struct ipv4_hdr *iph;
+	const struct rte_ipv4_hdr *iph;
 	int32_t dlen, len;
 
 	dlen = rte_pktmbuf_data_len(m);
-	dlen -= l2 + sizeof(struct udp_hdr);
+	dlen -= l2 + sizeof(struct rte_udp_hdr);
 
-	iph = rte_pktmbuf_mtod_offset(m, const struct ipv4_hdr *, l2);
-	len = (iph->version_ihl & IPV4_HDR_IHL_MASK) * IPV4_IHL_MULTIPLIER;
+	iph = rte_pktmbuf_mtod_offset(m, const struct rte_ipv4_hdr *, l2);
+	len = (iph->version_ihl & RTE_IPV4_HDR_IHL_MASK) * RTE_IPV4_IHL_MULTIPLIER;
 
 	if (frag != 0 && is_ipv4_frag(iph)) {
 		m->packet_type &= ~RTE_PTYPE_L4_MASK;
@@ -105,7 +105,7 @@ fill_ipv4_hdr_len(struct rte_mbuf *m, uint32_t l2, uint32_t proto,
 	if (len > dlen || (proto <= IPPROTO_MAX && iph->next_proto_id != proto))
 		m->packet_type = RTE_PTYPE_UNKNOWN;
 	else
-		fill_pkt_hdr_len(m, l2, len, sizeof(struct udp_hdr));
+		fill_pkt_hdr_len(m, l2, len, sizeof(struct rte_udp_hdr));
 }
 
 int
@@ -135,10 +135,10 @@ fill_ipv6x_hdr_len(struct rte_mbuf *m, uint32_t l2, uint32_t nproto,
 	const struct ip6_ext *ipx;
 	int32_t dlen, len, ofs;
 
-	len = sizeof(struct ipv6_hdr);
+	len = sizeof(struct rte_ipv6_hdr);
 
 	dlen = rte_pktmbuf_data_len(m);
-	dlen -= l2 + sizeof(struct udp_hdr);
+	dlen -= l2 + sizeof(struct rte_udp_hdr);
 
 	ofs = l2 + len;
 	ipx = rte_pktmbuf_mtod_offset(m, const struct ip6_ext *, ofs);
@@ -179,20 +179,20 @@ fill_ipv6x_hdr_len(struct rte_mbuf *m, uint32_t l2, uint32_t nproto,
 	if ((ofs == 0 && nproto != fproto) || len > dlen)
 		m->packet_type = RTE_PTYPE_UNKNOWN;
 	else
-		fill_pkt_hdr_len(m, l2, len, sizeof(struct udp_hdr));
+		fill_pkt_hdr_len(m, l2, len, sizeof(struct rte_udp_hdr));
 }
 
 void
 fill_ipv6_hdr_len(struct rte_mbuf *m, uint32_t l2, uint32_t fproto)
 {
-	const struct ipv6_hdr *iph;
+	const struct rte_ipv6_hdr *iph;
 
-	iph = rte_pktmbuf_mtod_offset(m, const struct ipv6_hdr *,
-		sizeof(struct ether_hdr));
+	iph = rte_pktmbuf_mtod_offset(m, const struct rte_ipv6_hdr *,
+		sizeof(struct rte_ether_hdr));
 
 	if (iph->proto == fproto)
-		fill_pkt_hdr_len(m, l2, sizeof(struct ipv6_hdr),
-			sizeof(struct udp_hdr));
+		fill_pkt_hdr_len(m, l2, sizeof(struct rte_ipv6_hdr),
+			sizeof(struct rte_udp_hdr));
 	else if (ipv6x_hdr(iph->proto) != 0)
 		fill_ipv6x_hdr_len(m, l2, iph->proto, fproto);
 }
@@ -202,32 +202,32 @@ fill_eth_hdr_len(struct rte_mbuf *m)
 {
 	uint32_t dlen, l2;
 	uint16_t etp;
-	const struct ether_hdr *eth;
+	const struct rte_ether_hdr *eth;
 
 	dlen = rte_pktmbuf_data_len(m);
 
 	/* check that first segment is at least 42B long. */
-	if (dlen < sizeof(struct ether_hdr) + sizeof(struct ipv4_hdr) +
-			sizeof(struct udp_hdr)) {
+	if (dlen < sizeof(struct rte_ether_hdr) + sizeof(struct rte_ipv4_hdr) +
+			sizeof(struct rte_udp_hdr)) {
 		m->packet_type = RTE_PTYPE_UNKNOWN;
 		return;
 	}
 
 	l2 = sizeof(*eth);
 
-	eth = rte_pktmbuf_mtod(m, const struct ether_hdr *);
+	eth = rte_pktmbuf_mtod(m, const struct rte_ether_hdr *);
 	etp = eth->ether_type;
-	if (etp == rte_be_to_cpu_16(ETHER_TYPE_VLAN))
-		l2 += sizeof(struct vlan_hdr);
+	if (etp == rte_be_to_cpu_16(RTE_ETHER_TYPE_VLAN))
+		l2 += sizeof(struct rte_vlan_hdr);
 
-	if (etp == rte_be_to_cpu_16(ETHER_TYPE_IPv4)) {
+	if (etp == rte_be_to_cpu_16(RTE_ETHER_TYPE_IPV4)) {
 		m->packet_type = RTE_PTYPE_L4_UDP |
 			RTE_PTYPE_L3_IPV4_EXT_UNKNOWN |
 			RTE_PTYPE_L2_ETHER;
 		fill_ipv4_hdr_len(m, l2, IPPROTO_UDP, 1);
-	} else if (etp == rte_be_to_cpu_16(ETHER_TYPE_IPv6) &&
-			dlen >= l2 + sizeof(struct ipv6_hdr) +
-			sizeof(struct udp_hdr)) {
+	} else if (etp == rte_be_to_cpu_16(RTE_ETHER_TYPE_IPV6) &&
+			dlen >= l2 + sizeof(struct rte_ipv6_hdr) +
+			sizeof(struct rte_udp_hdr)) {
 		m->packet_type = RTE_PTYPE_L4_UDP |
 			RTE_PTYPE_L3_IPV6_EXT_UNKNOWN |
 			RTE_PTYPE_L2_ETHER;

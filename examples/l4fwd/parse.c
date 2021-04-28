@@ -334,7 +334,7 @@ parse_netbe_arg(struct netbe_port *prt, const char *arg, rte_cpuset_t *pcpu)
 	union parse_val val[RTE_DIM(hndl)];
 
 	memset(val, 0, sizeof(val));
-	val[2].u64 = ETHER_MAX_LEN - ETHER_CRC_LEN;
+	val[2].u64 = RTE_ETHER_MAX_LEN - RTE_ETHER_CRC_LEN;
 
 	rc = parse_kvargs(arg, keys_man, RTE_DIM(keys_man),
 		keys_opt, RTE_DIM(keys_opt), hndl, val);
@@ -377,7 +377,8 @@ check_netbe_dest(const struct netbe_dest *dst)
 		RTE_LOG(ERR, USER1, "%s(line=%u) invalid masklen=%u",
 			__func__, dst->line, dst->prfx);
 		return -EINVAL;
-	} else if (dst->mtu > ETHER_MAX_JUMBO_FRAME_LEN - ETHER_CRC_LEN) {
+	} else if (dst->mtu >
+			RTE_ETHER_MAX_JUMBO_FRAME_LEN - RTE_ETHER_CRC_LEN) {
 		RTE_LOG(ERR, USER1, "%s(line=%u) invalid mtu=%u",
 			__func__, dst->line, dst->mtu);
 		return -EINVAL;
@@ -413,7 +414,7 @@ parse_netbe_dest(struct netbe_dest *dst, const char *arg)
 
 	/* set default values. */
 	memset(val, 0, sizeof(val));
-	val[4].u64 = ETHER_MAX_JUMBO_FRAME_LEN - ETHER_CRC_LEN;
+	val[4].u64 = RTE_ETHER_MAX_JUMBO_FRAME_LEN - RTE_ETHER_CRC_LEN;
 
 	rc = parse_kvargs(arg, keys_man, RTE_DIM(keys_man),
 		keys_opt, RTE_DIM(keys_opt), hndl, val);

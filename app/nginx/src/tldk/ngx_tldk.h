@@ -58,7 +58,7 @@ struct tldk_port_conf {
 	uint64_t tx_offload;
 	uint32_t ipv4;
 	struct in6_addr ipv6;
-	struct ether_addr mac;
+	struct rte_ether_addr mac;
 };
 
 struct tldk_dev_conf {
@@ -76,7 +76,7 @@ struct tldk_dest_conf {
 		struct in_addr ipv4;
 		struct in6_addr ipv6;
 	};
-	struct ether_addr mac;
+	struct rte_ether_addr mac;
 };
 
 #define	TLDK_MAX_DEST	0x10

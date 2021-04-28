@@ -29,7 +29,7 @@ union parse_val {
 			struct in6_addr addr6;
 		};
 	} in;
-	struct ether_addr mac;
+	struct rte_ether_addr mac;
 	rte_cpuset_t cpuset;
 };
 

@@ -75,7 +75,7 @@ struct netbe_port {
 	uint64_t tx_offload;
 	uint32_t ipv4;
 	struct in6_addr ipv6;
-	struct ether_addr mac;
+	struct rte_ether_addr mac;
 	uint32_t hash_key_size;
 	uint8_t hash_key[RSS_HASH_KEY_LENGTH];
 };
@@ -90,7 +90,7 @@ struct netbe_dest {
 		struct in_addr ipv4;
 		struct in6_addr ipv6;
 	};
-	struct ether_addr mac;
+	struct rte_ether_addr mac;
 };
 
 struct netbe_dest_prm {

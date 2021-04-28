@@ -183,7 +183,7 @@ get_ip_pid(struct tle_dev *dev, uint32_t num, uint32_t type, uint32_t st)
 }
 
 static inline void
-fill_tcph(struct tcp_hdr *l4h, const struct tcb *tcb, union l4_ports port,
+fill_tcph(struct rte_tcp_hdr *l4h, const struct tcb *tcb, union l4_ports port,
 	uint32_t seq, uint8_t hlen, uint8_t flags)
 {
 	uint16_t wnd;
@@ -217,7 +217,7 @@ tcp_fill_mbuf(struct rte_mbuf *m, const struct tle_tcp_stream *s,
 	uint32_t pid, uint32_t swcsm)
 {
 	uint32_t l4, len, plen;
-	struct tcp_hdr *l4h;
+	struct rte_tcp_hdr *l4h;
 	char *l2h;
 
 	len = dst->l2_len + dst->l3_len;
@@ -239,7 +239,7 @@ tcp_fill_mbuf(struct rte_mbuf *m, const struct tle_tcp_stream *s,
 	rte_memcpy(l2h, dst->hdr, len);
 
 	/* setup TCP header & options */
-	l4h = (struct tcp_hdr *)(l2h + len);
+	l4h = (struct rte_tcp_hdr *)(l2h + len);
 	fill_tcph(l4h, &s->tcb, port, seq, l4, flags);
 
 	/* setup mbuf TX offload related fields. */
@@ -249,8 +249,8 @@ tcp_fill_mbuf(struct rte_mbuf *m, const struct tle_tcp_stream *s,
 	/* update proto specific fields. */
 
 	if (s->s.type == TLE_V4) {
-		struct ipv4_hdr *l3h;
-		l3h = (struct ipv4_hdr *)(l2h + dst->l2_len);
+		struct rte_ipv4_hdr *l3h;
+		l3h = (struct rte_ipv4_hdr *)(l2h + dst->l2_len);
 		l3h->packet_id = rte_cpu_to_be_16(pid);
 		l3h->total_length = rte_cpu_to_be_16(plen + dst->l3_len + l4);
 
@@ -263,8 +263,8 @@ tcp_fill_mbuf(struct rte_mbuf *m, const struct tle_tcp_stream *s,
 		if ((ol_flags & PKT_TX_IP_CKSUM) == 0 && swcsm != 0)
 			l3h->hdr_checksum = _ipv4x_cksum(l3h, m->l3_len);
 	} else {
-		struct ipv6_hdr *l3h;
-		l3h = (struct ipv6_hdr *)(l2h + dst->l2_len);
+		struct rte_ipv6_hdr *l3h;
+		l3h = (struct rte_ipv6_hdr *)(l2h + dst->l2_len);
 		l3h->payload_len = rte_cpu_to_be_16(plen + l4);
 		if ((ol_flags & PKT_TX_TCP_CKSUM) != 0)
 			l4h->cksum = rte_ipv6_phdr_cksum(l3h, ol_flags);
@@ -285,11 +285,11 @@ static inline void
 tcp_update_mbuf(struct rte_mbuf *m, uint32_t type, const struct tcb *tcb,
 	uint32_t seq, uint32_t pid)
 {
-	struct tcp_hdr *l4h;
+	struct rte_tcp_hdr *l4h;
 	uint32_t len;
 
 	len = m->l2_len + m->l3_len;
-	l4h = rte_pktmbuf_mtod_offset(m, struct tcp_hdr *, len);
+	l4h = rte_pktmbuf_mtod_offset(m, struct rte_tcp_hdr *, len);
 
 	l4h->sent_seq = rte_cpu_to_be_32(seq);
 	l4h->recv_ack = rte_cpu_to_be_32(tcb->rcv.nxt);
@@ -298,8 +298,9 @@ tcp_update_mbuf(struct rte_mbuf *m, uint32_t type, const struct tcb *tcb,
 		fill_tms_opts(l4h + 1, tcb->snd.ts, tcb->rcv.ts);
 
 	if (type == TLE_V4) {
-		struct ipv4_hdr *l3h;
-		l3h = rte_pktmbuf_mtod_offset(m, struct ipv4_hdr *, m->l2_len);
+		struct rte_ipv4_hdr *l3h;
+		l3h = rte_pktmbuf_mtod_offset(m, struct rte_ipv4_hdr *,
+			m->l2_len);
 		l3h->hdr_checksum = 0;
 		l3h->packet_id = rte_cpu_to_be_16(pid);
 		if ((m->ol_flags & PKT_TX_IP_CKSUM) == 0)
@@ -312,14 +313,14 @@ tcp_update_mbuf(struct rte_mbuf *m, uint32_t type, const struct tcb *tcb,
 		l4h->cksum = 0;
 
 		if (type == TLE_V4) {
-			struct ipv4_hdr *l3h;
-			l3h = rte_pktmbuf_mtod_offset(m, struct ipv4_hdr *,
+			struct rte_ipv4_hdr *l3h;
+			l3h = rte_pktmbuf_mtod_offset(m, struct rte_ipv4_hdr *,
 				m->l2_len);
 			l4h->cksum = _ipv4_udptcp_mbuf_cksum(m, len, l3h);
 
 		} else {
-			struct ipv6_hdr *l3h;
-			l3h = rte_pktmbuf_mtod_offset(m, struct ipv6_hdr *,
+			struct rte_ipv6_hdr *l3h;
+			l3h = rte_pktmbuf_mtod_offset(m, struct rte_ipv6_hdr *,
 				m->l2_len);
 			l4h->cksum = _ipv6_udptcp_mbuf_cksum(m, len, l3h);
 		}
@@ -635,7 +636,7 @@ sync_ack(struct tle_tcp_stream *s, const union pkt_info *pi,
 	struct tle_dev *dev;
 	const void *da;
 	struct tle_dest dst;
-	const struct tcp_hdr *th;
+	const struct rte_tcp_hdr *th;
 
 	type = s->s.type;
 
@@ -649,7 +650,7 @@ sync_ack(struct tle_tcp_stream *s, const union pkt_info *pi,
 	if (rc < 0)
 		return rc;
 
-	th = rte_pktmbuf_mtod_offset(m, const struct tcp_hdr *,
+	th = rte_pktmbuf_mtod_offset(m, const struct rte_tcp_hdr *,
 		m->l2_len + m->l3_len);
 	get_syn_opts(&s->tcb.so, (uintptr_t)(th + 1), m->l4_len - sizeof(*th));
 
@@ -714,7 +715,7 @@ rx_tms_opt(const struct tcb *tcb, const struct rte_mbuf *mb)
 {
 	union tsopt ts;
 	uintptr_t opt;
-	const struct tcp_hdr *th;
+	const struct rte_tcp_hdr *th;
 
 	if (tcb->so.ts.val != 0) {
 		opt = rte_pktmbuf_mtod_offset(mb, uintptr_t,
@@ -786,7 +787,7 @@ restore_syn_opt(union seg_info *si, union tsopt *to,
 {
 	int32_t rc;
 	uint32_t len;
-	const struct tcp_hdr *th;
+	const struct rte_tcp_hdr *th;
 
 	/* check that ACK, etc fields are what we expected. */
 	rc = sync_check_ack(pi, si->seq, si->ack - 1, ts,
@@ -797,7 +798,7 @@ restore_syn_opt(union seg_info *si, union tsopt *to,
 
 	si->mss = rc;
 
-	th = rte_pktmbuf_mtod_offset(mb, const struct tcp_hdr *,
+	th = rte_pktmbuf_mtod_offset(mb, const struct rte_tcp_hdr *,
 		mb->l2_len + mb->l3_len);
 	len = mb->l4_len - sizeof(*th);
 	to[0] = get_tms_opts((uintptr_t)(th + 1), len);
@@ -1553,7 +1554,7 @@ rx_synack(struct tle_tcp_stream *s, uint32_t ts, uint32_t state,
 	struct resp_info *rsp)
 {
 	struct syn_opts so;
-	struct tcp_hdr *th;
+	struct rte_tcp_hdr *th;
 
 	if (state != TCP_ST_SYN_SENT)
 		return -EINVAL;
@@ -1570,7 +1571,7 @@ rx_synack(struct tle_tcp_stream *s, uint32_t ts, uint32_t state,
 		return 0;
 	}
 
-	th = rte_pktmbuf_mtod_offset(mb, struct tcp_hdr *,
+	th = rte_pktmbuf_mtod_offset(mb, struct rte_tcp_hdr *,
 		mb->l2_len + mb->l3_len);
 	get_syn_opts(&so, (uintptr_t)(th + 1), mb->l4_len - sizeof(*th));
 

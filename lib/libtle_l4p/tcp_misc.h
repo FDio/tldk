@@ -33,10 +33,10 @@ extern "C" {
 #define	TCP_WSCALE_DEFAULT	7
 #define	TCP_WSCALE_NONE		0
 
-#define	TCP_TX_HDR_MAX	(sizeof(struct tcp_hdr) + TCP_TX_OPT_LEN_MAX)
+#define	TCP_TX_HDR_MAX	(sizeof(struct rte_tcp_hdr) + TCP_TX_OPT_LEN_MAX)
 
 /* max header size for normal data+ack packet */
-#define	TCP_TX_HDR_DACK	(sizeof(struct tcp_hdr) + TCP_TX_OPT_LEN_TMS)
+#define	TCP_TX_HDR_DACK	(sizeof(struct rte_tcp_hdr) + TCP_TX_OPT_LEN_TMS)
 
 #define	TCP4_MIN_MSS	536
 
@@ -44,10 +44,12 @@ extern "C" {
 
 /* default MTU, no TCP options. */
 #define TCP4_NOP_MSS	\
-	(ETHER_MTU - sizeof(struct ipv4_hdr) - sizeof(struct tcp_hdr))
+	(RTE_ETHER_MTU - sizeof(struct rte_ipv4_hdr) - \
+	 sizeof(struct rte_tcp_hdr))
 
 #define TCP6_NOP_MSS	\
-	(ETHER_MTU - sizeof(struct ipv6_hdr) - sizeof(struct tcp_hdr))
+	(RTE_ETHER_MTU - sizeof(struct rte_ipv6_hdr) - \
+	 sizeof(struct rte_tcp_hdr))
 
 /* default MTU, TCP options present */
 #define TCP4_OP_MSS	(TCP4_NOP_MSS - TCP_TX_OPT_LEN_MAX)
@@ -256,7 +258,7 @@ tcp_seq_min(uint32_t l, uint32_t r)
 }
 
 static inline void
-get_seg_info(const struct tcp_hdr *th, union seg_info *si)
+get_seg_info(const struct rte_tcp_hdr *th, union seg_info *si)
 {
 	__m128i v;
 	const  __m128i bswap_mask =
@@ -421,7 +423,7 @@ static inline void
 get_pkt_info(const struct rte_mbuf *m, union pkt_info *pi, union seg_info *si)
 {
 	uint32_t len, type;
-	const struct tcp_hdr *tcph;
+	const struct rte_tcp_hdr *tcph;
 	const union l4_ports *prt;
 	const union ipv4_addrs *pa4;
 
@@ -436,17 +438,17 @@ get_pkt_info(const struct rte_mbuf *m, union pkt_info *pi, union seg_info *si)
 
 	if (type == TLE_V4) {
 		pa4 = rte_pktmbuf_mtod_offset(m, const union ipv4_addrs *,
-			len + offsetof(struct ipv4_hdr, src_addr));
+			len + offsetof(struct rte_ipv4_hdr, src_addr));
 		pi->addr4.raw = pa4->raw;
 	} else if (type == TLE_V6) {
 		pi->addr6 = rte_pktmbuf_mtod_offset(m, const union ipv6_addrs *,
-			len + offsetof(struct ipv6_hdr, src_addr));
+			len + offsetof(struct rte_ipv6_hdr, src_addr));
 	}
 
 	len += m->l3_len;
-	tcph = rte_pktmbuf_mtod_offset(m, const struct tcp_hdr *, len);
+	tcph = rte_pktmbuf_mtod_offset(m, const struct rte_tcp_hdr *, len);
 	prt = (const union l4_ports *)
-		((uintptr_t)tcph + offsetof(struct tcp_hdr, src_port));
+		((uintptr_t)tcph + offsetof(struct rte_tcp_hdr, src_port));
 	pi->tf.flags = tcph->tcp_flags;
 	pi->tf.type = type;
 	pi->csf = m->ol_flags & (PKT_RX_IP_CKSUM_MASK | PKT_RX_L4_CKSUM_MASK);

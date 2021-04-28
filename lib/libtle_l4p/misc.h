@@ -207,7 +207,7 @@ __udptcp_mbuf_cksum(const struct rte_mbuf *mb, uint16_t l4_ofs,
  *   The non-complemented checksum to set in the L4 header.
  */
 static inline uint16_t
-_ipv4x_phdr_cksum(const struct ipv4_hdr *ipv4_hdr, size_t ipv4h_len,
+_ipv4x_phdr_cksum(const struct rte_ipv4_hdr *ipv4_hdr, size_t ipv4h_len,
 	uint64_t ol_flags)
 {
 	uint32_t s0, s1;
@@ -243,7 +243,7 @@ _ipv4x_phdr_cksum(const struct ipv4_hdr *ipv4_hdr, size_t ipv4h_len,
  */
 static inline int
 _ipv4_udptcp_mbuf_cksum(const struct rte_mbuf *mb, uint16_t l4_ofs,
-	const struct ipv4_hdr *ipv4_hdr)
+	const struct rte_ipv4_hdr *ipv4_hdr)
 {
 	uint32_t cksum;
 
@@ -267,7 +267,7 @@ _ipv4_udptcp_mbuf_cksum(const struct rte_mbuf *mb, uint16_t l4_ofs,
  */
 static inline int
 _ipv6_udptcp_mbuf_cksum(const struct rte_mbuf *mb, uint16_t l4_ofs,
-	const struct ipv6_hdr *ipv6_hdr)
+	const struct rte_ipv6_hdr *ipv6_hdr)
 {
 	uint32_t cksum;
 
@@ -293,9 +293,9 @@ static inline int
 check_pkt_csum(const struct rte_mbuf *m, uint64_t ol_flags, uint32_t type,
 	uint32_t proto)
 {
-	const struct ipv4_hdr *l3h4;
-	const struct ipv6_hdr *l3h6;
-	const struct udp_hdr *l4h;
+	const struct rte_ipv4_hdr *l3h4;
+	const struct rte_ipv6_hdr *l3h6;
+	const struct rte_udp_hdr *l4h;
 	uint64_t fl3, fl4;
 	uint16_t csum;
 	int32_t ret;
@@ -313,8 +313,10 @@ check_pkt_csum(const struct rte_mbuf *m, uint64_t ol_flags, uint32_t type,
 		return 1;
 
 	/* case 2: either ip or l4 or both cksum is unknown */
-	l3h4 = rte_pktmbuf_mtod_offset(m, const struct ipv4_hdr *, m->l2_len);
-	l3h6 = rte_pktmbuf_mtod_offset(m, const struct ipv6_hdr *, m->l2_len);
+	l3h4 = rte_pktmbuf_mtod_offset(m, const struct rte_ipv4_hdr *,
+		m->l2_len);
+	l3h6 = rte_pktmbuf_mtod_offset(m, const struct rte_ipv6_hdr *,
+		m->l2_len);
 
 	ret = 0;
 	if (fl3 == PKT_RX_IP_CKSUM_UNKNOWN && l3h4->hdr_checksum != 0) {
@@ -329,7 +331,7 @@ check_pkt_csum(const struct rte_mbuf *m, uint64_t ol_flags, uint32_t type,
 		 * for IPv6 valid UDP cksum is mandatory.
 		 */
 		if (type == TLE_V4) {
-			l4h = (const struct udp_hdr *)((uintptr_t)l3h4 +
+			l4h = (const struct rte_udp_hdr *)((uintptr_t)l3h4 +
 				m->l3_len);
 			csum = (proto == IPPROTO_UDP && l4h->dgram_cksum == 0) ?
 				UINT16_MAX : _ipv4_udptcp_mbuf_cksum(m,

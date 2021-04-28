@@ -69,16 +69,16 @@ pkt_info(struct rte_mbuf *m, union l4_ports *ports, union ipv4_addrs *addr4,
 	len = m->l2_len;
 	if (ret.src == TLE_V4) {
 		pa4 = rte_pktmbuf_mtod_offset(m, union ipv4_addrs *,
-			len + offsetof(struct ipv4_hdr, src_addr));
+			len + offsetof(struct rte_ipv4_hdr, src_addr));
 		addr4->raw = pa4->raw;
 	} else if (ret.src == TLE_V6) {
 		*addr6 = rte_pktmbuf_mtod_offset(m, union ipv6_addrs *,
-			len + offsetof(struct ipv6_hdr, src_addr));
+			len + offsetof(struct rte_ipv6_hdr, src_addr));
 	}
 
 	len += m->l3_len;
 	up = rte_pktmbuf_mtod_offset(m, union l4_ports *,
-		len + offsetof(struct udp_hdr, src_port));
+		len + offsetof(struct rte_udp_hdr, src_port));
 	ports->raw = up->raw;
 	ret.dst = ports->dst;
 	return ret;
@@ -355,8 +355,8 @@ udp_fill_mbuf(struct rte_mbuf *m,
 	/* update proto specific fields. */
 
 	if (type == TLE_V4) {
-		struct ipv4_hdr *l3h;
-		l3h = (struct ipv4_hdr *)(l2h + dst->l2_len);
+		struct rte_ipv4_hdr *l3h;
+		l3h = (struct rte_ipv4_hdr *)(l2h + dst->l2_len);
 		l3h->packet_id = rte_cpu_to_be_16(pid);
 		l3h->total_length = rte_cpu_to_be_16(plen + dst->l3_len +
 			sizeof(*l4h));
@@ -370,8 +370,8 @@ udp_fill_mbuf(struct rte_mbuf *m,
 		if ((ol_flags & PKT_TX_IP_CKSUM) == 0)
 			l3h->hdr_checksum = _ipv4x_cksum(l3h, m->l3_len);
 	} else {
-		struct ipv6_hdr *l3h;
-		l3h = (struct ipv6_hdr *)(l2h + dst->l2_len);
+		struct rte_ipv6_hdr *l3h;
+		l3h = (struct rte_ipv6_hdr *)(l2h + dst->l2_len);
 		l3h->payload_len = rte_cpu_to_be_16(plen + sizeof(*l4h));
 		if ((ol_flags & PKT_TX_UDP_CKSUM) != 0)
 			l4h->cksum = rte_ipv6_phdr_cksum(l3h, ol_flags);
@@ -389,13 +389,13 @@ udp_fill_mbuf(struct rte_mbuf *m,
 static inline void
 frag_fixup(const struct rte_mbuf *ms, struct rte_mbuf *mf, uint32_t type)
 {
-	struct ipv4_hdr *l3h;
+	struct rte_ipv4_hdr *l3h;
 
 	mf->ol_flags = ms->ol_flags;
 	mf->tx_offload = ms->tx_offload;
 
 	if (type == TLE_V4 && (ms->ol_flags & PKT_TX_IP_CKSUM) == 0) {
-		l3h = rte_pktmbuf_mtod(mf, struct ipv4_hdr *);
+		l3h = rte_pktmbuf_mtod(mf, struct rte_ipv4_hdr *);
 		l3h->hdr_checksum = _ipv4x_cksum(l3h, mf->l3_len);
 	}
 }

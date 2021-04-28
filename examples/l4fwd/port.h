@@ -182,8 +182,8 @@ port_init(struct netbe_port *uprt, uint32_t proto)
 			__func__, uprt->id);
 		port_conf.rxmode.offloads |= uprt->rx_offload & RX_CSUM_OFFLOAD;
 	}
-	port_conf.rxmode.max_rx_pkt_len = uprt->mtu + ETHER_CRC_LEN;
-	if (port_conf.rxmode.max_rx_pkt_len > ETHER_MAX_LEN)
+	port_conf.rxmode.max_rx_pkt_len = uprt->mtu + RTE_ETHER_CRC_LEN;
+	if (port_conf.rxmode.max_rx_pkt_len > RTE_ETHER_MAX_LEN)
 		port_conf.rxmode.offloads |= DEV_RX_OFFLOAD_JUMBO_FRAME;
 
 	rc = update_rss_conf(uprt, &dev_info, &port_conf, proto);
@@ -258,8 +258,7 @@ check_lcore(uint32_t lc)
 		return -EINVAL;
 	}
 	if (rte_eal_get_lcore_state(lc) == RUNNING) {
-		RTE_LOG(ERR, USER1, "lcore %u already running %p\n",
-			lc, lcore_config[lc].f);
+		RTE_LOG(ERR, USER1, "lcore %u already in use\n", lc);
 		return -EINVAL;
 	}
 	return 0;
