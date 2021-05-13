@@ -19,6 +19,7 @@
 #include "net_misc.h"
 #include <rte_tcp.h>
 #include <rte_cycles.h>
+#include <tle_tcp.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -159,17 +160,6 @@ union seqlen {
 #define	TCP_OPT_KL_WSC		TCP_OPT_KL(TCP_OPT_KIND_WSC, TCP_OPT_LEN_WSC)
 #define	TCP_OPT_KL_TMS		TCP_OPT_KL(TCP_OPT_KIND_TMS, TCP_OPT_LEN_TMS)
 
-/*
- * Timestamp option.
- */
-union tsopt {
-	uint64_t raw;
-	struct {
-		uint32_t val;
-		uint32_t ecr;
-	};
-};
-
 struct tcpopt {
 	union {
 		uint16_t raw;
@@ -181,15 +171,9 @@ struct tcpopt {
 	union {
 		uint16_t mss;
 		uint8_t  wscale;
-		union tsopt ts;
+		union tle_tcp_tsopt ts;
 	};
 } __attribute__((__packed__));
-
-struct syn_opts {
-	uint16_t mss;
-	uint8_t  wscale;
-	union tsopt ts;
-};
 
 struct resp_info {
 	uint32_t flags;
@@ -217,9 +201,9 @@ struct dack_info {
 		uint32_t badseq;    /* bad seq/ack */
 		uint32_t ofo;       /* OFO incoming data */
 	} segs;
-	uint32_t ack;       /* highest received ACK */
-	union tsopt ts;     /* TS of highest ACK */
-	union wui wu;       /* window update information */
+	uint32_t ack;               /* highest received ACK */
+	union tle_tcp_tsopt ts;     /* TS of highest ACK */
+	union wui wu;               /* window update information */
 	uint32_t wnd;
 	struct {               /* 3 duplicate ACKs were observed after */
 		uint32_t seg;  /* # of meaningful ACK segments */
@@ -272,7 +256,7 @@ get_seg_info(const struct rte_tcp_hdr *th, union seg_info *si)
 }
 
 static inline void
-get_syn_opts(struct syn_opts *so, uintptr_t p, uint32_t len)
+get_syn_opts(struct tle_tcp_syn_opts *so, uintptr_t p, uint32_t len)
 {
 	uint32_t i, kind;
 	const struct tcpopt *opt;
@@ -310,7 +294,7 @@ get_syn_opts(struct syn_opts *so, uintptr_t p, uint32_t len)
  * at least TCP_TX_OPT_LEN_MAX bytes available.
  */
 static inline void
-fill_syn_opts(void *p, const struct syn_opts *so)
+fill_syn_opts(void *p, const struct tle_tcp_syn_opts *so)
 {
 	uint8_t *to;
 	struct tcpopt *opt;
@@ -364,10 +348,10 @@ fill_tms_opts(void *p, uint32_t val, uint32_t ecr)
 	opt[2] = rte_cpu_to_be_32(ecr);
 }
 
-static inline union tsopt
+static inline union tle_tcp_tsopt
 get_tms_opts(uintptr_t p, uint32_t len)
 {
-	union tsopt ts;
+	union tle_tcp_tsopt ts;
 	uint32_t i, kind;
 	const uint32_t *opt;
 	const struct tcpopt *to;

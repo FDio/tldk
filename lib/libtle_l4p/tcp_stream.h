@@ -46,10 +46,11 @@ enum {
 };
 
 enum {
-	TCP_OP_LISTEN =  0x1,
-	TCP_OP_ACCEPT =  0x2,
-	TCP_OP_CONNECT = 0x4,
-	TCP_OP_CLOSE =   0x8,
+	TCP_OP_LISTEN =    0x1,
+	TCP_OP_ACCEPT =    0x2,
+	TCP_OP_CONNECT =   0x4,
+	TCP_OP_ESTABLISH = 0x8,
+	TCP_OP_CLOSE =     0x10,
 };
 
 struct tcb {
@@ -90,7 +91,7 @@ struct tcb {
 		uint8_t nb_retx; /* number of retransmission */
 		uint8_t nb_retm; /**< max number of retx attempts. */
 	} snd;
-	struct syn_opts so; /* initial syn options. */
+	struct tle_tcp_syn_opts so; /* initial syn options. */
 };
 
 struct tle_tcp_stream {
@@ -188,6 +189,9 @@ struct tcp_streams {
 #define CTX_TCP_TSQ(ctx)	(CTX_TCP_STREAMS(ctx)->tsq)
 #define CTX_TCP_SDR(ctx)	(&CTX_TCP_STREAMS(ctx)->dr)
 #define CTX_TCP_MTS(ctx)	(CTX_TCP_STREAMS(ctx)->mts)
+
+extern int tcp_stream_fill_prm(struct tle_tcp_stream *s,
+	const struct tle_tcp_stream_param *prm);
 
 #ifdef __cplusplus
 }

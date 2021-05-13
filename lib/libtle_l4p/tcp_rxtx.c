@@ -710,10 +710,10 @@ check_seqn(const struct tcb *tcb, uint32_t seqn, uint32_t len)
 	return 0;
 }
 
-static inline union tsopt
+static inline union tle_tcp_tsopt
 rx_tms_opt(const struct tcb *tcb, const struct rte_mbuf *mb)
 {
-	union tsopt ts;
+	union tle_tcp_tsopt ts;
 	uintptr_t opt;
 	const struct rte_tcp_hdr *th;
 
@@ -732,7 +732,8 @@ rx_tms_opt(const struct tcb *tcb, const struct rte_mbuf *mb)
  * RFC 1323 4.2.1
  */
 static inline int
-rx_check_seq(struct tcb *tcb, uint32_t seq, uint32_t len, const union tsopt ts)
+rx_check_seq(struct tcb *tcb, uint32_t seq, uint32_t len,
+	const union tle_tcp_tsopt ts)
 {
 	int32_t rc;
 
@@ -771,7 +772,7 @@ rx_check_ack(const struct tcb *tcb, uint32_t ack)
 
 static inline int
 rx_check_seqack(struct tcb *tcb, uint32_t seq, uint32_t ack, uint32_t len,
-	const union tsopt ts)
+	const union tle_tcp_tsopt ts)
 {
 	int32_t rc;
 
@@ -781,7 +782,7 @@ rx_check_seqack(struct tcb *tcb, uint32_t seq, uint32_t ack, uint32_t len,
 }
 
 static inline int
-restore_syn_opt(union seg_info *si, union tsopt *to,
+restore_syn_opt(union seg_info *si, union tle_tcp_tsopt *to,
 	const union pkt_info *pi, uint32_t ts, const struct rte_mbuf *mb,
 	uint32_t hash_alg, rte_xmm_t *secret_key)
 {
@@ -846,15 +847,31 @@ stream_fill_dest(struct tle_tcp_stream *s)
 }
 
 /*
+ * estimate the rto
+ * for now rtt is calculated based on the tcp TMS option,
+ * later add real-time one
+ */
+static inline void
+estimate_stream_rto(struct tle_tcp_stream *s, uint32_t tms)
+{
+	uint32_t rtt;
+
+	if (s->tcb.so.ts.ecr) {
+		rtt = tms - s->tcb.so.ts.ecr;
+		rto_estimate(&s->tcb, rtt);
+	} else
+		s->tcb.snd.rto = TCP_RTO_DEFAULT;
+}
+
+/*
  * helper function, prepares a new accept stream.
  */
 static inline int
 accept_prep_stream(struct tle_tcp_stream *ps, struct stbl *st,
-	struct tle_tcp_stream *cs, const union tsopt *to,
+	struct tle_tcp_stream *cs, const union tle_tcp_tsopt *to,
 	uint32_t tms, const union pkt_info *pi, const union seg_info *si)
 {
 	int32_t rc;
-	uint32_t rtt;
 
 	/* some TX still pending for that stream. */
 	if (TCP_STREAM_TX_PENDING(cs))
@@ -880,16 +897,7 @@ accept_prep_stream(struct tle_tcp_stream *ps, struct stbl *st,
 	sync_fill_tcb(&cs->tcb, si, to);
 	cs->tcb.rcv.wnd = calc_rx_wnd(cs, cs->tcb.rcv.wscale);
 
-	/*
-	 * estimate the rto
-	 * for now rtt is calculated based on the tcp TMS option,
-	 * later add real-time one
-	 */
-	if (cs->tcb.so.ts.ecr) {
-		rtt = tms - cs->tcb.so.ts.ecr;
-		rto_estimate(&cs->tcb, rtt);
-	} else
-		cs->tcb.snd.rto = TCP_RTO_DEFAULT;
+	estimate_stream_rto(cs, tms);
 
 	/* copy streams type & flags. */
 	cs->s.type = ps->s.type;
@@ -938,7 +946,7 @@ rx_ack_listen(struct tle_tcp_stream *s, struct stbl *st,
 	struct tle_ctx *ctx;
 	struct tle_stream *ts;
 	struct tle_tcp_stream *cs;
-	union tsopt to;
+	union tle_tcp_tsopt to;
 
 	*csp = NULL;
 
@@ -1086,7 +1094,7 @@ rx_fin(struct tle_tcp_stream *s, uint32_t state,
 {
 	uint32_t hlen, plen, seq;
 	int32_t ret;
-	union tsopt ts;
+	union tle_tcp_tsopt ts;
 
 	hlen = PKT_L234_HLEN(mb);
 	plen = mb->pkt_len - hlen;
@@ -1231,7 +1239,7 @@ rto_cwnd_update(struct tcb *tcb)
 
 static inline void
 ack_info_update(struct dack_info *tack, const union seg_info *si,
-	int32_t badseq, uint32_t dlen, const union tsopt ts)
+	int32_t badseq, uint32_t dlen, const union tle_tcp_tsopt ts)
 {
 	if (badseq != 0) {
 		tack->segs.badseq++;
@@ -1291,7 +1299,7 @@ rx_data_ack(struct tle_tcp_stream *s, struct dack_info *tack,
 	uint32_t i, j, k, n, t;
 	uint32_t hlen, plen, seq, tlen;
 	int32_t ret;
-	union tsopt ts;
+	union tle_tcp_tsopt ts;
 
 	k = 0;
 	for (i = 0; i != num; i = j) {
@@ -1553,7 +1561,7 @@ rx_synack(struct tle_tcp_stream *s, uint32_t ts, uint32_t state,
 	const union seg_info *si, struct rte_mbuf *mb,
 	struct resp_info *rsp)
 {
-	struct syn_opts so;
+	struct tle_tcp_syn_opts so;
 	struct rte_tcp_hdr *th;
 
 	if (state != TCP_ST_SYN_SENT)
@@ -2164,6 +2172,93 @@ tle_tcp_stream_connect(struct tle_stream *ts, const struct sockaddr *addr)
 		tle_tcp_stream_close(ts);
 
 	return rc;
+}
+
+/*
+ * Helper function for tle_tcp_stream_establish().
+ * updates stream's TCB.
+ */
+static inline void
+tcb_establish(struct tle_tcp_stream *s, const struct tle_tcp_conn_info *ci)
+{
+	uint32_t tms;
+
+	tms = tcp_get_tms(s->s.ctx->cycles_ms_shift);
+
+	s->tcb.so = ci->so;
+	fill_tcb_snd(&s->tcb, ci->seq, ci->ack, ci->so.mss,
+		ci->wnd, ci->so.wscale, &ci->so.ts);
+	fill_tcb_rcv(&s->tcb, ci->seq, ci->so.wscale, &ci->so.ts);
+
+	s->tcb.rcv.wnd = calc_rx_wnd(s, s->tcb.rcv.wscale);
+
+	/* setup congestion variables */
+	s->tcb.snd.cwnd = initial_cwnd(s->tcb.snd.mss, s->tcb.snd.cwnd);
+	s->tcb.snd.ssthresh = s->tcb.snd.wnd;
+
+	estimate_stream_rto(s, tms);
+}
+
+/*
+ * !!! add flgs to distinguish - add or not stream into the table.
+ */
+struct tle_stream *
+tle_tcp_stream_establish(struct tle_ctx *ctx,
+	const struct tle_tcp_stream_param *prm,
+	const struct tle_tcp_conn_info *ci)
+{
+	int32_t rc;
+	struct tle_tcp_stream *s;
+	struct stbl *st;
+
+	if (ctx == NULL || prm == NULL || ci == NULL) {
+		rte_errno = -EINVAL;
+		return NULL;
+	}
+
+	/* allocate new stream */
+	s = tcp_stream_get(ctx, TLE_MTANK_ALLOC_CHUNK | TLE_MTANK_ALLOC_GROW);
+	if (s == NULL) {
+		rte_errno = ENFILE;
+		return NULL;
+	}
+
+	do {
+		s->tcb.uop |= TCP_OP_ESTABLISH;
+
+		/* check and use stream addresses and parameters */
+		rc = tcp_stream_fill_prm(s, prm);
+		if (rc != 0)
+			break;
+
+		/* retrieve and cache destination information. */
+		rc = stream_fill_dest(s);
+		if (rc != 0)
+			break;
+
+		/* add the stream to the stream table */
+		st = CTX_TCP_STLB(s->s.ctx);
+		s->ste = stbl_add_stream_lock(st, s);
+		if (s->ste == NULL) {
+			rc = -ENOBUFS;
+			break;
+		}
+
+		/* fill TCB from user provided data */
+		tcb_establish(s, ci);
+		s->tcb.state = TCP_ST_ESTABLISHED;
+		tcp_stream_up(s);
+
+	} while (0);
+
+	/* cleanup on failure */
+	if (rc != 0) {
+		tcp_stream_reset(ctx, s);
+		rte_errno = -rc;
+		s = NULL;
+	}
+
+	return &s->s;
 }
 
 uint16_t
