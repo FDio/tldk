@@ -52,6 +52,33 @@ struct tle_tcp_stream_param {
 };
 
 /**
+ * Timestamp option.
+ */
+union tle_tcp_tsopt {
+	uint64_t raw;
+	struct {
+		uint32_t val;
+		uint32_t ecr;
+	};
+};
+
+/**
+ * SYN time option values.
+ */
+struct tle_tcp_syn_opts {
+	uint16_t mss;
+	uint8_t  wscale;
+	union tle_tcp_tsopt ts;
+};
+
+struct tle_tcp_conn_info {
+	uint16_t wnd;
+	uint32_t seq;
+	uint32_t ack;
+	struct tle_tcp_syn_opts so;
+};
+
+/**
  * create a new stream within given TCP context.
  * @param ctx
  *   TCP context to create new stream within.
@@ -128,6 +155,11 @@ tle_tcp_stream_get_addr(const struct tle_stream *s,
  *   Negative on failure.
  */
 int tle_tcp_stream_get_mss(const struct tle_stream *ts);
+
+struct tle_stream *
+tle_tcp_stream_establish(struct tle_ctx *ctx,
+	const struct tle_tcp_stream_param *prm,
+	const struct tle_tcp_conn_info *ci);
 
 /**
  * Client mode connect API.

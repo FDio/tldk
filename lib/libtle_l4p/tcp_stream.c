@@ -361,6 +361,106 @@ check_stream_prm(const struct tle_ctx *ctx,
 	return 0;
 }
 
+static void
+tcp_stream_fill_cfg(struct tle_tcp_stream *s, const struct tle_ctx_param *cprm,
+	const struct tle_tcp_stream_cfg *scfg)
+{
+	/* setup stream notification menchanism */
+	s->rx.ev = scfg->recv_ev;
+	s->rx.cb = scfg->recv_cb;
+	s->tx.ev = scfg->send_ev;
+	s->tx.cb = scfg->send_cb;
+	s->err.ev = scfg->err_ev;
+	s->err.cb = scfg->err_cb;
+
+	/* store other params */
+	s->flags = cprm->flags;
+	s->tcb.snd.nb_retm = (scfg->nb_retries != 0) ? scfg->nb_retries :
+		TLE_TCP_DEFAULT_RETRIES;
+	s->tcb.snd.cwnd = (cprm->icw == 0) ? TCP_INITIAL_CWND_MAX :
+				cprm->icw;
+	s->tcb.snd.rto_tw = (cprm->timewait == TLE_TCP_TIMEWAIT_DEFAULT) ?
+				TCP_RTO_2MSL : cprm->timewait;
+}
+
+static int
+stream_fill_type_addrs_type(struct tle_stream *s, const struct sockaddr *laddr,
+	const struct sockaddr *raddr)
+{
+	const struct sockaddr_in *lin4, *rin4;
+	const struct sockaddr_in6 *lin6, *rin6;
+
+	const size_t sz = sizeof(tle_ipv6_any);
+
+	lin4 = (const struct sockaddr_in *)laddr;
+	lin6 = (const struct sockaddr_in6 *)laddr;
+
+	rin4 = (const struct sockaddr_in *)raddr;
+	rin6 = (const struct sockaddr_in6 *)raddr;
+
+	if (laddr->sa_family == AF_INET) {
+
+		if (lin4->sin_addr.s_addr == INADDR_ANY ||
+				rin4->sin_addr.s_addr == INADDR_ANY ||
+				lin4->sin_port == 0 || rin4->sin_port == 0)
+			return -EINVAL;
+
+		s->port.src = rin4->sin_port;
+		s->port.dst = lin4->sin_port;
+
+		s->ipv4.addr.src = rin4->sin_addr.s_addr;
+		s->ipv4.addr.dst = lin4->sin_addr.s_addr;
+
+		s->ipv4.mask.src = INADDR_NONE;
+		s->ipv4.mask.dst = INADDR_NONE;
+
+		s->type = TLE_V4;
+
+	} else if (laddr->sa_family == AF_INET6) {
+
+		if (memcmp(&lin6->sin6_addr, &tle_ipv6_any, sz) == 0 ||
+				memcmp(&rin6->sin6_addr, &tle_ipv6_any,
+				sz) == 0 ||
+				lin6->sin6_port == 0 || rin6->sin6_port == 0)
+			return -EINVAL;
+
+		s->port.src = rin6->sin6_port;
+		s->port.dst = lin6->sin6_port;
+
+		memcpy(&s->ipv6.addr.src, &rin6->sin6_addr, sz);
+		memcpy(&s->ipv6.addr.dst, &lin6->sin6_addr, sz);
+
+		memcpy(&s->ipv6.mask.src, &tle_ipv6_none, sz);
+		memcpy(&s->ipv6.mask.dst, &tle_ipv6_none, sz);
+
+		s->type = TLE_V6;
+
+	} else
+		return -EINVAL;
+
+	s->pmsk.raw = UINT32_MAX;
+	return 0;
+}
+
+int
+tcp_stream_fill_prm(struct tle_tcp_stream *s,
+	const struct tle_tcp_stream_param *prm)
+{
+	int32_t rc;
+	struct tle_ctx *ctx;
+
+	ctx = s->s.ctx;
+	if (ctx == NULL || prm == NULL || check_stream_prm(ctx, prm) != 0)
+		return -EINVAL;
+
+	rc = stream_fill_type_addrs_type(&s->s,
+		(const struct sockaddr *)&prm->addr.local,
+		(const struct sockaddr *)&prm->addr.remote);
+	if (rc == 0)
+		tcp_stream_fill_cfg(s, &ctx->prm, &prm->cfg);
+	return rc;
+}
+
 struct tle_stream *
 tle_tcp_stream_open(struct tle_ctx *ctx,
 	const struct tle_tcp_stream_param *prm)
@@ -394,22 +494,7 @@ tle_tcp_stream_open(struct tle_ctx *ctx,
 		return NULL;
 	}
 
-	/* setup stream notification menchanism */
-	s->rx.ev = prm->cfg.recv_ev;
-	s->rx.cb = prm->cfg.recv_cb;
-	s->tx.ev = prm->cfg.send_ev;
-	s->tx.cb = prm->cfg.send_cb;
-	s->err.ev = prm->cfg.err_ev;
-	s->err.cb = prm->cfg.err_cb;
-
-	/* store other params */
-	s->flags = ctx->prm.flags;
-	s->tcb.snd.nb_retm = (prm->cfg.nb_retries != 0) ? prm->cfg.nb_retries :
-		TLE_TCP_DEFAULT_RETRIES;
-	s->tcb.snd.cwnd = (ctx->prm.icw == 0) ? TCP_INITIAL_CWND_MAX :
-				ctx->prm.icw;
-	s->tcb.snd.rto_tw = (ctx->prm.timewait == TLE_TCP_TIMEWAIT_DEFAULT) ?
-				TCP_RTO_2MSL : ctx->prm.timewait;
+	tcp_stream_fill_cfg(s, &ctx->prm, &prm->cfg);
 
 	tcp_stream_up(s);
 	return &s->s;
