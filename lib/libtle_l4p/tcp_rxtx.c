@@ -72,6 +72,23 @@ rx_obtain_listen_stream(const struct tle_dev *dev, const union pkt_info *pi,
 }
 
 static inline struct tle_tcp_stream *
+rx_acquire_stream(struct tle_stream *ts)
+{
+	struct tle_tcp_stream *s;
+
+	s = TCP_STREAM(ts);
+	if (tcp_stream_acquire(s) < 0)
+		return NULL;
+
+	else if (s->tcb.state == TCP_ST_CLOSED) {
+		tcp_stream_release(s);
+		return NULL;
+	}
+
+	return s;
+}
+
+static inline struct tle_tcp_stream *
 rx_obtain_stream(const struct tle_dev *dev, struct stbl *st,
 	const union pkt_info *pi, uint32_t type)
 {
@@ -1955,6 +1972,60 @@ tle_tcp_rx_bulk(struct tle_dev *dev, struct rte_mbuf *pkt[],
 	if (stu.t[TLE_V6] != 0)
 		stbl_unlock(st, TLE_V6);
 
+	return num - k;
+}
+
+uint16_t
+tle_tcp_stream_rx_bulk(struct tle_stream *ts, struct rte_mbuf *pkt[],
+	struct rte_mbuf *rp[], int32_t rc[], uint16_t num)
+{
+	struct tle_ctx *ctx;
+	struct tle_tcp_stream *s;
+	uint32_t i, j, k, n, t, tms;
+	union pkt_info pi[num];
+	union seg_info si[num];
+
+	ctx = ts->ctx;
+	tms = tcp_get_tms(ctx->cycles_ms_shift);
+
+	s = rx_acquire_stream(ts);
+	if (s == NULL) {
+		for (i = 0; i != num; i++) {
+			rc[i] = ENOENT;
+			rp[i] = pkt[i];
+		}
+		return 0;
+	}
+
+	/* extract packet info and check the L3/L4 csums */
+	for (i = 0; i != num; i++) {
+		get_pkt_info(pkt[i], &pi[i], &si[i]);
+		pi[i].csf = check_pkt_csum(pkt[i], pi[i].csf, pi[i].tf.type,
+			IPPROTO_TCP);
+	}
+
+	k = 0;
+	for (i = 0; i != num; i += j) {
+
+		t = pi[i].tf.type;
+		j = 1;
+
+		/*basic checks for incoming packet */
+		if (t != ts->type || pi[i].csf != 0 ||
+				 rx_check_stream(s, pi + i) != 0) {
+			rc[k] = EINVAL;
+			rp[k] = pkt[i];
+			k++;
+			continue;
+		}
+
+		j = pkt_info_bulk_eq(pi + i, num - i);
+		n = rx_stream(s, tms, pi + i, si + i, pkt + i,
+			rp + k, rc + k, j);
+		k += j - n;
+	}
+
+	tcp_stream_release(s);
 	return num - k;
 }
 
