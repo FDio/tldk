@@ -414,40 +414,6 @@ ssize_t tle_tcp_stream_writev(struct tle_stream *ts, struct rte_mempool *mp,
 uint16_t tle_tcp_rx_bulk(struct tle_dev *dev, struct rte_mbuf *pkt[],
 	struct rte_mbuf *rp[], int32_t rc[], uint16_t num);
 
-
-/**
- * Take input mbufs and put them for processing to given TCP streams.
- * expects that for each input packet:
- *	- l2_len, l3_len, l4_len are setup correctly
- *	- (packet_type & (RTE_PTYPE_L3_IPV4 | RTE_PTYPE_L3_IPV6)) != 0,
- *	- (packet_type & RTE_PTYPE_L4_TCP) != 0,
- * During delivery L3/L4 checksums will be verified
- * (either relies on HW offload or in SW).
- * May cause some extra packets to be queued for TX.
- * This function is not multi-thread safe.
- * @param ts
- *   TCP stream given packets belong to.
- *   Note that it is caller repsonsibility to make sure that input packets
- *   belong to given stream.
- * @param pkt
- *   The burst of input packets that need to be processed.
- * @param rp
- *   The array that will contain pointers of unprocessed packets at return.
- *   Should contain at least *num* elements.
- * @param rc
- *   The array that will contain error code for corresponding rp[] entry:
- *   - ENOENT - invalid stream.
- *   - ENOBUFS - receive buffer of the destination stream is full.
- *   - EINVAL - invalid input packet encountered.
- *   Should contain at least *num* elements.
- * @param num
- *   Number of elements in the *pkt* input array.
- * @return
- *   number of packets delivered to the TCP stream.
- */
-uint16_t tle_tcp_stream_rx_bulk(struct tle_stream *ts, struct rte_mbuf *pkt[],
-	struct rte_mbuf *rp[], int32_t rc[], uint16_t num);
-
 /**
  * Fill *pkt* with pointers to the packets that have to be transmitted
  * over given TCP device.
