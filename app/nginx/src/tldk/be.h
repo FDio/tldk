@@ -31,9 +31,9 @@
 
 extern volatile int force_quit;
 
-int be_lpm4_dst_lookup(void *data, const struct in_addr *addr,
+int be_lpm4_dst_lookup(void *data, uint64_t sdata, const struct in_addr *addr,
 			struct tle_dest *res);
-int be_lpm6_dst_lookup(void *data, const struct in6_addr *addr,
+int be_lpm6_dst_lookup(void *data, uint64_t sdata, const struct in6_addr *addr,
 			struct tle_dest *res);
 int be_lcore_lpm_init(struct tldk_ctx *tcx, uint32_t sid,
 		const struct tldk_ctx_conf *cf);

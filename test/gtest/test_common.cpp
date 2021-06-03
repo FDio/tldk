@@ -255,18 +255,22 @@ typen_rx_callback(dpdk_port_t port, __rte_unused uint16_t queue,
 }
 
 int
-dummy_lookup4(void *opaque, const struct in_addr *addr, struct tle_dest *res)
+dummy_lookup4(void *opaque, uint64_t sdata, const struct in_addr *addr,
+	struct tle_dest *res)
 {
 	RTE_SET_USED(opaque);
+	RTE_SET_USED(sdata);
 	RTE_SET_USED(addr);
 	RTE_SET_USED(res);
 	return -ENOENT;
 }
 
 int
-dummy_lookup6(void *opaque, const struct in6_addr *addr, struct tle_dest *res)
+dummy_lookup6(void *opaque, uint64_t sdata, const struct in6_addr *addr,
+	struct tle_dest *res)
 {
 	RTE_SET_USED(opaque);
+	RTE_SET_USED(sdata);
 	RTE_SET_USED(addr);
 	RTE_SET_USED(res);
 	return -ENOENT;

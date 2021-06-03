@@ -35,6 +35,8 @@ struct tle_tcp_stream_addr {
 struct tle_tcp_stream_cfg {
 	uint8_t nb_retries;     /**< max number of retransmission attempts. */
 
+	uint64_t udata; /**< user data to be associated with the stream. */
+
 	/* _cb and _ev are mutually exclusive */
 	struct tle_event *err_ev;      /**< error event to use.  */
 	struct tle_stream_cb err_cb;   /**< error callback to use. */

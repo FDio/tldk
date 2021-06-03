@@ -62,7 +62,8 @@ extern struct rte_mempool *mbuf_pool;
 /* Dummy lookup functions, TX operations are not performed in these tests */
 
 static int
-lookup4_function(void *opaque, const struct in_addr *addr, struct tle_dest *res)
+lookup4_function(void *opaque, __rte_unused uint64_t sdata,
+	const struct in_addr *addr, struct tle_dest *res)
 {
 	struct in_addr route;
 	struct rte_ether_hdr *eth;
@@ -98,8 +99,8 @@ lookup4_function(void *opaque, const struct in_addr *addr, struct tle_dest *res)
 }
 
 static int
-lookup6_function(void *opaque, const struct in6_addr *addr,
-	struct tle_dest *res)
+lookup6_function(void *opaque, __rte_unused uint64_t sdata,
+	const struct in6_addr *addr, struct tle_dest *res)
 {
 	struct rte_ether_hdr *eth;
 	struct rte_ipv6_hdr *ip6h;

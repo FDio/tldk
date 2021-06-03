@@ -98,9 +98,11 @@ typen_rx_callback(dpdk_port_t port, __rte_unused uint16_t queue,
 	__rte_unused uint16_t max_pkts, void *user_param);
 
 int
-dummy_lookup4(void *opaque, const struct in_addr *addr, struct tle_dest *res);
+dummy_lookup4(void *opaque, uint64_t sdata, const struct in_addr *addr,
+	struct tle_dest *res);
 
 int
-dummy_lookup6(void *opaque, const struct in6_addr *addr, struct tle_dest *res);
+dummy_lookup6(void *opaque, uint64_t sdata, const struct in6_addr *addr,
+	struct tle_dest *res);
 
 #endif /* TEST_COMMON_H_ */

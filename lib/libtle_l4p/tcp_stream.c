@@ -381,6 +381,8 @@ tcp_stream_fill_cfg(struct tle_tcp_stream *s, const struct tle_ctx_param *cprm,
 				cprm->icw;
 	s->tcb.snd.rto_tw = (cprm->timewait == TLE_TCP_TIMEWAIT_DEFAULT) ?
 				TCP_RTO_2MSL : cprm->timewait;
+
+	s->s.udata = scfg->udata;
 }
 
 static int
@@ -717,6 +719,7 @@ stream_update_cfg(struct tle_stream *ts,struct tle_tcp_stream_cfg *prm)
 	/* store other params */
 	s->tcb.snd.nb_retm = (prm->nb_retries != 0) ? prm->nb_retries :
 		TLE_TCP_DEFAULT_RETRIES;
+	s->s.udata = prm->udata;
 
 	/* invoke async notifications, if any */
 	if (rte_ring_count(s->rx.q) != 0) {

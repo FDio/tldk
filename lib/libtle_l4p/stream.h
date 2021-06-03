@@ -33,6 +33,8 @@ struct tle_stream {
 
 	uint8_t type;	       /* TLE_V4 or TLE_V6 */
 
+	uint64_t udata; /* user data associated wih the stream */
+
 	/* Stream address information. */
 	union l4_ports port;
 	union l4_ports pmsk;
@@ -137,10 +139,10 @@ stream_get_dest(struct tle_stream *s, const void *dst_addr,
 
 	if (s->type == TLE_V4) {
 		d4 = dst_addr;
-		rc = ctx->prm.lookup4(ctx->prm.lookup4_data, d4, dst);
+		rc = ctx->prm.lookup4(ctx->prm.lookup4_data, s->udata, d4, dst);
 	} else if (s->type == TLE_V6) {
 		d6 = dst_addr;
-		rc = ctx->prm.lookup6(ctx->prm.lookup6_data, d6, dst);
+		rc = ctx->prm.lookup6(ctx->prm.lookup6_data, s->udata, d6, dst);
 	} else
 		rc = -ENOENT;
 
@@ -150,17 +152,19 @@ stream_get_dest(struct tle_stream *s, const void *dst_addr,
 	dev = dst->dev;
 	dst->ol_flags = dev->tx.ol_flags[s->type];
 
-	if (s->type == TLE_V4) {
-		struct rte_ipv4_hdr *l3h;
-		l3h = (struct rte_ipv4_hdr *)(dst->hdr + dst->l2_len);
-		l3h->src_addr = dev->prm.local_addr4.s_addr;
-		l3h->dst_addr = d4->s_addr;
-	} else {
-		struct rte_ipv6_hdr *l3h;
-		l3h = (struct rte_ipv6_hdr *)(dst->hdr + dst->l2_len);
-		rte_memcpy(l3h->src_addr, &dev->prm.local_addr6,
-			sizeof(l3h->src_addr));
-		rte_memcpy(l3h->dst_addr, d6, sizeof(l3h->dst_addr));
+	if (rc == 0) {
+		if (s->type == TLE_V4) {
+			struct rte_ipv4_hdr *l3h;
+			l3h = (struct rte_ipv4_hdr *)(dst->hdr + dst->l2_len);
+			l3h->src_addr = dev->prm.local_addr4.s_addr;
+			l3h->dst_addr = d4->s_addr;
+		} else {
+			struct rte_ipv6_hdr *l3h;
+			l3h = (struct rte_ipv6_hdr *)(dst->hdr + dst->l2_len);
+			rte_memcpy(l3h->src_addr, &dev->prm.local_addr6,
+				sizeof(l3h->src_addr));
+			rte_memcpy(l3h->dst_addr, d6, sizeof(l3h->dst_addr));
+		}
 	}
 
 	return dev - ctx->dev;

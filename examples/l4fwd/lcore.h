@@ -24,8 +24,8 @@
  * IPv4 destination lookup callback.
  */
 static int
-lpm4_dst_lookup(void *data, const struct in_addr *addr,
-	struct tle_dest *res)
+lpm4_dst_lookup(void *data, __rte_unused uint64_t sdata,
+	const struct in_addr *addr, struct tle_dest *res)
 {
 	int32_t rc;
 	uint32_t idx;
@@ -47,8 +47,8 @@ lpm4_dst_lookup(void *data, const struct in_addr *addr,
  * IPv6 destination lookup callback.
  */
 static int
-lpm6_dst_lookup(void *data, const struct in6_addr *addr,
-	struct tle_dest *res)
+lpm6_dst_lookup(void *data, __rte_unused uint64_t sdata,
+	const struct in6_addr *addr, struct tle_dest *res)
 {
 	int32_t rc;
 	dpdk_lpm6_idx_t idx;

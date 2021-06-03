@@ -122,8 +122,8 @@ be_lcore_lpm_init(struct tldk_ctx *tcx, uint32_t sid,
 }
 
 int
-be_lpm4_dst_lookup(void *data, const struct in_addr *addr,
-		struct tle_dest *res)
+be_lpm4_dst_lookup(void *data, __rte_unused uint64_t sdata,
+		const struct in_addr *addr, struct tle_dest *res)
 {
 	int32_t rc;
 	uint32_t idx;
@@ -142,8 +142,8 @@ be_lpm4_dst_lookup(void *data, const struct in_addr *addr,
 }
 
 int
-be_lpm6_dst_lookup(void *data, const struct in6_addr *addr,
-	struct tle_dest *res)
+be_lpm6_dst_lookup(void *data, __rte_unused uint64_t sdata,
+		const struct in6_addr *addr, struct tle_dest *res)
 {
 	int32_t rc;
 	struct tldk_ctx *tcx;

@@ -123,14 +123,14 @@ struct tle_ctx_param {
 	uint32_t send_bulk_size;   /**< expected # of packets per send call. */
 	uint32_t flags;            /**< specific flags */
 
-	int (*lookup4)(void *opaque, const struct in_addr *addr,
-		struct tle_dest *res);
+	int (*lookup4)(void *opaque, uint64_t stream_udata,
+		const struct in_addr *addr, struct tle_dest *res);
 	/**< will be called by send() to get IPv4 packet destination info. */
 	void *lookup4_data;
 	/**< opaque data pointer for lookup4() callback. */
 
-	int (*lookup6)(void *opaque, const struct in6_addr *addr,
-		struct tle_dest *res);
+	int (*lookup6)(void *opaque, uint64_t stream_udata,
+		const struct in6_addr *addr, struct tle_dest *res);
 	/**< will be called by send() to get IPv6 packet destination info. */
 	void *lookup6_data;
 	/**< opaque data pointer for lookup6() callback. */
