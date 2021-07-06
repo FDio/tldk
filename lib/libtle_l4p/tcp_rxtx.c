@@ -63,7 +63,7 @@ rx_obtain_listen_stream(const struct tle_dev *dev, const union pkt_info *pi,
 		return NULL;
 
 	/* check that we have a proper stream. */
-	if (s->tcb.state != TCP_ST_LISTEN) {
+	if (s->tcb.state != TLE_TCP_ST_LISTEN) {
 		tcp_stream_release(s);
 		s = NULL;
 	}
@@ -80,7 +80,7 @@ rx_acquire_stream(struct tle_stream *ts)
 	if (tcp_stream_acquire(s) < 0)
 		return NULL;
 
-	else if (s->tcb.state == TCP_ST_CLOSED) {
+	else if (s->tcb.state == TLE_TCP_ST_CLOSED) {
 		tcp_stream_release(s);
 		return NULL;
 	}
@@ -104,7 +104,7 @@ rx_obtain_stream(const struct tle_dev *dev, struct stbl *st,
 	if (tcp_stream_acquire(s) < 0)
 		return NULL;
 	/* check that we have a proper stream. */
-	else if (s->tcb.state == TCP_ST_CLOSED) {
+	else if (s->tcb.state == TLE_TCP_ST_CLOSED) {
 		tcp_stream_release(s);
 		s = NULL;
 	}
@@ -828,13 +828,13 @@ stream_term(struct tle_tcp_stream *s)
 {
 	struct sdr *dr;
 
-	s->tcb.state = TCP_ST_CLOSED;
+	s->tcb.state = TLE_TCP_ST_CLOSED;
 	rte_smp_wmb();
 
 	timer_stop(s);
 
 	/* close() was already invoked, schedule final cleanup */
-	if ((s->tcb.uop & TCP_OP_CLOSE) != 0) {
+	if ((s->tcb.uop & TLE_TCP_OP_CLOSE) != 0) {
 
 		dr = CTX_TCP_SDR(s->s.ctx);
 		STAILQ_INSERT_TAIL(&dr->be, &s->s, link);
@@ -933,14 +933,14 @@ accept_prep_stream(struct tle_tcp_stream *ps, struct stbl *st,
 	cs->tcb.snd.ssthresh = cs->tcb.snd.wnd;
 	cs->tcb.snd.rto_tw = ps->tcb.snd.rto_tw;
 
-	cs->tcb.state = TCP_ST_ESTABLISHED;
+	cs->tcb.state = TLE_TCP_ST_ESTABLISHED;
 
 	/* add stream to the table */
 	cs->ste = stbl_add_stream(st, pi, cs);
 	if (cs->ste == NULL)
 		return -ENOBUFS;
 
-	cs->tcb.uop |= TCP_OP_ACCEPT;
+	cs->tcb.uop |= TLE_TCP_OP_ACCEPT;
 	tcp_stream_up(cs);
 	return 0;
 }
@@ -1058,7 +1058,7 @@ static void
 stream_timewait(struct tle_tcp_stream *s, uint32_t rto)
 {
 	if (rto != 0) {
-		s->tcb.state = TCP_ST_TIME_WAIT;
+		s->tcb.state = TLE_TCP_ST_TIME_WAIT;
 		s->tcb.snd.rto = rto;
 		timer_reset(s);
 	} else
@@ -1072,27 +1072,29 @@ rx_fin_state(struct tle_tcp_stream *s, struct resp_info *rsp)
 	int32_t ackfin;
 
 	s->tcb.rcv.nxt += 1;
+	s->err.rev |= TLE_TCP_REV_FIN;
 
 	ackfin = (s->tcb.snd.una == s->tcb.snd.fss);
 	state = s->tcb.state;
 
-	if (state == TCP_ST_ESTABLISHED) {
-		s->tcb.state = TCP_ST_CLOSE_WAIT;
+	if (state == TLE_TCP_ST_ESTABLISHED) {
+		s->tcb.state = TLE_TCP_ST_CLOSE_WAIT;
 		/* raise err.ev & err.cb */
 		if (s->err.ev != NULL)
 			tle_event_raise(s->err.ev);
 		else if (s->err.cb.func != NULL)
 			s->err.cb.func(s->err.cb.data, &s->s);
-	} else if (state == TCP_ST_FIN_WAIT_1 || state == TCP_ST_CLOSING) {
+	} else if (state == TLE_TCP_ST_FIN_WAIT_1 ||
+			state == TLE_TCP_ST_CLOSING) {
 		rsp->flags |= TCP_FLAG_ACK;
 		if (ackfin != 0)
 			stream_timewait(s, s->tcb.snd.rto_tw);
 		else
-			s->tcb.state = TCP_ST_CLOSING;
-	} else if (state == TCP_ST_FIN_WAIT_2) {
+			s->tcb.state = TLE_TCP_ST_CLOSING;
+	} else if (state == TLE_TCP_ST_FIN_WAIT_2) {
 		rsp->flags |= TCP_FLAG_ACK;
 		stream_timewait(s, s->tcb.snd.rto_tw);
-	} else if (state == TCP_ST_LAST_ACK && ackfin != 0) {
+	} else if (state == TLE_TCP_ST_LAST_ACK && ackfin != 0) {
 		stream_term(s);
 	}
 }
@@ -1122,7 +1124,7 @@ rx_fin(struct tle_tcp_stream *s, uint32_t state,
 	if (ret != 0)
 		return ret;
 
-	if (state < TCP_ST_ESTABLISHED)
+	if (state < TLE_TCP_ST_ESTABLISHED)
 		return -EINVAL;
 
 	if (plen != 0) {
@@ -1169,7 +1171,7 @@ rx_rst(struct tle_tcp_stream *s, uint32_t state, uint32_t flags,
 	 * In the SYN-SENT state (a RST received in response to an initial SYN),
 	 * the RST is acceptable if the ACK field acknowledges the SYN.
 	 */
-	if (state == TCP_ST_SYN_SENT) {
+	if (state == TLE_TCP_ST_SYN_SENT) {
 		rc = ((flags & TCP_FLAG_ACK) == 0 ||
 				si->ack != s->tcb.snd.nxt) ?
 			-ERANGE : 0;
@@ -1178,8 +1180,10 @@ rx_rst(struct tle_tcp_stream *s, uint32_t state, uint32_t flags,
 	else
 		rc = check_seqn(&s->tcb, si->seq, 0);
 
-	if (rc == 0)
+	if (rc == 0) {
+		s->err.rev |= TLE_TCP_REV_RST;
 		stream_term(s);
+	}
 
 	return rc;
 }
@@ -1534,12 +1538,12 @@ rx_ackfin(struct tle_tcp_stream *s)
 	empty_tq(s);
 
 	state = s->tcb.state;
-	if (state == TCP_ST_LAST_ACK)
+	if (state == TLE_TCP_ST_LAST_ACK)
 		stream_term(s);
-	else if (state == TCP_ST_FIN_WAIT_1) {
+	else if (state == TLE_TCP_ST_FIN_WAIT_1) {
 		timer_stop(s);
-		s->tcb.state = TCP_ST_FIN_WAIT_2;
-	} else if (state == TCP_ST_CLOSING) {
+		s->tcb.state = TLE_TCP_ST_FIN_WAIT_2;
+	} else if (state == TLE_TCP_ST_CLOSING) {
 		stream_timewait(s, s->tcb.snd.rto_tw);
 	}
 }
@@ -1581,7 +1585,7 @@ rx_synack(struct tle_tcp_stream *s, uint32_t ts, uint32_t state,
 	struct tle_tcp_syn_opts so;
 	struct rte_tcp_hdr *th;
 
-	if (state != TCP_ST_SYN_SENT)
+	if (state != TLE_TCP_ST_SYN_SENT)
 		return -EINVAL;
 
 	/*
@@ -1628,7 +1632,7 @@ rx_synack(struct tle_tcp_stream *s, uint32_t ts, uint32_t state,
 	rsp->flags |= TCP_FLAG_ACK;
 
 	timer_stop(s);
-	s->tcb.state = TCP_ST_ESTABLISHED;
+	s->tcb.state = TLE_TCP_ST_ESTABLISHED;
 	rte_smp_wmb();
 
 	if (s->tx.ev != NULL)
@@ -1704,7 +1708,8 @@ rx_stream(struct tle_tcp_stream *s, uint32_t ts,
 		i += (ret > 0);
 
 	/* normal data/ack packets */
-	} else if (state >= TCP_ST_ESTABLISHED && state <= TCP_ST_LAST_ACK) {
+	} else if (state >= TLE_TCP_ST_ESTABLISHED &&
+			state <= TLE_TCP_ST_LAST_ACK) {
 
 		/* process incoming data packets. */
 		dack_info_init(&tack, &s->tcb);
@@ -1807,7 +1812,7 @@ rx_postsyn(struct tle_dev *dev, struct stbl *st, uint32_t type, uint32_t ts,
 	k = 0;
 	state = s->tcb.state;
 
-	if (state == TCP_ST_LISTEN) {
+	if (state == TLE_TCP_ST_LISTEN) {
 
 		/* one connection per flow */
 		cs = NULL;
@@ -2222,8 +2227,8 @@ tle_tcp_stream_connect(struct tle_stream *ts, const struct sockaddr *addr)
 		return -EINVAL;
 
 	if (tcp_stream_try_acquire(s) > 0) {
-		rc = rte_atomic16_cmpset(&s->tcb.state, TCP_ST_CLOSED,
-			TCP_ST_SYN_SENT);
+		rc = rte_atomic16_cmpset(&s->tcb.state, TLE_TCP_ST_CLOSED,
+			TLE_TCP_ST_SYN_SENT);
 		rc = (rc == 0) ? -EDEADLK : 0;
 	} else
 		rc = -EINVAL;
@@ -2234,7 +2239,7 @@ tle_tcp_stream_connect(struct tle_stream *ts, const struct sockaddr *addr)
 	}
 
 	/* fill stream, prepare and transmit syn pkt */
-	s->tcb.uop |= TCP_OP_CONNECT;
+	s->tcb.uop |= TLE_TCP_OP_CONNECT;
 	rc = tx_syn(s, addr);
 	tcp_stream_release(s);
 
@@ -2295,7 +2300,7 @@ tle_tcp_stream_establish(struct tle_ctx *ctx,
 	}
 
 	do {
-		s->tcb.uop |= TCP_OP_ESTABLISH;
+		s->tcb.uop |= TLE_TCP_OP_ESTABLISH;
 
 		/* check and use stream addresses and parameters */
 		rc = tcp_stream_fill_prm(s, prm);
@@ -2317,7 +2322,7 @@ tle_tcp_stream_establish(struct tle_ctx *ctx,
 
 		/* fill TCB from user provided data */
 		tcb_establish(s, ci);
-		s->tcb.state = TCP_ST_ESTABLISHED;
+		s->tcb.state = TLE_TCP_ST_ESTABLISHED;
 		tcp_stream_up(s);
 
 	} while (0);
@@ -2463,7 +2468,7 @@ tle_tcp_stream_send(struct tle_stream *ts, struct rte_mbuf *pkt[], uint16_t num)
 	}
 
 	state = s->tcb.state;
-	if (state != TCP_ST_ESTABLISHED && state != TCP_ST_CLOSE_WAIT) {
+	if (state != TLE_TCP_ST_ESTABLISHED && state != TLE_TCP_ST_CLOSE_WAIT) {
 		rte_errno = ENOTCONN;
 		tcp_stream_release(s);
 		return 0;
@@ -2567,7 +2572,7 @@ tle_tcp_stream_writev(struct tle_stream *ts, struct rte_mempool *mp,
 	}
 
 	state = s->tcb.state;
-	if (state != TCP_ST_ESTABLISHED && state != TCP_ST_CLOSE_WAIT) {
+	if (state != TLE_TCP_ST_ESTABLISHED && state != TLE_TCP_ST_CLOSE_WAIT) {
 		rte_errno = ENOTCONN;
 		tcp_stream_release(s);
 		return -1;
@@ -2663,8 +2668,8 @@ tx_data_fin(struct tle_tcp_stream *s, uint32_t tms, uint32_t state)
 	tx_nxt_data(s, tms);
 
 	/* we also have to send a FIN */
-	if (state != TCP_ST_ESTABLISHED &&
-			state != TCP_ST_CLOSE_WAIT &&
+	if (state != TLE_TCP_ST_ESTABLISHED &&
+			state != TLE_TCP_ST_CLOSE_WAIT &&
 			tcp_txq_nxt_cnt(s) == 0 &&
 			s->tcb.snd.fss != s->tcb.snd.nxt) {
 		s->tcb.snd.fss = ++s->tcb.snd.nxt;
@@ -2679,12 +2684,13 @@ tx_stream(struct tle_tcp_stream *s, uint32_t tms)
 
 	state = s->tcb.state;
 
-	if (state == TCP_ST_SYN_SENT) {
+	if (state == TLE_TCP_ST_SYN_SENT) {
 		/* send the SYN, start the rto timer */
 		send_ack(s, tms, TCP_FLAG_SYN);
 		timer_start(s);
 
-	} else if (state >= TCP_ST_ESTABLISHED && state <= TCP_ST_LAST_ACK) {
+	} else if (state >= TLE_TCP_ST_ESTABLISHED &&
+			state <= TLE_TCP_ST_LAST_ACK) {
 
 		tx_data_fin(s, tms, state);
 
@@ -2718,7 +2724,8 @@ rto_stream(struct tle_tcp_stream *s, uint32_t tms)
 
 	if (s->tcb.snd.nb_retx < s->tcb.snd.nb_retm) {
 
-		if (state >= TCP_ST_ESTABLISHED && state <= TCP_ST_LAST_ACK) {
+		if (state >= TLE_TCP_ST_ESTABLISHED &&
+				state <= TLE_TCP_ST_LAST_ACK) {
 
 			/* update SND.CWD and SND.SSTHRESH */
 			rto_cwnd_update(&s->tcb);
@@ -2733,7 +2740,7 @@ rto_stream(struct tle_tcp_stream *s, uint32_t tms)
 
 			tx_data_fin(s, tms, state);
 
-		} else if (state == TCP_ST_SYN_SENT) {
+		} else if (state == TLE_TCP_ST_SYN_SENT) {
 			/* resending SYN */
 			s->tcb.so.ts.val = tms;
 
@@ -2750,7 +2757,8 @@ rto_stream(struct tle_tcp_stream *s, uint32_t tms)
 
 			send_ack(s, tms, TCP_FLAG_SYN);
 
-		} else if (state == TCP_ST_TIME_WAIT) {
+		} else if (state == TLE_TCP_ST_TIME_WAIT) {
+			s->err.rev |= TLE_TCP_REV_RTO;
 			stream_term(s);
 		}
 
@@ -2760,6 +2768,7 @@ rto_stream(struct tle_tcp_stream *s, uint32_t tms)
 		timer_restart(s);
 
 	} else {
+		s->err.rev |= TLE_TCP_REV_RTO;
 		send_rst(s, s->tcb.snd.nxt);
 		stream_term(s);
 	}

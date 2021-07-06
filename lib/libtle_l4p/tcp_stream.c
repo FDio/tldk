@@ -514,11 +514,11 @@ stream_close(struct tle_ctx *ctx, struct tle_tcp_stream *s)
 
 	/* check was close() already invoked */
 	uop = s->tcb.uop;
-	if ((uop & TCP_OP_CLOSE) != 0)
+	if ((uop & TLE_TCP_OP_CLOSE) != 0)
 		return -EDEADLK;
 
 	/* record that close() was already invoked */
-	if (rte_atomic16_cmpset(&s->tcb.uop, uop, uop | TCP_OP_CLOSE) == 0)
+	if (rte_atomic16_cmpset(&s->tcb.uop, uop, uop | TLE_TCP_OP_CLOSE) == 0)
 		return -EDEADLK;
 
 	/* mark stream as unavaialbe for RX/TX. */
@@ -536,17 +536,17 @@ stream_close(struct tle_ctx *ctx, struct tle_tcp_stream *s)
 	state = s->tcb.state;
 
 	/* CLOSED, LISTEN, SYN_SENT - we can close the stream straighway */
-	if (state <= TCP_ST_SYN_SENT) {
+	if (state <= TLE_TCP_ST_SYN_SENT) {
 		tcp_stream_reset(ctx, s);
 		return 0;
 	}
 
 	/* generate FIN and proceed with normal connection termination */
-	if (state == TCP_ST_ESTABLISHED || state == TCP_ST_CLOSE_WAIT) {
+	if (state == TLE_TCP_ST_ESTABLISHED || state == TLE_TCP_ST_CLOSE_WAIT) {
 
 		/* change state */
-		s->tcb.state = (state == TCP_ST_ESTABLISHED) ?
-			TCP_ST_FIN_WAIT_1 : TCP_ST_LAST_ACK;
+		s->tcb.state = (state == TLE_TCP_ST_ESTABLISHED) ?
+			TLE_TCP_ST_FIN_WAIT_1 : TLE_TCP_ST_LAST_ACK;
 
 		/* mark stream as writable/readable again */
 		tcp_stream_up(s);
@@ -666,15 +666,15 @@ tle_tcp_stream_listen(struct tle_stream *ts)
 	/* app may listen for multiple times to change backlog,
 	 * we will just return success for such cases.
 	 */
-	if (s->tcb.state == TCP_ST_LISTEN)
+	if (s->tcb.state == TLE_TCP_ST_LISTEN)
 		return 0;
 
 	/* mark stream as not closable. */
 	if (tcp_stream_try_acquire(s) > 0) {
-		rc = rte_atomic16_cmpset(&s->tcb.state, TCP_ST_CLOSED,
-				TCP_ST_LISTEN);
+		rc = rte_atomic16_cmpset(&s->tcb.state, TLE_TCP_ST_CLOSED,
+				TLE_TCP_ST_LISTEN);
 		if (rc != 0) {
-			s->tcb.uop |= TCP_OP_LISTEN;
+			s->tcb.uop |= TLE_TCP_OP_LISTEN;
 			s->tcb.rcv.wnd = calc_rx_wnd(s, TCP_WSCALE_DEFAULT);
 			rc = 0;
 		} else
@@ -696,7 +696,8 @@ stream_update_cfg(struct tle_stream *ts,struct tle_tcp_stream_cfg *prm)
 
 	s = TCP_STREAM(ts);
 
-	if (tcp_stream_try_acquire(s) < 0 || (s->tcb.uop & TCP_OP_CLOSE) != 0) {
+	if (tcp_stream_try_acquire(s) < 0 ||
+			(s->tcb.uop & TLE_TCP_OP_CLOSE) != 0) {
 		tcp_stream_release(s);
 		return -EINVAL;
 	}
@@ -734,8 +735,8 @@ stream_update_cfg(struct tle_stream *ts,struct tle_tcp_stream_cfg *prm)
 		else if (s->tx.cb.func != NULL)
 			s->tx.cb.func(s->tx.cb.data, &s->s);
 	}
-	if (s->tcb.state == TCP_ST_CLOSE_WAIT ||
-			s->tcb.state ==  TCP_ST_CLOSED) {
+	if (s->tcb.state == TLE_TCP_ST_CLOSE_WAIT ||
+			s->tcb.state ==  TLE_TCP_ST_CLOSED) {
 		if (s->err.ev != NULL)
 			tle_event_raise(s->err.ev);
 		else if (s->err.cb.func != NULL)
@@ -769,9 +770,26 @@ tle_tcp_stream_get_mss(const struct tle_stream * ts)
 {
 	struct tle_tcp_stream *s;
 
-	if (ts == NULL)
+	s = TCP_STREAM(ts);
+	if (ts == NULL || s->s.type >= TLE_VNUM)
 		return -EINVAL;
 
-	s = TCP_STREAM(ts);
 	return s->tcb.snd.mss;
+}
+
+int
+tle_tcp_stream_get_state(const struct tle_stream * ts,
+	struct tle_tcp_stream_state *st)
+{
+	struct tle_tcp_stream *s;
+
+	s = TCP_STREAM(ts);
+	if (ts == NULL || s->s.type >= TLE_VNUM)
+		return -EINVAL;
+
+	st->state = s->tcb.state;
+	st->uop = s->tcb.uop;
+	st->rev = s->err.rev;
+
+	return 0;
 }

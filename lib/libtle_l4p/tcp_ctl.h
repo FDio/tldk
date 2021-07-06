@@ -152,16 +152,19 @@ tcp_stream_reset(struct tle_ctx *ctx, struct tle_tcp_stream *s)
 	rte_atomic32_set(&s->tx.arm, 0);
 
 	/* reset TCB */
-	uop = s->tcb.uop & ~TCP_OP_CLOSE;
+	uop = s->tcb.uop & ~TLE_TCP_OP_CLOSE;
 	memset(&s->tcb, 0, sizeof(s->tcb));
+
+	/* reset remote events */
+	s->err.rev = 0;
 
 	/* reset cached destination */
 	memset(&s->tx.dst, 0, sizeof(s->tx.dst));
 
-	if (uop != TCP_OP_ACCEPT) {
+	if (uop != TLE_TCP_OP_ACCEPT) {
 		/* free stream's destination port */
 		stream_clear_ctx(ctx, &s->s);
-		if (uop == TCP_OP_LISTEN)
+		if (uop == TLE_TCP_OP_LISTEN)
 			empty_lq(s);
 	}
 

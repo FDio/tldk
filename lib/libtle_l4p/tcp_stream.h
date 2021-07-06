@@ -30,29 +30,6 @@
 extern "C" {
 #endif
 
-enum {
-	TCP_ST_CLOSED,
-	TCP_ST_LISTEN,
-	TCP_ST_SYN_SENT,
-	TCP_ST_SYN_RCVD,
-	TCP_ST_ESTABLISHED,
-	TCP_ST_FIN_WAIT_1,
-	TCP_ST_FIN_WAIT_2,
-	TCP_ST_CLOSE_WAIT,
-	TCP_ST_CLOSING,
-	TCP_ST_LAST_ACK,
-	TCP_ST_TIME_WAIT,
-	TCP_ST_NUM
-};
-
-enum {
-	TCP_OP_LISTEN =    0x1,
-	TCP_OP_ACCEPT =    0x2,
-	TCP_OP_CONNECT =   0x4,
-	TCP_OP_ESTABLISH = 0x8,
-	TCP_OP_CLOSE =     0x10,
-};
-
 struct tcb {
 	volatile uint16_t state;
 	volatile uint16_t uop; /* operations by user performed */
@@ -111,6 +88,8 @@ struct tle_tcp_stream {
 	struct {
 		struct tle_event *ev;
 		struct tle_stream_cb cb;
+		/*bitmask of remote events */
+		uint16_t rev;
 	} err;
 
 	struct {

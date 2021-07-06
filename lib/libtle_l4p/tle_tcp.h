@@ -23,6 +23,44 @@ extern "C" {
 #endif
 
 /**
+ * TCP stream states
+ */
+enum {
+	TLE_TCP_ST_CLOSED,
+	TLE_TCP_ST_LISTEN,
+	TLE_TCP_ST_SYN_SENT,
+	TLE_TCP_ST_SYN_RCVD,
+	TLE_TCP_ST_ESTABLISHED,
+	TLE_TCP_ST_FIN_WAIT_1,
+	TLE_TCP_ST_FIN_WAIT_2,
+	TLE_TCP_ST_CLOSE_WAIT,
+	TLE_TCP_ST_CLOSING,
+	TLE_TCP_ST_LAST_ACK,
+	TLE_TCP_ST_TIME_WAIT,
+	TLE_TCP_ST_NUM
+};
+
+/**
+ * User control operations for TCP stream
+ */
+enum {
+	TLE_TCP_OP_LISTEN =    0x1,
+	TLE_TCP_OP_ACCEPT =    0x2,
+	TLE_TCP_OP_CONNECT =   0x4,
+	TLE_TCP_OP_ESTABLISH = 0x8,
+	TLE_TCP_OP_CLOSE =     0x10,
+};
+
+/**
+ * termination/error events from remote peer
+ */
+enum {
+	TLE_TCP_REV_FIN = 0x1,  /** FIN received from peer*/
+	TLE_TCP_REV_RST = 0x2,  /** RST received from peer */
+	TLE_TCP_REV_RTO = 0x4,  /** receive timed-out */
+};
+
+/**
  * TCP stream creation parameters.
  */
 struct tle_tcp_stream_addr {
@@ -78,6 +116,18 @@ struct tle_tcp_conn_info {
 	uint32_t seq;
 	uint32_t ack;
 	struct tle_tcp_syn_opts so;
+};
+
+/**
+ * TCP stream state information.
+ */
+struct tle_tcp_stream_state {
+	/** current TCP state (one of TLE_TCP_ST_*) */
+	uint16_t state;
+	/** bitmask of control ops performed by user (TLE_TCP_OP_*) */
+	uint16_t uop;
+	/** bitmask of remote termination events (TLE_TCP_REV_*) */
+	uint16_t rev;
 };
 
 /**
@@ -157,6 +207,17 @@ tle_tcp_stream_get_addr(const struct tle_stream *s,
  *   Negative on failure.
  */
 int tle_tcp_stream_get_mss(const struct tle_stream *ts);
+
+/**
+ * Get current TCP stream state
+ * @param ts
+ *   Stream to retrieve state information from.
+ * @return
+ *   zero on successful completion.
+ *   - EINVAL - invalid parameter passed to function
+ */
+int tle_tcp_stream_get_state(const struct tle_stream *ts,
+	struct tle_tcp_stream_state *st);
 
 struct tle_stream *
 tle_tcp_stream_establish(struct tle_ctx *ctx,
