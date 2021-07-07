@@ -67,6 +67,7 @@ struct tcb {
 		uint8_t  wscale;
 		uint8_t nb_retx; /* number of retransmission */
 		uint8_t nb_retm; /**< max number of retx attempts. */
+		uint8_t close_flags; /* tcp flags to send on close */
 	} snd;
 	struct tle_tcp_syn_opts so; /* initial syn options. */
 };

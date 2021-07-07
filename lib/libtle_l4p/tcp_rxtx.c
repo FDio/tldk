@@ -2697,6 +2697,10 @@ tx_stream(struct tle_tcp_stream *s, uint32_t tms)
 		/* start RTO timer. */
 		if (s->tcb.snd.nxt != s->tcb.snd.una)
 			timer_start(s);
+	} else if (state == TLE_TCP_ST_CLOSED) {
+		if ((s->tcb.snd.close_flags & TCP_FLAG_RST) != 0)
+			send_rst(s, s->tcb.snd.nxt);
+		stream_term(s);
 	}
 }
 

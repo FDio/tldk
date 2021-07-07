@@ -103,6 +103,10 @@ calc_rx_wnd(const struct tle_tcp_stream *s, uint32_t scale)
 		return  _rte_ring_get_mask(s->rx.q) << scale;
 }
 
+/*
+ * Helper functions for stream_close()
+ */
+
 /* empty stream's send queue */
 static inline void
 empty_tq(struct tle_tcp_stream *s)
@@ -152,7 +156,7 @@ tcp_stream_reset(struct tle_ctx *ctx, struct tle_tcp_stream *s)
 	rte_atomic32_set(&s->tx.arm, 0);
 
 	/* reset TCB */
-	uop = s->tcb.uop & ~TLE_TCP_OP_CLOSE;
+	uop = s->tcb.uop & ~TLE_TCP_OP_CLOSE_ABORT;
 	memset(&s->tcb, 0, sizeof(s->tcb));
 
 	/* reset remote events */
@@ -190,6 +194,55 @@ tcp_stream_reset(struct tle_ctx *ctx, struct tle_tcp_stream *s)
 		s->s.type = TLE_VNUM;
 		tle_memtank_free(ts->mts, (void **)&s, 1, 0);
 	}
+}
+
+/*
+ * - set new uop (CLOSE, ABORT) atomically
+ * - mark stream down
+ * - reset events/callbacks
+ * - if no further actions are necessary, then reset the stream straightway
+ * @return
+ *   - negative error code
+ *   - zero if stream was terminated and no further action is required
+ *   - current stream state (TLE_TCP_ST *) otherwise
+ */
+static inline int
+stream_close_prolog(struct tle_ctx *ctx, struct tle_tcp_stream *s, uint16_t nop)
+{
+	uint16_t uop;
+	uint32_t state;
+	static const struct tle_stream_cb zcb;
+
+	/* check was *nop* already invoked */
+	uop = s->tcb.uop;
+	if ((uop & nop) == nop)
+		return -EDEADLK;
+
+	/* record that *nop* was already invoked */
+	if (rte_atomic16_cmpset(&s->tcb.uop, uop, uop | nop) == 0)
+		return -EDEADLK;
+
+	/* mark stream as unavaialbe for RX/TX. */
+	tcp_stream_down(s);
+
+	/* reset events/callbacks */
+	s->rx.ev = NULL;
+	s->tx.ev = NULL;
+	s->err.ev = NULL;
+
+	s->rx.cb = zcb;
+	s->tx.cb = zcb;
+	s->err.cb = zcb;
+
+	state = s->tcb.state;
+
+	/* CLOSED, LISTEN, SYN_SENT - we can close the stream straighway */
+	if (state <= TLE_TCP_ST_SYN_SENT) {
+		tcp_stream_reset(ctx, s);
+		return 0;
+	}
+
+	return state;
 }
 
 static inline struct tle_tcp_stream *

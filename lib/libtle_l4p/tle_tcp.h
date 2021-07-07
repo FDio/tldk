@@ -49,7 +49,10 @@ enum {
 	TLE_TCP_OP_CONNECT =   0x4,
 	TLE_TCP_OP_ESTABLISH = 0x8,
 	TLE_TCP_OP_CLOSE =     0x10,
+	TLE_TCP_OP_ABORT =     0x20,
 };
+
+#define TLE_TCP_OP_CLOSE_ABORT	(TLE_TCP_OP_CLOSE | TLE_TCP_OP_ABORT)
 
 /**
  * termination/error events from remote peer
@@ -154,7 +157,7 @@ tle_tcp_stream_open(struct tle_ctx *ctx,
  * - if stream contains unsent data, then actual close will be postponed
  * till either remaining data will be TX-ed, or timeout will expire.
  * All packets that belong to that stream and remain in the device
- * TX queue will be kept for father transmission.
+ * TX queue will be kept for further transmission.
  * @param s
  *   Pointer to the stream to close.
  * @return
@@ -163,6 +166,25 @@ tle_tcp_stream_open(struct tle_ctx *ctx,
  *   - -EDEADLK - close was already invoked on that stream
  */
 int tle_tcp_stream_close(struct tle_stream *s);
+
+/**
+ * abnormal stream termination.
+ * if the stream is in connected state, then:
+ * - abnormal connection termination would be performed.
+ * - if stream contains unread data, then it will be wiped out.
+ * - if stream contains unsent data, then it will be wiped out,
+ *   without further attempt to TX it.
+ * All packets that belong to that stream and remain in the device
+ * TX queue will be kept for further transmission.
+ * @param s
+ *   Pointer to the stream to close.
+ * @return
+ *   zero on successful completion.
+ *   - -EINVAL - invalid parameter passed to function
+ *   - -EDEADLK - close was already invoked on that stream
+ */
+int tle_tcp_stream_abort(struct tle_stream *s);
+
 
 /**
  * close a group of open streams.

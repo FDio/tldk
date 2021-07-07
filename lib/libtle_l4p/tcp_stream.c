@@ -503,49 +503,22 @@ tle_tcp_stream_open(struct tle_ctx *ctx,
 }
 
 /*
- * Helper functions, used by close API.
+ * Helper function, used by close API.
  */
 static inline int
 stream_close(struct tle_ctx *ctx, struct tle_tcp_stream *s)
 {
-	uint16_t uop;
-	uint32_t state;
-	static const struct tle_stream_cb zcb;
+	int32_t rc;
 
-	/* check was close() already invoked */
-	uop = s->tcb.uop;
-	if ((uop & TLE_TCP_OP_CLOSE) != 0)
-		return -EDEADLK;
-
-	/* record that close() was already invoked */
-	if (rte_atomic16_cmpset(&s->tcb.uop, uop, uop | TLE_TCP_OP_CLOSE) == 0)
-		return -EDEADLK;
-
-	/* mark stream as unavaialbe for RX/TX. */
-	tcp_stream_down(s);
-
-	/* reset events/callbacks */
-	s->rx.ev = NULL;
-	s->tx.ev = NULL;
-	s->err.ev = NULL;
-
-	s->rx.cb = zcb;
-	s->tx.cb = zcb;
-	s->err.cb = zcb;
-
-	state = s->tcb.state;
-
-	/* CLOSED, LISTEN, SYN_SENT - we can close the stream straighway */
-	if (state <= TLE_TCP_ST_SYN_SENT) {
-		tcp_stream_reset(ctx, s);
-		return 0;
-	}
+	rc = stream_close_prolog(ctx, s, TLE_TCP_OP_CLOSE);
+	if (rc <= 0)
+		return rc;
 
 	/* generate FIN and proceed with normal connection termination */
-	if (state == TLE_TCP_ST_ESTABLISHED || state == TLE_TCP_ST_CLOSE_WAIT) {
+	if (rc == TLE_TCP_ST_ESTABLISHED || rc == TLE_TCP_ST_CLOSE_WAIT) {
 
 		/* change state */
-		s->tcb.state = (state == TLE_TCP_ST_ESTABLISHED) ?
+		s->tcb.state = (rc == TLE_TCP_ST_ESTABLISHED) ?
 			TLE_TCP_ST_FIN_WAIT_1 : TLE_TCP_ST_LAST_ACK;
 
 		/* mark stream as writable/readable again */
@@ -605,6 +578,52 @@ tle_tcp_stream_close(struct tle_stream *ts)
 
 	ctx = s->s.ctx;
 	rc = stream_close(ctx, s);
+	tle_memtank_shrink(CTX_TCP_MTS(ctx));
+	return rc;
+}
+
+int
+tle_tcp_stream_abort(struct tle_stream *ts)
+{
+	int32_t rc;
+	struct tle_ctx *ctx;
+	struct tle_tcp_stream *s;
+
+	s = TCP_STREAM(ts);
+	if (ts == NULL || s->s.type >= TLE_VNUM)
+		return -EINVAL;
+
+	ctx = s->s.ctx;
+	rc = stream_close_prolog(ctx, s, TLE_TCP_OP_CLOSE_ABORT);
+	if (rc > 0) {
+
+		/*
+		 * RFC 793, On ABORT call, for states:
+		 *   SYN-RECEIVED STATE
+		 *   ESTABLISHED STATE
+		 *   FIN-WAIT-1 STATE
+		 *   FIN-WAIT-2 STATE
+		 *   CLOSE-WAIT STATE
+		 * Send a reset segment: <SEQ=SND.NXT><CTL=RST>
+		 * ...; all segments queued for transmission (except for the
+		 * RST formed above) or retransmission should be flushed,
+		 * delete the TCB, enter CLOSED state, and return.
+		*/
+
+		if (rc >= TLE_TCP_ST_ESTABLISHED && rc <= TLE_TCP_ST_CLOSE_WAIT)
+			s->tcb.snd.close_flags |= TCP_FLAG_RST;
+
+		/*
+		 * set state to CLOSED, mark stream as writable/readable again
+		 * and enqueue stream into to-send queue.
+		 * That will cause later RST generation and stream termination.
+		 */
+		s->tcb.state = TLE_TCP_ST_CLOSED;
+		tcp_stream_up(s);
+		txs_enqueue(ctx, s);
+		rc = 0;
+	}
+
 	tle_memtank_shrink(CTX_TCP_MTS(ctx));
 	return rc;
 }
