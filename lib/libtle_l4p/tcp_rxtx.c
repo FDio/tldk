@@ -2262,9 +2262,9 @@ tcb_establish(struct tle_tcp_stream *s, const struct tle_tcp_conn_info *ci)
 	tms = tcp_get_tms(s->s.ctx->cycles_ms_shift);
 
 	s->tcb.so = ci->so;
-	fill_tcb_snd(&s->tcb, ci->seq, ci->ack, ci->so.mss,
+	fill_tcb_snd(&s->tcb, ci->ack, ci->sec, ci->so.mss,
 		ci->wnd, ci->so.wscale, &ci->so.ts);
-	fill_tcb_rcv(&s->tcb, ci->seq, ci->so.wscale, &ci->so.ts);
+	fill_tcb_rcv(&s->tcb, ci->ack, ci->so.wscale, &ci->so.ts);
 
 	s->tcb.rcv.wnd = calc_rx_wnd(s, s->tcb.rcv.wscale);
 
