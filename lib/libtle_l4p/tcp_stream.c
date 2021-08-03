@@ -503,6 +503,26 @@ tle_tcp_stream_open(struct tle_ctx *ctx,
 }
 
 /*
+ * Helper function, used by close()/shutdown API
+ * Check stream state, if FIN was not generatedi yet, then
+ * change stream state and queue it for TX.
+ */
+static inline int
+stream_finalize(struct tle_ctx *ctx, struct tle_tcp_stream *s, uint32_t state)
+{
+	if (state != TLE_TCP_ST_ESTABLISHED && state != TLE_TCP_ST_CLOSE_WAIT)
+		return -EINVAL;
+
+	/* change state */
+	s->tcb.state = (state == TLE_TCP_ST_ESTABLISHED) ?
+		TLE_TCP_ST_FIN_WAIT_1 : TLE_TCP_ST_LAST_ACK;
+
+	/* queue stream into to-send queue */
+	txs_enqueue(ctx, s);
+	return 0;
+}
+
+/*
  * Helper function, used by close API.
  */
 static inline int
@@ -515,26 +535,12 @@ stream_close(struct tle_ctx *ctx, struct tle_tcp_stream *s)
 		return rc;
 
 	/* generate FIN and proceed with normal connection termination */
-	if (rc == TLE_TCP_ST_ESTABLISHED || rc == TLE_TCP_ST_CLOSE_WAIT) {
+	stream_finalize(ctx, s, rc);
 
-		/* change state */
-		s->tcb.state = (rc == TLE_TCP_ST_ESTABLISHED) ?
-			TLE_TCP_ST_FIN_WAIT_1 : TLE_TCP_ST_LAST_ACK;
+	/* mark stream as writable/readable again */
+	tcp_stream_up(s);
 
-		/* mark stream as writable/readable again */
-		tcp_stream_up(s);
-
-		/* queue stream into to-send queue */
-		txs_enqueue(ctx, s);
-		return 0;
-	}
-
-	/*
-	 * accroding to the state, close() was already invoked,
-	 * should never that point.
-	 */
-	RTE_ASSERT(0);
-	return -EINVAL;
+	return 0;
 }
 
 uint32_t
@@ -625,6 +631,43 @@ tle_tcp_stream_abort(struct tle_stream *ts)
 	}
 
 	tle_memtank_shrink(CTX_TCP_MTS(ctx));
+	return rc;
+}
+
+int
+tle_tcp_stream_shutdown(struct tle_stream *ts)
+{
+	int32_t rc;
+	uint16_t uop;
+	struct tle_ctx *ctx;
+	struct tle_tcp_stream *s;
+
+	const uint16_t nop = TLE_TCP_OP_SHUTDOWN;
+
+	s = TCP_STREAM(ts);
+	if (ts == NULL || s->s.type >= TLE_VNUM)
+		return -EINVAL;
+
+	ctx = s->s.ctx;
+
+	/* check was shutdown() or close() already invoked */
+	uop = s->tcb.uop;
+	if ((uop & (TLE_TCP_OP_CLOSE | nop)) != 0)
+		return -EDEADLK;
+
+	/* record that shutdown was invoked */
+	if (rte_atomic16_cmpset(&s->tcb.uop, uop, uop | nop) == 0)
+		return -EDEADLK;
+
+	/* mark stream as unavaialbe for RX/TX. */
+	tcp_stream_down(s);
+
+	/* change state, generate FIN */
+	rc = stream_finalize(ctx, s, s->tcb.state);
+
+	/* mark stream as writable/readable again */
+	tcp_stream_up(s);
+
 	return rc;
 }
 

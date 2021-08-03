@@ -48,8 +48,9 @@ enum {
 	TLE_TCP_OP_ACCEPT =    0x2,
 	TLE_TCP_OP_CONNECT =   0x4,
 	TLE_TCP_OP_ESTABLISH = 0x8,
-	TLE_TCP_OP_CLOSE =     0x10,
-	TLE_TCP_OP_ABORT =     0x20,
+	TLE_TCP_OP_SHUTDOWN  = 0x10,
+	TLE_TCP_OP_CLOSE =     0x20,
+	TLE_TCP_OP_ABORT =     0x40,
 };
 
 #define TLE_TCP_OP_CLOSE_ABORT	(TLE_TCP_OP_CLOSE | TLE_TCP_OP_ABORT)
@@ -166,6 +167,21 @@ tle_tcp_stream_open(struct tle_ctx *ctx,
  *   - -EDEADLK - close was already invoked on that stream
  */
 int tle_tcp_stream_close(struct tle_stream *s);
+
+/**
+ * half-close for open stream.
+ * if the stream is in connected or close-wait state, then:
+ * - FIN packet will be generated and stream state will be changed accordingly.
+ * Note that stream will remain open till user will call actual close()
+ * for that stream (even if actual connection was already terminated).
+ * @param s
+ *   Pointer to the stream to close.
+ * @return
+ *   zero on successful completion.
+ *   - -EINVAL - invalid parameter passed to function
+ *   - -EDEADLK - shutdown/close was already invoked on that stream
+ */
+int tle_tcp_stream_shutdown(struct tle_stream *s);
 
 /**
  * abnormal stream termination.
