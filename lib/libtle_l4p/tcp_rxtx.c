@@ -2281,7 +2281,7 @@ tcb_establish(struct tle_tcp_stream *s, const struct tle_tcp_conn_info *ci)
 struct tle_stream *
 tle_tcp_stream_establish(struct tle_ctx *ctx,
 	const struct tle_tcp_stream_param *prm,
-	const struct tle_tcp_conn_info *ci)
+	const struct tle_tcp_conn_info *ci, uint32_t flags)
 {
 	int32_t rc;
 	struct tle_tcp_stream *s;
@@ -2313,11 +2313,13 @@ tle_tcp_stream_establish(struct tle_ctx *ctx,
 			break;
 
 		/* add the stream to the stream table */
-		st = CTX_TCP_STLB(s->s.ctx);
-		s->ste = stbl_add_stream_lock(st, s);
-		if (s->ste == NULL) {
-			rc = -ENOBUFS;
-			break;
+		if ((flags & TLE_TCP_STREAM_F_PRIVATE) == 0) {
+			st = CTX_TCP_STLB(s->s.ctx);
+			s->ste = stbl_add_stream_lock(st, s);
+			if (s->ste == NULL) {
+				rc = -ENOBUFS;
+				break;
+			}
 		}
 
 		/* fill TCB from user provided data */

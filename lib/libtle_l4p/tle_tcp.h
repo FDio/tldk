@@ -64,6 +64,18 @@ enum {
 	TLE_TCP_REV_RTO = 0x4,  /** receive timed-out */
 };
 
+/*
+ * flags for stream creation/establishment
+ */
+enum {
+	/**
+	 * don't put stream into internal stream table
+	 * Note that tle_tcp_rx_bulk() wouldn't able to properly process
+	 * packets for such stream.
+	 */
+	TLE_TCP_STREAM_F_PRIVATE = 0x1,
+};
+
 /**
  * TCP stream creation parameters.
  */
@@ -257,10 +269,29 @@ int tle_tcp_stream_get_mss(const struct tle_stream *ts);
 int tle_tcp_stream_get_state(const struct tle_stream *ts,
 	struct tle_tcp_stream_state *st);
 
+/**
+ * create a new stream within given TCP context.
+ * Stream is put into ESTABLISHED state stragithway.
+ * Connection state is recreated based on provided information.
+ * @param ctx
+ *   TCP context to create new stream within.
+ * @param prm
+ *   Parameters used to create and initialise the new stream.
+ * @param ci
+ *   Connection state values to recreate.
+ * @param flags
+ *   Combination of TLE_TCP_STREAM_F_* values.
+ * @return
+ *   Pointer to TCP stream structure that can be used in future TCP API calls,
+ *   or NULL on error, with error code set in rte_errno.
+ *   Possible rte_errno errors include:
+ *   - EINVAL - invalid parameter passed to function
+ *   - ENOFILE - max limit of open streams reached for that context
+ */
 struct tle_stream *
 tle_tcp_stream_establish(struct tle_ctx *ctx,
 	const struct tle_tcp_stream_param *prm,
-	const struct tle_tcp_conn_info *ci);
+	const struct tle_tcp_conn_info *ci, uint32_t flags);
 
 /**
  * Client mode connect API.
