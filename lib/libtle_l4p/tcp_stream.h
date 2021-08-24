@@ -113,6 +113,8 @@ struct tle_tcp_stream {
 		struct tle_dest dst;
 	} tx __rte_cache_aligned;
 
+	int32_t ts_offset; /* TS.VAL offset from TSC calculated */
+
 } __rte_cache_aligned;
 
 #define TCP_STREAM(p)	\

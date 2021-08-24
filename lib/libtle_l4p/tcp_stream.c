@@ -188,7 +188,7 @@ alloc_timers(const struct tle_ctx *ctx)
 	twprm.max_timer = ctx->prm.max_streams;
 	twprm.socket_id = ctx->prm.socket_id;
 
-	twl = tle_timer_create(&twprm, tcp_get_tms(ctx->cycles_ms_shift));
+	twl = tle_timer_create(&twprm, tcp_get_tms(ctx->cycles_ms_shift, 0));
 	if (twl == NULL)
 		TCP_LOG(ERR, "alloc_timers(ctx=%p) failed with error=%d\n",
 			ctx, rte_errno);
@@ -381,6 +381,8 @@ tcp_stream_fill_cfg(struct tle_tcp_stream *s, const struct tle_ctx_param *cprm,
 				cprm->icw;
 	s->tcb.snd.rto_tw = (cprm->timewait == TLE_TCP_TIMEWAIT_DEFAULT) ?
 				TCP_RTO_2MSL : cprm->timewait;
+
+	s->ts_offset = 0;
 
 	s->s.udata = scfg->udata;
 }

@@ -213,10 +213,11 @@ struct dack_info {
 
 /* get current timestamp in ms */
 static inline uint32_t
-tcp_get_tms(uint32_t mshift)
+tcp_get_tms(uint32_t mshift, int32_t offset)
 {
 	uint64_t ts;
 	ts = rte_get_tsc_cycles() >> mshift;
+	ts -= offset;
 	return ts;
 }
 

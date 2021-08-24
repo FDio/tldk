@@ -1926,7 +1926,7 @@ tle_tcp_rx_bulk(struct tle_dev *dev, struct rte_mbuf *pkt[],
 	} stu;
 
 	ctx = dev->ctx;
-	ts = tcp_get_tms(ctx->cycles_ms_shift);
+	ts = tcp_get_tms(ctx->cycles_ms_shift, 0);
 	st = CTX_TCP_STLB(ctx);
 	mt = ((ctx->prm.flags & TLE_CTX_FLAG_ST) == 0);
 
@@ -1990,9 +1990,6 @@ tle_tcp_stream_rx_bulk(struct tle_stream *ts, struct rte_mbuf *pkt[],
 	union pkt_info pi[num];
 	union seg_info si[num];
 
-	ctx = ts->ctx;
-	tms = tcp_get_tms(ctx->cycles_ms_shift);
-
 	s = rx_acquire_stream(ts);
 	if (s == NULL) {
 		for (i = 0; i != num; i++) {
@@ -2001,6 +1998,9 @@ tle_tcp_stream_rx_bulk(struct tle_stream *ts, struct rte_mbuf *pkt[],
 		}
 		return 0;
 	}
+
+	ctx = ts->ctx;
+	tms = tcp_get_tms(ctx->cycles_ms_shift, s->ts_offset);
 
 	/* extract packet info and check the L3/L4 csums */
 	for (i = 0; i != num; i++) {
@@ -2176,7 +2176,7 @@ tx_syn(struct tle_tcp_stream *s, const struct sockaddr *addr)
 	/* fill pkt info to generate seq.*/
 	stream_fill_pkt_info(s, &pi);
 
-	tms = tcp_get_tms(s->s.ctx->cycles_ms_shift);
+	tms = tcp_get_tms(s->s.ctx->cycles_ms_shift, s->ts_offset);
 	s->tcb.so.ts.val = tms;
 	s->tcb.so.ts.ecr = 0;
 	s->tcb.so.wscale = TCP_WSCALE_DEFAULT;
@@ -2259,7 +2259,7 @@ tcb_establish(struct tle_tcp_stream *s, const struct tle_tcp_conn_info *ci)
 {
 	uint32_t tms;
 
-	tms = tcp_get_tms(s->s.ctx->cycles_ms_shift);
+	tms = tcp_get_tms(s->s.ctx->cycles_ms_shift, s->ts_offset);
 
 	s->tcb.so = ci->so;
 	fill_tcb_snd(&s->tcb, ci->ack, ci->seq, ci->so.mss,
@@ -2272,12 +2272,15 @@ tcb_establish(struct tle_tcp_stream *s, const struct tle_tcp_conn_info *ci)
 	s->tcb.snd.cwnd = initial_cwnd(s->tcb.snd.mss, s->tcb.snd.cwnd);
 	s->tcb.snd.ssthresh = s->tcb.snd.wnd;
 
+	/* calculate and store real timestamp offset */
+	if (ci->so.ts.raw != 0) {
+		s->ts_offset = tms - ci->so.ts.ecr;
+		tms -= s->ts_offset;
+	}
+
 	estimate_stream_rto(s, tms);
 }
 
-/*
- * !!! add flgs to distinguish - add or not stream into the table.
- */
 struct tle_stream *
 tle_tcp_stream_establish(struct tle_ctx *ctx,
 	const struct tle_tcp_stream_param *prm,
@@ -2792,7 +2795,7 @@ tle_tcp_process(struct tle_ctx *ctx, uint32_t num)
 	/* process streams with RTO exipred */
 
 	tw = CTX_TCP_TMWHL(ctx);
-	tms = tcp_get_tms(ctx->cycles_ms_shift);
+	tms = tcp_get_tms(ctx->cycles_ms_shift, 0);
 	tle_timer_expire(tw, tms);
 
 	k = tle_timer_get_expired_bulk(tw, (void **)rs, RTE_DIM(rs));
@@ -2802,7 +2805,7 @@ tle_tcp_process(struct tle_ctx *ctx, uint32_t num)
 		s = rs[i];
 		s->timer.handle = NULL;
 		if (tcp_stream_try_acquire(s) > 0)
-			rto_stream(s, tms);
+			rto_stream(s, (tms - s->ts_offset));
 		tcp_stream_release(s);
 	}
 
@@ -2816,7 +2819,7 @@ tle_tcp_process(struct tle_ctx *ctx, uint32_t num)
 		rte_atomic32_set(&s->tx.arm, 0);
 
 		if (tcp_stream_try_acquire(s) > 0)
-			tx_stream(s, tms);
+			tx_stream(s, (tms - s->ts_offset));
 		else
 			txs_enqueue(s->s.ctx, s);
 		tcp_stream_release(s);
