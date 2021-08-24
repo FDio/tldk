@@ -382,6 +382,8 @@ tcp_stream_fill_cfg(struct tle_tcp_stream *s, const struct tle_ctx_param *cprm,
 	s->tcb.snd.rto_tw = (cprm->timewait == TLE_TCP_TIMEWAIT_DEFAULT) ?
 				TCP_RTO_2MSL : cprm->timewait;
 
+	s->ts_offset = 0;
+
 	s->s.udata = scfg->udata;
 }
 

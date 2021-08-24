@@ -199,6 +199,12 @@ get_ip_pid(struct tle_dev *dev, uint32_t num, uint32_t type, uint32_t st)
 	}
 }
 
+static inline uint32_t
+tcp_stream_adjust_tms(const struct tle_tcp_stream *s, uint32_t tms)
+{
+	return tms - s->ts_offset;
+}
+
 static inline void
 fill_tcph(struct rte_tcp_hdr *l4h, const struct tcb *tcb, union l4_ports port,
 	uint32_t seq, uint8_t hlen, uint8_t flags)
@@ -2002,6 +2008,8 @@ tle_tcp_stream_rx_bulk(struct tle_stream *ts, struct rte_mbuf *pkt[],
 		return 0;
 	}
 
+	tms = tcp_stream_adjust_tms(s, tms);
+
 	/* extract packet info and check the L3/L4 csums */
 	for (i = 0; i != num; i++) {
 		get_pkt_info(pkt[i], &pi[i], &si[i]);
@@ -2272,12 +2280,15 @@ tcb_establish(struct tle_tcp_stream *s, const struct tle_tcp_conn_info *ci)
 	s->tcb.snd.cwnd = initial_cwnd(s->tcb.snd.mss, s->tcb.snd.cwnd);
 	s->tcb.snd.ssthresh = s->tcb.snd.wnd;
 
+	/* calculate and store real timestamp offset */
+	if (ci->so.ts.raw != 0) {
+		s->ts_offset = tms - ci->so.ts.ecr;
+		tms -= s->ts_offset;
+	}
+
 	estimate_stream_rto(s, tms);
 }
 
-/*
- * !!! add flgs to distinguish - add or not stream into the table.
- */
 struct tle_stream *
 tle_tcp_stream_establish(struct tle_ctx *ctx,
 	const struct tle_tcp_stream_param *prm,
@@ -2802,7 +2813,7 @@ tle_tcp_process(struct tle_ctx *ctx, uint32_t num)
 		s = rs[i];
 		s->timer.handle = NULL;
 		if (tcp_stream_try_acquire(s) > 0)
-			rto_stream(s, tms);
+			rto_stream(s, tcp_stream_adjust_tms(s, tms));
 		tcp_stream_release(s);
 	}
 
@@ -2816,7 +2827,7 @@ tle_tcp_process(struct tle_ctx *ctx, uint32_t num)
 		rte_atomic32_set(&s->tx.arm, 0);
 
 		if (tcp_stream_try_acquire(s) > 0)
-			tx_stream(s, tms);
+			tx_stream(s, tcp_stream_adjust_tms(s, tms));
 		else
 			txs_enqueue(s->s.ctx, s);
 		tcp_stream_release(s);

@@ -82,6 +82,8 @@ struct tle_tcp_stream {
 	struct stbl_entry *ste;     /* entry in streams table. */
 	struct tcb tcb;
 
+	int32_t ts_offset; /* TS.VAL offset from TSC calculated */
+
 	struct {
 		void *handle;
 	} timer;
