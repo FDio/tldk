@@ -33,6 +33,24 @@
       "revId": "54bc66c9a12d174b3fed766ea1bf6d60bcc42fee",
       "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "445d1896_1ccf3671",
+        "filename": "lib/libtle_l4p/tcp_stream.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 116,
+      "author": {
+        "id": 2548
+      },
+      "writtenOn": "2021-09-17T01:04:09Z",
+      "side": 1,
+      "message": "The tms is unsigned. We are using a signed value here since the remote device could be ahead of or behind our clock. In our testing, the value used was tied to the system uptime. To keep the operation simple, we said just do the delta and store in a signed variable. It will always be subtracted from tms.",
+      "parentUuid": "7e35e001_a86d03e2",
+      "revId": "54bc66c9a12d174b3fed766ea1bf6d60bcc42fee",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
     }
   ]
 }
