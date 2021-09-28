@@ -177,8 +177,10 @@ tcp_stream_reset(struct tle_ctx *ctx, struct tle_tcp_stream *s)
 		stbl_del_stream(&ts->st, s->ste, s,
 			(s->flags & TLE_CTX_FLAG_ST) == 0);
 		s->ste = NULL;
-		empty_rq(s);
 	}
+
+	/* empty RX queue */
+	empty_rq(s);
 
 	/* empty TX queue */
 	empty_tq(s);
