@@ -384,7 +384,7 @@ test_dring_mt(int32_t master_enq_type, int32_t master_deq_type,
 	memset(arg, 0, sizeof(arg));
 
 	/* launch on all slaves */
-	RTE_LCORE_FOREACH_SLAVE(lc) {
+	RTE_LCORE_FOREACH_WORKER(lc) {
 		arg[lc].dr = &dr;
 		arg[lc].r = r;
 		arg[lc].iter = ITER_NUM;
@@ -405,7 +405,7 @@ test_dring_mt(int32_t master_enq_type, int32_t master_deq_type,
 	deq = arg[lc].deq;
 
 	/* wait for slaves. */
-	RTE_LCORE_FOREACH_SLAVE(lc) {
+	RTE_LCORE_FOREACH_WORKER(lc) {
 		rc |= rte_eal_wait_lcore(lc);
 		enq += arg[lc].enq;
 		deq += arg[lc].deq;

@@ -11,26 +11,47 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-EXTLIB_BUILD := y
+APP_SHARED = $(APP_NAME)-shared
+APP_STATIC = $(APP_NAME)-static
 
-# we must create the output dir first and recall the same Makefile
-# from this directory
-ifeq ($(NOT_FIRST_CALL),)
+ifneq ($(LIB_DEPS),)
+	LDLIBS += -L$(RTE_OUTPUT)/lib
+	LDLIBS_SHARED += $(patsubst %,-l%,$(LIB_DEPS))
+	LDLIBS_STATIC += $(patsubst %,-l:lib%.a,$(LIB_DEPS))
+	LDFLAGS_SHARED += $(LDLIBS) $(LDLIBS_SHARED)
+	LDFLAGS_STATIC += $(LDLIBS) $(LDLIBS_STATIC)
+endif
 
-NOT_FIRST_CALL = 1
-export NOT_FIRST_CALL
+.PHONY: all clean static shared
+all: shared static
+shared: $(RTE_OUTPUT)/app/$(APP_SHARED)
+static: $(RTE_OUTPUT)/app/$(APP_STATIC)
 
-BDIR := $(RTE_OUTPUT)/build/$(CUR_SUBDIR)
+OBJS += $(patsubst %.c,$(BDIR)/%.o,$(SRCS-y))
 
-all:
-	$(Q)mkdir -p $(BDIR)
-	$(Q)$(MAKE) -C $(BDIR) -f $(RTE_EXTMK) \
-		S=$(RTE_SRCDIR) O=$(RTE_OUTPUT) SRCDIR=$(RTE_SRCDIR)
+$(BDIR)/%.o: %.c Makefile $(PC_FILE)
+	@mkdir -p $(BDIR)
+	$(Q)$(CC) $(CFLAGS) $(CFLAGS_$(<)) -c $< -o $@
 
-%::
-	$(Q)mkdir -p $(BDIR)
-	$(Q)$(MAKE) -C $(BDIR) -f $(RTE_EXTMK) $@ \
-		S=$(RTE_SRCDIR) O=$(RTE_OUTPUT) SRCDIR=$(RTE_SRCDIR)
-else
-include $(RTE_SDK)/mk/rte.app.mk
+SCRIPTS := $(patsubst %,$(RTE_OUTPUT)/app/%,$(SYMLINK-y-app))
+
+$(RTE_OUTPUT)/app/%.py: %.py Makefile
+	$(Q)ln -s -f $(RTE_SRCDIR)/$< $@
+
+clean:
+	$(Q)rm -f $(RTE_OUTPUT)/app/$(APP_SHARED)
+	$(Q)rm -f $(RTE_OUTPUT)/app/$(APP_STATIC)
+	$(Q)rm -f $(RTE_OUTPUT)/app/$(APP_NAME)
+	$(Q)rm -f $(SCRIPTS)
+	$(Q)rm -rf $(BDIR)
+
+$(RTE_OUTPUT)/app/$(APP_SHARED): $(SCRIPTS) $(OBJS) Makefile $(PC_FILE)
+ifneq ($(OBJS),)
+	$(Q)$(CC) $(OBJS) -o $@ $(LDFLAGS) $(LDFLAGS_SHARED)
+endif
+
+$(RTE_OUTPUT)/app/$(APP_STATIC): $(SCRIPTS) $(OBJS) Makefile $(PC_FILE)
+ifneq ($(OBJS),)
+	$(Q)$(CC) $(OBJS) -o $@ $(LDFLAGS) $(LDFLAGS_STATIC)
+	$(Q)ln -s -f $@ $(RTE_OUTPUT)/app/$(APP_NAME)
 endif
