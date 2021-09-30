@@ -11,10 +11,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-ifeq ($(RTE_SDK),)
-$(error "Please define RTE_SDK environment variable")
-endif
-
 ifeq ($(GTEST_DIR),)
 all:
 	@echo "GTEST_DIR is not setup properly. Skipping gtest"
@@ -24,111 +20,45 @@ all:
 
 else
 
-# Default target, can be overridden by command line or environment
-RTE_TARGET ?= x86_64-native-linuxapp-gcc
-
-include $(RTE_SDK)/mk/rte.vars.mk
-
-CUR_SUBDIR ?= .
-
-# we must create the output dir first and recall the same Makefile
-# from this directory
-ifeq ($(NOT_FIRST_CALL),)
-
-NOT_FIRST_CALL = 1
-export NOT_FIRST_CALL
-
-
-BDIR := $(RTE_OUTPUT)/build/$(CUR_SUBDIR)
-
-all:
-	$(Q)mkdir -p $(BDIR)
-	$(Q)$(MAKE) -C $(BDIR) -f $(RTE_EXTMK) \
-		S=$(RTE_SRCDIR) O=$(RTE_OUTPUT) SRCDIR=$(RTE_SRCDIR) X=obj
-	$(Q)$(MAKE) -C $(BDIR) -f $(RTE_EXTMK) \
-		S=$(RTE_SRCDIR) O=$(RTE_OUTPUT) SRCDIR=$(RTE_SRCDIR) X=app
-
-%::
-	$(Q)mkdir -p $(BDIR)
-	$(Q)$(MAKE) -C $(BDIR) -f $(RTE_EXTMK) $@ \
-		S=$(RTE_SRCDIR) O=$(RTE_OUTPUT) SRCDIR=$(RTE_SRCDIR) X=obj
-	$(Q)$(MAKE) -C $(BDIR) -f $(RTE_EXTMK) $@ \
-		S=$(RTE_SRCDIR) O=$(RTE_OUTPUT) SRCDIR=$(RTE_SRCDIR) X=app
-else
-
-#
-# building object
-#
-
-ifeq ($(X),obj)
-include $(TLDK_ROOT)/mk/tle.cpp-vars.mk
-
 # binary name
-OBJ = gtest-rfc.o
+APP_NAME = gtest-rfc
+
+include $(TLDK_ROOT)/mk/tle.var.mk
 
 # all source are stored in SRCS-y
-SRCS-y += main.cpp
-SRCS-y += test_common.cpp
-SRCS-y += test_tle_dring.cpp
-SRCS-y += test_tle_ctx.cpp
-#SRCS-y += test_tle_udp_dev.cpp
-SRCS-y += test_tle_udp_destroy.cpp
-SRCS-y += test_tle_udp_event.cpp
-#SRCS-y += test_tle_udp_stream.cpp
-SRCS-y += test_tle_udp_stream_gen.cpp
-SRCS-y += test_tle_tcp_stream.cpp
-#SRCS-y += test_tle_tcp_stream_gen.cpp
+SRCCPP-y += main.cpp
+SRCCPP-y += test_common.cpp
+SRCCPP-y += test_tle_dring.cpp
+SRCCPP-y += test_tle_ctx.cpp
+SRCCPP-y += test_tle_udp_destroy.cpp
+SRCCPP-y += test_tle_udp_event.cpp
+SRCCPP-y += test_tle_udp_stream_gen.cpp
+SRCCPP-y += test_tle_tcp_stream.cpp
 
 SYMLINK-y-app += test_scapy_gen.py
 
 CXXFLAGS += -std=c++11
 
-ifeq ($(shell test $(GCC_VERSION) -lt 50 && echo 1), 1)
-CXXFLAGS += -D __STDC_FORMAT_MACROS
-endif
-
 CXXFLAGS += -I$(GTEST_DIR)/include
 CXXFLAGS += -I$(GMOCK_DIR)/include
-CXXFLAGS += -I$(RTE_OUTPUT)/include
 
-CXXFLAGS += $(EXTRA_CFLAGS)
+CXXFLAGS += $(CFLAGS) -Wno-error
 
-LDFLAGS += -lstdc++
+LDFLAGS += -lstdc++ -lpthread
 LDFLAGS += -L$(GMOCK_DIR) -L$(GMOCK_DIR)/../lib -lgmock
-LDLIBS += -whole-archive -ltle_l4p -ltle_dring
 
-include $(TLDK_ROOT)/mk/tle.cpp-obj.mk
-endif
+LIB_DEPS += tle_l4p
+LIB_DEPS += tle_memtank
+LIB_DEPS += tle_timer
+LIB_DEPS += tle_dring
 
-#
-# building app
-#
+CPP_OBJS := $(patsubst %.cpp,$(BDIR)/%.o,$(SRCCPP-y))
+OBJS += $(CPP_OBJS)
 
-ifeq ($(X),app)
-
-# binary name
-APP = gtest-rfc
-
-# all source are stored in SRCS-y
-
-CFLAGS += -O3
-
-ifeq ($(shell test $(GCC_VERSION) -lt 50 && echo 1), 1)
-CFLAGS += -D __STDC_FORMAT_MACROS
-endif
-
-CFLAGS += $(WERROR_FLAGS)
-
-LDLIBS += gtest-rfc.o
-
-LDLIBS += -lstdc++
-LDLIBS += -L$(GMOCK_DIR) -L$(GMOCK_DIR)/../lib -lgmock
-LDLIBS += -L$(GMOCK_DIR)/gtest -L$(GMOCK_DIR)/../lib -lgtest
-LDLIBS += -L$(RTE_OUTPUT)/lib
-LDLIBS += -whole-archive -ltle_l4p -ltle_dring -ltle_memtank -ltle_timer
+$(BDIR)/%.o: %.cpp Makefile
+	@mkdir -p $(BDIR)
+	$(Q)$(CXX) $(CXXFLAGS) $(CXXFLAGS_$(<)) -c $< -o $@
 
 include $(TLDK_ROOT)/mk/tle.app.mk
-endif
 
-endif
 endif
