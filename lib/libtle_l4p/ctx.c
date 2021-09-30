@@ -22,7 +22,7 @@
 
 #include "stream.h"
 #include "misc.h"
-#include <halfsiphash.h>
+#include "halfsiphash.h"
 
 #define	LPORT_START	0x8000
 #define	LPORT_END	MAX_PORT_NUM
