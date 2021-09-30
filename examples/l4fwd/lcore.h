@@ -478,7 +478,7 @@ netfe_lcore_fill(struct lcore_prm prm[RTE_MAX_LCORE],
 			return -EINVAL;
 		}
 
-		if (rte_get_master_lcore() != lc &&
+		if (rte_get_main_lcore() != lc &&
 				rte_eal_get_lcore_state(lc) == RUNNING) {
 			RTE_LOG(ERR, USER1,
 				"%s(line=%u): lcore %u already in use\n",

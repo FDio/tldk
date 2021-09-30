@@ -19,11 +19,12 @@ clean: $(DIRS-y)
 
 .PHONY: $(DIRS-y)
 $(DIRS-y):
-	@echo "== $@"
+	@echo "=> $@"
 	$(Q)$(MAKE) -C $(@) \
+		O=$(O) \
 		M=$(CURDIR)/$(@)/Makefile \
-		CUR_SUBDIR=$(CUR_SUBDIR)/$(@) \
 		S=$(CURDIR)/$(@) \
 		RTE_TARGET=$(RTE_TARGET) \
 		$(filter-out $(DIRS-y),$(MAKECMDGOALS))
+	@echo "<= $@"
 

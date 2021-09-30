@@ -11,24 +11,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-ifeq ($(RTE_SDK),)
-$(error "Please define RTE_SDK environment variable")
-endif
-
-# Default target, can be overwritten by command line or environment
-RTE_TARGET ?= x86_64-native-linuxapp-gcc
-
-include $(RTE_SDK)/mk/rte.vars.mk
-
 # library name
-LIB = libtle_l4p.a
+LIB_NAME = libtle_l4p
 
-CFLAGS += -O3
-CFLAGS += $(WERROR_FLAGS) -I$(SRCDIR)
-
-EXPORT_MAP := tle_l4p_version.map
-
-LIBABIVER := 1
+include $(TLDK_ROOT)/mk/tle.var.mk
 
 #source files
 SRCS-y += ctx.c
@@ -51,5 +37,9 @@ DEPDIRS-y += lib/libtle_misc
 DEPDIRS-y += lib/libtle_memtank
 DEPDIRS-y += lib/libtle_dring
 DEPDIRS-y += lib/libtle_timer
+
+LIB_DEPS += tle_memtank
+LIB_DEPS += tle_dring
+LIB_DEPS += tle_timer
 
 include $(TLDK_ROOT)/mk/tle.lib.mk

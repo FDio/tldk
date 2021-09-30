@@ -11,26 +11,45 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-EXTLIB_BUILD := y
+LIB_SHARED = $(LIB_NAME).so
+LIB_STATIC = $(LIB_NAME).a
 
-# we must create the output dir first and recall the same Makefile
-# from this directory
-ifeq ($(NOT_FIRST_CALL),)
+LDFLAGS += -Wl,--no-undefined $(LDFLAGS_SHARED)
 
-NOT_FIRST_CALL = 1
-export NOT_FIRST_CALL
+ifneq ($(LIB_DEPS),)
+	LDLIBS += -L$(RTE_OUTPUT)/lib
+	LDLIBS += $(patsubst %,-l%,$(LIB_DEPS))
+	LDFLAGS += $(LDLIBS)
+endif
 
-BDIR := $(RTE_OUTPUT)/build/$(CUR_SUBDIR)
+.PHONY: all clean static shared
+all: shared static
+shared: $(RTE_OUTPUT)/lib/$(LIB_SHARED)
+static: $(RTE_OUTPUT)/lib/$(LIB_STATIC)
 
-all:
-	$(Q)mkdir -p $(BDIR)
-	$(Q)$(MAKE) -C $(BDIR) -f $(RTE_EXTMK) \
-		S=$(RTE_SRCDIR) O=$(RTE_OUTPUT) SRCDIR=$(RTE_SRCDIR)
+OBJS := $(patsubst %.c,$(BDIR)/%.o,$(SRCS-y))
 
-%::
-	$(Q)mkdir -p $(BDIR)
-	$(Q)$(MAKE) -C $(BDIR) -f $(RTE_EXTMK) $@ \
-		S=$(RTE_SRCDIR) O=$(RTE_OUTPUT) SRCDIR=$(RTE_SRCDIR)
-else
-include $(RTE_SDK)/mk/rte.lib.mk
+$(BDIR)/%.o: %.c Makefile $(HDRS) $(PC_FILE)
+	@mkdir -p $(BDIR)
+	$(Q)$(CC) $(CFLAGS) -c $< -o $@
+
+HDRS := $(patsubst %.h,$(RTE_OUTPUT)/include/%.h,$(SYMLINK-y-include))
+
+$(RTE_OUTPUT)/include/%.h: %.h Makefile $(PC_FILE)
+	$(Q)ln -s -f $(RTE_SRCDIR)/$< $@
+
+clean:
+	$(Q)rm -f $(RTE_OUTPUT)/lib/$(LIB_SHARED)
+	$(Q)rm -f $(RTE_OUTPUT)/lib/$(LIB_STATIC)
+	$(Q)rm -f $(HDRS)
+	$(Q)rm -rf $(BDIR)
+
+$(RTE_OUTPUT)/lib/$(LIB_SHARED): $(HDRS) $(OBJS) Makefile $(PC_FILE)
+ifneq ($(OBJS),)
+	$(Q)$(CC) $(OBJS) -o $@ -shared $(LDFLAGS)
+endif
+
+$(RTE_OUTPUT)/lib/$(LIB_STATIC): $(HDRS) $(OBJS) Makefile $(PC_FILE)
+ifneq ($(OBJS),)
+	$(Q)$(AR) -cr $@ $(OBJS) -o $@
 endif

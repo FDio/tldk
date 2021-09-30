@@ -19,8 +19,6 @@ ifeq ($(TLDK_ROOT),)
 $(error "Please define TLDK_SDK environment variable")
 endif
 
-include $(RTE_SDK)/mk/rte.vars.mk
-
 DIRS-y += l4fwd
 
 include $(TLDK_ROOT)/mk/tle.subdir.mk
