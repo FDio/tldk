@@ -271,13 +271,13 @@ main(int argc, char *argv[])
 		sig_handle(SIGQUIT);
 
 	/* launch all slave lcores. */
-	RTE_LCORE_FOREACH_SLAVE(i) {
+	RTE_LCORE_FOREACH_WORKER(i) {
 		if (prm[i].be.lc != NULL || prm[i].fe.max_streams != 0)
 			rte_eal_remote_launch(lcore_main, prm + i, i);
 	}
 
 	/* launch master lcore. */
-	i = rte_get_master_lcore();
+	i = rte_get_main_lcore();
 	if (prm[i].be.lc != NULL || prm[i].fe.max_streams != 0)
 		lcore_main(prm + i);
 
