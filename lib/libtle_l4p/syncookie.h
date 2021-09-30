@@ -20,7 +20,7 @@
 
 #include "tcp_misc.h"
 #include <tle_ctx.h>
-#include <halfsiphash.h>
+#include "halfsiphash.h"
 
 #ifdef __cplusplus
 extern "C" {
