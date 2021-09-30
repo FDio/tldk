@@ -14,13 +14,15 @@
 TLDK_ROOT := $(CURDIR)
 export TLDK_ROOT
 
-LOCAL_RTE_SDK=$(TLDK_ROOT)/dpdk/_build/dpdk
+RTE_TARGET ?= x86_64-native-linuxapp-gcc
+
+LOCAL_RTE_SDK=$(TLDK_ROOT)/dpdk/$(RTE_TARGET)
 
 ifeq ($(RTE_SDK),)
 	export RTE_SDK=$(LOCAL_RTE_SDK)
 endif
 
-RTE_TARGET ?= x86_64-native-linuxapp-gcc
+RTE_PKG_CONF=$(RTE_SDK)/lib/x86_64-linux-gnu/pkgconfig
 
 DIRS-y += lib
 DIRS-y += examples
@@ -33,24 +35,34 @@ O ?= $(TLDK_ROOT)/${RTE_TARGET}
 BASE_OUTPUT ?= $(abspath $(O))
 
 .PHONY: all
-all: $(DIRS-y)
+all: $(BASE_OUTPUT) $(DIRS-y)
 
 .PHONY: clean
-clean: $(DIRS-y)
+clean: $(DIRS-y) $(RTE_PKG_CONF)
+	$(Q)rm -rf $(BASE_OUTPUT)
+ifeq ($(RTE_SDK),$(LOCAL_RTE_SDK))
+	$(Q)make $(@) -C $(TLDK_ROOT)/dpdk O=$(RTE_SDK)
+endif
+
+examples test: lib
 
 .PHONY: $(DIRS-y)
-$(DIRS-y): $(RTE_SDK)/mk/rte.vars.mk
+$(DIRS-y): $(RTE_PKG_CONF)
 	@echo "== $@"
 	$(Q)$(MAKE) -C $(@) \
 		M=$(CURDIR)/$(@)/Makefile \
 		O=$(BASE_OUTPUT) \
-		BASE_OUTPUT=$(BASE_OUTPUT) \
-		CUR_SUBDIR=$(CUR_SUBDIR)/$(@) \
 		S=$(CURDIR)/$(@) \
 		RTE_TARGET=$(RTE_TARGET) \
 		$(filter-out $(DIRS-y),$(MAKECMDGOALS))
 
-$(RTE_SDK)/mk/rte.vars.mk:
+$(BASE_OUTPUT):
+	$(Q)mkdir -p $(BASE_OUTPUT)/lib
+	$(Q)mkdir -p $(BASE_OUTPUT)/include
+	$(Q)mkdir -p $(BASE_OUTPUT)/app
+
+$(RTE_PKG_CONF):
 ifeq ($(RTE_SDK),$(LOCAL_RTE_SDK))
-	@make RTE_TARGET=$(RTE_TARGET) config all -C $(TLDK_ROOT)/dpdk/
+	@echo "== $@"
+	$(Q)make -C $(TLDK_ROOT)/dpdk O=$(RTE_SDK) 
 endif

@@ -96,11 +96,14 @@ static inline void
 _rte_ring_dequeue_ptrs(struct rte_ring *r, void **obj_table, uint32_t num)
 {
 	uint32_t tail;
-	void **data;
 
 	tail = r->cons.tail;
-	data = _rte_ring_get_data(r);
+#if RTE_VERSION >= RTE_VERSION_NUM(20, 8, 0, 0)
+	__rte_ring_dequeue_elems(r, tail, obj_table, sizeof(obj_table[0]), num);
+#else
+	void **data = _rte_ring_get_data(r);
 	DEQUEUE_PTRS(r, data, tail, obj_table, num, void *);
+#endif
 }
 
 #else
