@@ -1,0 +1,55 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "9fb3e5f8_6b16bc73",
+        "filename": "examples/l4fwd/Makefile",
+        "patchSetId": 1
+      },
+      "lineNbr": 15,
+      "author": {
+        "id": 2548
+      },
+      "writtenOn": "2021-10-07T13:23:51Z",
+      "side": 1,
+      "message": "Not sure of a better place to leave the comment.  Using the embedded DPDK install with changes described below, I cannot build the examples.  I was not able to track this one down.\n\n```\ncc /home/user/github/tldk-gerrit/x86_64-native-linuxapp-gcc/build/l4fwd/parse.o /home/user/github/tldk-gerrit/x86_64-native-linuxapp-gcc/build/l4fwd/pkt.o /home/user/github/tldk-gerrit/x86_64-native-linuxapp-gcc/build/l4fwd/main.o -o /home/user/github/tldk-gerrit/x86_64-native-linuxapp-gcc/app/l4fwd-static  -Wl,--whole-archive -Wl,--no-whole-archive -Wl,--export-dynamic -Wl,--as-needed -pthread -L/home/user/github/tldk-gerrit/dpdk/x86_64-native-linuxapp-gcc/lib64 -l:librte_common_cpt.a -l:librte_common_dpaax.a -l:librte_common_iavf.a -l:librte_common_octeontx.a -l:librte_common_octeontx2.a -l:librte_common_sfc_efx.a -l:librte_bus_dpaa.a -l:librte_bus_fslmc.a -l:librte_bus_ifpga.a -l:librte_bus_pci.a -l:librte_bus_vdev.a -l:librte_bus_vmbus.a -l:librte_common_qat.a -l:librte_mempool_bucket.a -l:librte_mempool_dpaa.a -l:librte_mempool_dpaa2.a -l:librte_mempool_octeontx.a -l:librte_mempool_octeontx2.a -l:librte_mempool_ring.a -l:librte_mempool_stack.a -l:librte_net_af_packet.a -l:librte_net_ark.a -l:librte_net_atlantic.a -l:librte_net_avp.a -l:librte_net_axgbe.a -l:librte_net_bond.a -l:librte_net_bnxt.a -l:librte_net_cxgbe.a -l:librte_net_dpaa.a -l:librte_net_dpaa2.a -l:librte_net_e1000.a -l:librte_net_ena.a -l:librte_net_enetc.a -l:librte_net_enic.a -l:librte_net_failsafe.a -l:librte_net_fm10k.a -l:librte_net_i40e.a -l:librte_net_hinic.a -l:librte_net_hns3.a -l:librte_net_iavf.a -l:librte_net_ice.a -l:librte_net_igc.a -l:librte_net_ixgbe.a -l:librte_net_kni.a -l:librte_net_liquidio.a -l:librte_net_memif.a -l:librte_net_netvsc.a -l:librte_net_nfp.a -l:librte_net_null.a -l:librte_net_octeontx.a -l:librte_net_octeontx2.a -l:librte_net_pfe.a -l:librte_net_qede.a -l:librte_net_ring.a -l:librte_net_sfc.a -l:librte_net_softnic.a -l:librte_net_tap.a -l:librte_net_thunderx.a -l:librte_net_txgbe.a -l:librte_net_vdev_netvsc.a -l:librte_net_vhost.a -l:librte_net_virtio.a -l:librte_net_vmxnet3.a -l:librte_raw_dpaa2_cmdif.a -l:librte_raw_dpaa2_qdma.a -l:librte_raw_ioat.a -l:librte_raw_ntb.a -l:librte_raw_octeontx2_dma.a -l:librte_raw_octeontx2_ep.a -l:librte_raw_skeleton.a -l:librte_crypto_bcmfs.a -l:librte_crypto_caam_jr.a -l:librte_crypto_dpaa_sec.a -l:librte_crypto_dpaa2_sec.a -l:librte_crypto_nitrox.a -l:librte_crypto_null.a -l:librte_crypto_octeontx.a -l:librte_crypto_octeontx2.a -l:librte_crypto_scheduler.a -l:librte_crypto_virtio.a -l:librte_compress_octeontx.a -l:librte_regex_octeontx2.a -l:librte_vdpa_ifc.a -l:librte_event_dlb.a -l:librte_event_dlb2.a -l:librte_event_dpaa.a -l:librte_event_dpaa2.a -l:librte_event_octeontx2.a -l:librte_event_opdl.a -l:librte_event_skeleton.a -l:librte_event_sw.a -l:librte_event_dsw.a -l:librte_event_octeontx.a -l:librte_baseband_null.a -l:librte_baseband_turbo_sw.a -l:librte_baseband_fpga_lte_fec.a -l:librte_baseband_fpga_5gnr_fec.a -l:librte_baseband_acc100.a -l:librte_node.a -l:librte_graph.a -l:librte_bpf.a -l:librte_flow_classify.a -l:librte_pipeline.a -l:librte_table.a -l:librte_port.a -l:librte_fib.a -l:librte_ipsec.a -l:librte_vhost.a -l:librte_stack.a -l:librte_security.a -l:librte_sched.a -l:librte_reorder.a -l:librte_rib.a -l:librte_regexdev.a -l:librte_rawdev.a -l:librte_pdump.a -l:librte_power.a -l:librte_member.a -l:librte_lpm.a -l:librte_latencystats.a -l:librte_kni.a -l:librte_jobstats.a -l:librte_ip_frag.a -l:librte_gso.a -l:librte_gro.a -l:librte_eventdev.a -l:librte_efd.a -l:librte_distributor.a -l:librte_cryptodev.a -l:librte_compressdev.a -l:librte_cfgfile.a -l:librte_bitratestats.a -l:librte_bbdev.a -l:librte_acl.a -l:librte_timer.a -l:librte_hash.a -l:librte_metrics.a -l:librte_cmdline.a -l:librte_pci.a -l:librte_ethdev.a -l:librte_meter.a -l:librte_net.a -l:librte_mbuf.a -l:librte_mempool.a -l:librte_rcu.a -l:librte_ring.a -l:librte_eal.a -l:librte_telemetry.a -l:librte_kvargs.a -lrte_node -lrte_graph -lrte_bpf -lrte_flow_classify -lrte_pipeline -lrte_table -lrte_port -lrte_fib -lrte_ipsec -lrte_vhost -lrte_stack -lrte_security -lrte_sched -lrte_reorder -lrte_rib -lrte_regexdev -lrte_rawdev -lrte_pdump -lrte_power -lrte_member -lrte_lpm -lrte_latencystats -lrte_kni -lrte_jobstats -lrte_ip_frag -lrte_gso -lrte_gro -lrte_eventdev -lrte_efd -lrte_distributor -lrte_cryptodev -lrte_compressdev -lrte_cfgfile -lrte_bitratestats -lrte_bbdev -lrte_acl -lrte_timer -lrte_hash -lrte_metrics -lrte_cmdline -lrte_pci -lrte_ethdev -lrte_meter -lrte_net -lrte_mbuf -lrte_mempool -lrte_rcu -lrte_ring -lrte_eal -lrte_telemetry -lrte_kvargs -lm -ldl   -L/home/user/github/tldk-gerrit/x86_64-native-linuxapp-gcc/lib -l:libtle_l4p.a -l:libtle_memtank.a -l:libtle_timer.a\n/home/user/github/tldk-gerrit/x86_64-native-linuxapp-gcc/lib/libtle_l4p.a(udp_rxtx.o): In function `tle_udp_stream_send\u0027:\nudp_rxtx.c:(.text+0x56a9): undefined reference to `rte_ipv4_fragment_packet\u0027\nudp_rxtx.c:(.text+0x6be9): undefined reference to `rte_ipv6_fragment_packet\u0027\ncollect2: error: ld returned 1 exit status\nmake[2]: *** [/home/user/github/tldk-gerrit/x86_64-native-linuxapp-gcc/app/l4fwd-static] Error 1\nmake[1]: *** [l4fwd] Error 2\nmake: *** [examples] Error 2\n```",
+      "revId": "a755e72d74a7c4d5f325851bfa27e931a7213f34",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "b873da4a_8f93c4f2",
+        "filename": "mk/tle.var.mk",
+        "patchSetId": 1
+      },
+      "lineNbr": 23,
+      "author": {
+        "id": 2548
+      },
+      "writtenOn": "2021-10-07T13:23:51Z",
+      "side": 1,
+      "message": "If I try building with the embedded version of DPDK, the path turns into `$(RTE_SDK)/lib64/pkgconfig`. I still need to work through supplying our own DPDK build dir but it looks like the path will be similar.  I can see maybe exposing this as an env var to be passed it to offer more flexibility but not sure it is absolutely necessary.\n\ncentos 7 + devtoolset; gcc v7.3.1",
+      "revId": "a755e72d74a7c4d5f325851bfa27e931a7213f34",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "9e3f876d_3bd9dae6",
+        "filename": "mk/tle.var.mk",
+        "patchSetId": 1
+      },
+      "lineNbr": 26,
+      "author": {
+        "id": 2548
+      },
+      "writtenOn": "2021-10-07T13:23:51Z",
+      "side": 1,
+      "message": "Leading space here causes error message to not be displayed and instead results in.\n\n```\n.../tldk-gerrit/mk/tle.var.mk:26: *** recipe commences before first target.  Stop.\n```",
+      "revId": "a755e72d74a7c4d5f325851bfa27e931a7213f34",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    }
+  ]
+}
