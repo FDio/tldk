@@ -37,6 +37,24 @@
     },
     {
       "key": {
+        "uuid": "74169cfe_de811a89",
+        "filename": "examples/l4fwd/Makefile",
+        "patchSetId": 1
+      },
+      "lineNbr": 15,
+      "author": {
+        "id": 2548
+      },
+      "writtenOn": "2021-10-12T13:25:43Z",
+      "side": 1,
+      "message": "Tested with an Ubuntu box and it did build so likely an OS/env delta?",
+      "parentUuid": "0688c2ce_95440575",
+      "revId": "a755e72d74a7c4d5f325851bfa27e931a7213f34",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "b873da4a_8f93c4f2",
         "filename": "mk/tle.var.mk",
         "patchSetId": 1
@@ -90,6 +108,24 @@
     },
     {
       "key": {
+        "uuid": "4f07845a_12f01a44",
+        "filename": "mk/tle.var.mk",
+        "patchSetId": 1
+      },
+      "lineNbr": 23,
+      "author": {
+        "id": 2548
+      },
+      "writtenOn": "2021-10-12T13:25:43Z",
+      "side": 1,
+      "message": "Had a chance try building with a supplied dpdk in our environment and am able to build utilizing the env var",
+      "parentUuid": "6ce575ea_a9f994df",
+      "revId": "a755e72d74a7c4d5f325851bfa27e931a7213f34",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "9e3f876d_3bd9dae6",
         "filename": "mk/tle.var.mk",
         "patchSetId": 1
@@ -122,6 +158,24 @@
       "revId": "a755e72d74a7c4d5f325851bfa27e931a7213f34",
       "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "12fd9e97_edc9e342",
+        "filename": "mk/tle.var.mk",
+        "patchSetId": 1
+      },
+      "lineNbr": 26,
+      "author": {
+        "id": 2548
+      },
+      "writtenOn": "2021-10-12T13:25:43Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "7e905a66_c8727940",
+      "revId": "a755e72d74a7c4d5f325851bfa27e931a7213f34",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
     }
   ]
 }
