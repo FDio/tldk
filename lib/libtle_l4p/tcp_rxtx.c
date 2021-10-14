@@ -2265,12 +2265,13 @@ tle_tcp_stream_connect(struct tle_stream *ts, const struct sockaddr *addr)
 static inline void
 tcb_establish(struct tle_tcp_stream *s, const struct tle_tcp_conn_info *ci)
 {
-	uint32_t tms;
+	uint32_t mss, tms;
 
 	tms = tcp_get_tms(s->s.ctx->cycles_ms_shift);
+	mss = calc_smss(ci->so.mss, &s->tx.dst);
 
 	s->tcb.so = ci->so;
-	fill_tcb_snd(&s->tcb, ci->ack, ci->seq, ci->so.mss,
+	fill_tcb_snd(&s->tcb, ci->ack, ci->seq, mss,
 		ci->wnd, ci->so.wscale, &ci->so.ts);
 	fill_tcb_rcv(&s->tcb, ci->ack, ci->so.wscale, &ci->so.ts);
 
