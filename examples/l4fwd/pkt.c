@@ -418,7 +418,7 @@ fix_reassembled(struct rte_mbuf *m, int32_t hwcsum, uint32_t proto)
 		m->packet_type |= RTE_PTYPE_L4_UDP;
 
 	/* fix reassemble setting TX flags. */
-	m->ol_flags &= ~PKT_TX_IP_CKSUM;
+	m->ol_flags &= ~RTE_MBUF_F_TX_IP_CKSUM;
 
 	/* fix l3_len after reassemble. */
 	if (RTE_ETH_IS_IPV6_HDR(m->packet_type))

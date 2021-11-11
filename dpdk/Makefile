@@ -19,7 +19,7 @@ RTE_OUTPUT ?= $(O)
 DOWNLOAD_DIR := $(CURDIR)/downloads
 MESON_DIR := $(CURDIR)/meson
 
-DPDK_VERSION          ?= 20.11
+DPDK_VERSION          ?= v21.11-rc2
 DPDK_SRC_DIR          ?= $(RTE_OUTPUT)-src
 DPDK_BUILD_DIR        ?= $(RTE_OUTPUT)-build
 DPDK_INSTALL_DIR      ?= $(RTE_OUTPUT)
@@ -30,7 +30,7 @@ S := $(DPDK_SRC_DIR)
 B := $(DPDK_BUILD_DIR)
 I := $(DPDK_INSTALL_DIR)
 
-DPDK_GIT_REPO ?= http://dpdk.org/git/dpdk-stable
+DPDK_GIT_REPO ?= http://dpdk.org/git/dpdk
 
 JOBS := $(shell grep processor /proc/cpuinfo | wc -l)
 
