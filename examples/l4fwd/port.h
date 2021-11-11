@@ -182,9 +182,7 @@ port_init(struct netbe_port *uprt, uint32_t proto)
 			__func__, uprt->id);
 		port_conf.rxmode.offloads |= uprt->rx_offload & RX_CSUM_OFFLOAD;
 	}
-	port_conf.rxmode.max_rx_pkt_len = uprt->mtu + RTE_ETHER_CRC_LEN;
-	if (port_conf.rxmode.max_rx_pkt_len > RTE_ETHER_MAX_LEN)
-		port_conf.rxmode.offloads |= DEV_RX_OFFLOAD_JUMBO_FRAME;
+	port_conf.rxmode.mtu = uprt->mtu - RTE_ETHER_HDR_LEN;
 
 	rc = update_rss_conf(uprt, &dev_info, &port_conf, proto);
 	if (rc != 0)
