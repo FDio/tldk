@@ -216,7 +216,7 @@ _ipv4x_phdr_cksum(const struct rte_ipv4_hdr *ipv4_hdr, size_t ipv4h_len,
 	s1 = ipv4_hdr->dst_addr;
 	CKSUM_ADD_CARRY(s0, s1);
 
-	if (ol_flags & PKT_TX_TCP_SEG)
+	if (ol_flags & RTE_MBUF_F_TX_TCP_SEG)
 		s1 = 0;
 	else
 		s1 = rte_cpu_to_be_16(
@@ -300,16 +300,16 @@ check_pkt_csum(const struct rte_mbuf *m, uint64_t ol_flags, uint32_t type,
 	uint16_t csum;
 	int32_t ret;
 
-	fl4 = ol_flags & PKT_RX_L4_CKSUM_MASK;
+	fl4 = ol_flags & RTE_MBUF_F_RX_L4_CKSUM_MASK;
 	fl3 = (type == TLE_V4) ?
-		(ol_flags & PKT_RX_IP_CKSUM_MASK) : PKT_RX_IP_CKSUM_GOOD;
+		(ol_flags & RTE_MBUF_F_RX_IP_CKSUM_MASK) : RTE_MBUF_F_RX_IP_CKSUM_GOOD;
 
 	/* case 0: both ip and l4 cksum is verified or data is valid */
-	if ((fl3 | fl4) == (PKT_RX_IP_CKSUM_GOOD | PKT_RX_L4_CKSUM_GOOD))
+	if ((fl3 | fl4) == (RTE_MBUF_F_RX_IP_CKSUM_GOOD | RTE_MBUF_F_RX_L4_CKSUM_GOOD))
 		return 0;
 
 	/* case 1: either ip or l4 cksum bad */
-	if (fl3 == PKT_RX_IP_CKSUM_BAD || fl4 == PKT_RX_L4_CKSUM_BAD)
+	if (fl3 == RTE_MBUF_F_RX_IP_CKSUM_BAD || fl4 == RTE_MBUF_F_RX_L4_CKSUM_BAD)
 		return 1;
 
 	/* case 2: either ip or l4 or both cksum is unknown */
@@ -319,12 +319,12 @@ check_pkt_csum(const struct rte_mbuf *m, uint64_t ol_flags, uint32_t type,
 		m->l2_len);
 
 	ret = 0;
-	if (fl3 == PKT_RX_IP_CKSUM_UNKNOWN && l3h4->hdr_checksum != 0) {
+	if (fl3 == RTE_MBUF_F_RX_IP_CKSUM_UNKNOWN && l3h4->hdr_checksum != 0) {
 		csum = _ipv4x_cksum(l3h4, m->l3_len);
 		ret = (csum != UINT16_MAX);
 	}
 
-	if (ret == 0 && fl4 == PKT_RX_L4_CKSUM_UNKNOWN) {
+	if (ret == 0 && fl4 == RTE_MBUF_F_RX_L4_CKSUM_UNKNOWN) {
 
 		/*
 		 * for IPv4 it is allowed to have zero UDP cksum,
