@@ -435,7 +435,7 @@ get_pkt_info(const struct rte_mbuf *m, union pkt_info *pi, union seg_info *si)
 		((uintptr_t)tcph + offsetof(struct rte_tcp_hdr, src_port));
 	pi->tf.flags = tcph->tcp_flags;
 	pi->tf.type = type;
-	pi->csf = m->ol_flags & (PKT_RX_IP_CKSUM_MASK | PKT_RX_L4_CKSUM_MASK);
+	pi->csf = m->ol_flags & (RTE_MBUF_F_RX_IP_CKSUM_MASK | RTE_MBUF_F_RX_L4_CKSUM_MASK);
 	pi->port.raw = prt->raw;
 
 	get_seg_info(tcph, si);
