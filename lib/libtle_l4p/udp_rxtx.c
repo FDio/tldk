@@ -361,19 +361,19 @@ udp_fill_mbuf(struct rte_mbuf *m,
 		l3h->total_length = rte_cpu_to_be_16(plen + dst->l3_len +
 			sizeof(*l4h));
 
-		if ((ol_flags & PKT_TX_UDP_CKSUM) != 0)
+		if ((ol_flags & RTE_MBUF_F_TX_UDP_CKSUM) != 0)
 			l4h->cksum = _ipv4x_phdr_cksum(l3h, m->l3_len,
 				ol_flags);
 		else
 			l4h->cksum = _ipv4_udptcp_mbuf_cksum(m, len, l3h);
 
-		if ((ol_flags & PKT_TX_IP_CKSUM) == 0)
+		if ((ol_flags & RTE_MBUF_F_TX_IP_CKSUM) == 0)
 			l3h->hdr_checksum = _ipv4x_cksum(l3h, m->l3_len);
 	} else {
 		struct rte_ipv6_hdr *l3h;
 		l3h = (struct rte_ipv6_hdr *)(l2h + dst->l2_len);
 		l3h->payload_len = rte_cpu_to_be_16(plen + sizeof(*l4h));
-		if ((ol_flags & PKT_TX_UDP_CKSUM) != 0)
+		if ((ol_flags & RTE_MBUF_F_TX_UDP_CKSUM) != 0)
 			l4h->cksum = rte_ipv6_phdr_cksum(l3h, ol_flags);
 		else
 			l4h->cksum = _ipv6_udptcp_mbuf_cksum(m, len, l3h);
@@ -394,7 +394,7 @@ frag_fixup(const struct rte_mbuf *ms, struct rte_mbuf *mf, uint32_t type)
 	mf->ol_flags = ms->ol_flags;
 	mf->tx_offload = ms->tx_offload;
 
-	if (type == TLE_V4 && (ms->ol_flags & PKT_TX_IP_CKSUM) == 0) {
+	if (type == TLE_V4 && (ms->ol_flags & RTE_MBUF_F_TX_IP_CKSUM) == 0) {
 		l3h = rte_pktmbuf_mtod(mf, struct rte_ipv4_hdr *);
 		l3h->hdr_checksum = _ipv4x_cksum(l3h, mf->l3_len);
 	}
@@ -570,7 +570,7 @@ tle_udp_stream_send(struct tle_stream *us, struct rte_mbuf *pkt[],
 		while (i != num && frg == 0) {
 			frg = pkt[i]->pkt_len > mtu;
 			if (frg != 0)
-				ol_flags &= ~PKT_TX_UDP_CKSUM;
+				ol_flags &= ~RTE_MBUF_F_TX_UDP_CKSUM;
 			rc = udp_fill_mbuf(pkt[i], type, ol_flags, pid + i,
 				udph, &dst);
 			if (rc != 0) {

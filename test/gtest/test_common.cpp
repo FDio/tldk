@@ -27,7 +27,7 @@ port_init(dpdk_port_t port, struct rte_mempool *mbuf_pool)
 	socket_id = rte_eth_dev_socket_id(port);
 
 	memset(&port_conf, 0, sizeof(struct rte_eth_conf));
-	port_conf.rxmode.max_rx_pkt_len = RTE_ETHER_MAX_LEN;
+	port_conf.rxmode.mtu = RTE_ETHER_MAX_LEN;
 
 	/* Configure the Ethernet device. */
 	retval = rte_eth_dev_configure(port, rx_rings, tx_rings, &port_conf);

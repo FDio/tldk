@@ -368,8 +368,8 @@ fill_dst(struct tle_dest *dst, struct netbe_dev *bed,
 
 	eth = (struct rte_ether_hdr *)dst->hdr;
 
-	rte_ether_addr_copy(&bed->port.mac, &eth->s_addr);
-	rte_ether_addr_copy(&bdp->mac, &eth->d_addr);
+	rte_ether_addr_copy(&bed->port.mac, &eth->src_addr);
+	rte_ether_addr_copy(&bdp->mac, &eth->dst_addr);
 	eth->ether_type = rte_cpu_to_be_16(l3_type);
 
 	if (l3_type == RTE_ETHER_TYPE_IPV4) {
@@ -448,8 +448,8 @@ fill_arp_reply(struct netbe_dev *dev, struct rte_mbuf *m)
 
 	/* set up the ethernet data */
 	eth = rte_pktmbuf_mtod(m, struct rte_ether_hdr *);
-	eth->d_addr = eth->s_addr;
-	eth->s_addr = dev->port.mac;
+	eth->dst_addr = eth->src_addr;
+	eth->src_addr = dev->port.mac;
 
 	/* set up the arp data */
 	ahdr = rte_pktmbuf_mtod_offset(m, struct rte_arp_hdr *, m->l2_len);
