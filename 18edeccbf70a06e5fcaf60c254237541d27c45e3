@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "41356063_479f3403",
+        "filename": "examples/l4fwd/port.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 185,
+      "author": {
+        "id": 2548
+      },
+      "writtenOn": "2021-11-11T02:03:43Z",
+      "side": 1,
+      "message": "I would like a second set of eyes on this change.  I believe I got this right based on the notes and changes in https://patches.dpdk.org/project/dpdk/patch/20211018134854.1258938-1-ferruh.yigit@intel.com/.",
+      "revId": "18edeccbf70a06e5fcaf60c254237541d27c45e3",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    }
+  ]
+}
