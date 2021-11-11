@@ -277,19 +277,19 @@ tcp_fill_mbuf(struct rte_mbuf *m, const struct tle_tcp_stream *s,
 		l3h->packet_id = rte_cpu_to_be_16(pid);
 		l3h->total_length = rte_cpu_to_be_16(plen + dst->l3_len + l4);
 
-		if ((ol_flags & PKT_TX_TCP_CKSUM) != 0)
+		if ((ol_flags & RTE_MBUF_F_TX_TCP_CKSUM) != 0)
 			l4h->cksum = _ipv4x_phdr_cksum(l3h, m->l3_len,
 				ol_flags);
 		else if (swcsm != 0)
 			l4h->cksum = _ipv4_udptcp_mbuf_cksum(m, len, l3h);
 
-		if ((ol_flags & PKT_TX_IP_CKSUM) == 0 && swcsm != 0)
+		if ((ol_flags & RTE_MBUF_F_TX_IP_CKSUM) == 0 && swcsm != 0)
 			l3h->hdr_checksum = _ipv4x_cksum(l3h, m->l3_len);
 	} else {
 		struct rte_ipv6_hdr *l3h;
 		l3h = (struct rte_ipv6_hdr *)(l2h + dst->l2_len);
 		l3h->payload_len = rte_cpu_to_be_16(plen + l4);
-		if ((ol_flags & PKT_TX_TCP_CKSUM) != 0)
+		if ((ol_flags & RTE_MBUF_F_TX_TCP_CKSUM) != 0)
 			l4h->cksum = rte_ipv6_phdr_cksum(l3h, ol_flags);
 		else if (swcsm != 0)
 			l4h->cksum = _ipv6_udptcp_mbuf_cksum(m, len, l3h);
@@ -326,12 +326,12 @@ tcp_update_mbuf(struct rte_mbuf *m, uint32_t type, const struct tcb *tcb,
 			m->l2_len);
 		l3h->hdr_checksum = 0;
 		l3h->packet_id = rte_cpu_to_be_16(pid);
-		if ((m->ol_flags & PKT_TX_IP_CKSUM) == 0)
+		if ((m->ol_flags & RTE_MBUF_F_TX_IP_CKSUM) == 0)
 			l3h->hdr_checksum = _ipv4x_cksum(l3h, m->l3_len);
 	}
 
 	/* have to calculate TCP checksum in SW */
-	if ((m->ol_flags & PKT_TX_TCP_CKSUM) == 0) {
+	if ((m->ol_flags & RTE_MBUF_F_TX_TCP_CKSUM) == 0) {
 
 		l4h->cksum = 0;
 
