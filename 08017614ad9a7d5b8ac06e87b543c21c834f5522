@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "8518a9bc_fde176f2",
+        "filename": "examples/l4fwd/port.h",
+        "patchSetId": 3
+      },
+      "lineNbr": 185,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2021-11-15T14:31:58Z",
+      "side": 1,
+      "message": "why \u0027- RTE_ETHER_CRC_LEN\u0027 here?",
+      "revId": "08017614ad9a7d5b8ac06e87b543c21c834f5522",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    }
+  ]
+}
