@@ -16,6 +16,24 @@
       "revId": "08017614ad9a7d5b8ac06e87b543c21c834f5522",
       "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "0867f0df_d811fa57",
+        "filename": "examples/l4fwd/port.h",
+        "patchSetId": 3
+      },
+      "lineNbr": 185,
+      "author": {
+        "id": 2548
+      },
+      "writtenOn": "2021-11-23T14:37:25Z",
+      "side": 1,
+      "message": "So I struggled a bit interpreting https://patches.dpdk.org/project/dpdk/patch/20211018134854.1258938-1-ferruh.yigit@intel.com/ as it seemed like more than just a simple field rename so based this change off of what was happening in the DPDK apps and examples with this patch.",
+      "parentUuid": "8518a9bc_fde176f2",
+      "revId": "08017614ad9a7d5b8ac06e87b543c21c834f5522",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
     }
   ]
 }
