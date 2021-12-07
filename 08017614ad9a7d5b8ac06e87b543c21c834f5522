@@ -34,6 +34,24 @@
       "revId": "08017614ad9a7d5b8ac06e87b543c21c834f5522",
       "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "054fbc62_d9119d0c",
+        "filename": "examples/l4fwd/port.h",
+        "patchSetId": 3
+      },
+      "lineNbr": 185,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2021-12-07T14:10:52Z",
+      "side": 1,
+      "message": "here uprt-\u003emtu \u003d\u003d application data size + L2/L3/L4 headers sizes (by default\u003d1514).\nSo I think here:\nport_conf.rxmode.mtu \u003d uprt-\u003emtu - RTE_ETHER_HDR_LEN\nwill be enough.",
+      "parentUuid": "0867f0df_d811fa57",
+      "revId": "08017614ad9a7d5b8ac06e87b543c21c834f5522",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
     }
   ]
 }
