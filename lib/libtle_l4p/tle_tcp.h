@@ -122,8 +122,12 @@ union tle_tcp_tsopt {
  * SYN time option values.
  */
 struct tle_tcp_syn_opts {
+	/* mss to use when communicating with the peer */
 	uint16_t mss;
+	/* peer window scaling factor */
 	uint8_t  wscale;
+	/* local window scaling factor, only used via tcp_establish */
+	uint8_t  l_wscale;
 	union tle_tcp_tsopt ts;
 };
 

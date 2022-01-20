@@ -2273,7 +2273,7 @@ tcb_establish(struct tle_tcp_stream *s, const struct tle_tcp_conn_info *ci)
 	s->tcb.so = ci->so;
 	fill_tcb_snd(&s->tcb, ci->ack, ci->seq, mss,
 		ci->wnd, ci->so.wscale, &ci->so.ts);
-	fill_tcb_rcv(&s->tcb, ci->ack, ci->so.wscale, &ci->so.ts);
+	fill_tcb_rcv(&s->tcb, ci->ack, ci->so.l_wscale, &ci->so.ts);
 
 	s->tcb.rcv.wnd = calc_rx_wnd(s, s->tcb.rcv.wscale);
 
