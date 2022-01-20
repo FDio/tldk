@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "e23c4a66_c69efe17",
+        "filename": "lib/libtle_l4p/tcp_rxtx.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 501,
+      "author": {
+        "id": 2548
+      },
+      "writtenOn": "2022-01-20T22:33:27Z",
+      "side": 1,
+      "message": "I think this can be safely moved out of the loop and to line 484 but would like a second set of eyes to confirm.",
+      "revId": "ba76f1a34d0a3682da1225822794f44bf0122c94",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    }
+  ]
+}
