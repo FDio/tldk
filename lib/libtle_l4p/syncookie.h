@@ -184,8 +184,7 @@ fill_tcb_rcv(struct tcb *tcb, uint32_t seq, uint32_t wscale,
 	tcb->rcv.nxt = seq;
 	tcb->rcv.irs = seq - 1;
 	tcb->rcv.ts = to->val;
-	tcb->rcv.wscale = (wscale == TCP_WSCALE_NONE) ?
-		TCP_WSCALE_NONE : TCP_WSCALE_DEFAULT;
+	tcb->rcv.wscale = wscale;
 }
 
 static inline void
@@ -216,7 +215,8 @@ sync_fill_tcb(struct tcb *tcb, const union seg_info *si,
 	seq = si->seq;
 	ack = si->ack;
 	mss = si->mss;
-	wscale = to->ecr & SYNC_TMS_WSCALE_MASK;
+	wscale = ((to->ecr & SYNC_TMS_WSCALE_MASK) == TCP_WSCALE_NONE) ?
+		TCP_WSCALE_NONE : TCP_WSCALE_DEFAULT;
 
 	fill_tcb_snd(tcb, seq, ack, mss, si->wnd, wscale, to);
 	fill_tcb_rcv(tcb, seq, wscale, to);
