@@ -306,7 +306,7 @@ tcp_fill_mbuf(struct rte_mbuf *m, const struct tle_tcp_stream *s,
  */
 static inline void
 tcp_update_mbuf(struct rte_mbuf *m, uint32_t type, const struct tcb *tcb,
-	uint32_t seq, uint32_t pid)
+	uint32_t seq, uint32_t pid, uint8_t tcp_flags)
 {
 	struct rte_tcp_hdr *l4h;
 	uint32_t len;
@@ -316,6 +316,8 @@ tcp_update_mbuf(struct rte_mbuf *m, uint32_t type, const struct tcb *tcb,
 
 	l4h->sent_seq = rte_cpu_to_be_32(seq);
 	l4h->recv_ack = rte_cpu_to_be_32(tcb->rcv.nxt);
+
+	l4h->tcp_flags |= tcp_flags;
 
 	if (tcb->so.ts.raw != 0)
 		fill_tms_opts(l4h + 1, tcb->snd.ts, tcb->rcv.ts);
@@ -394,6 +396,7 @@ tx_data_bulk(struct tle_tcp_stream *s, union seqlen *sl, struct rte_mbuf *mi[],
 	struct tle_dev *dev;
 	struct rte_mbuf *mb;
 	struct rte_mbuf *mo[MAX_PKT_BURST + TCP_MAX_PKT_SEG];
+	uint8_t tcp_flags;
 
 	mss = s->tcb.snd.mss;
 	type = s->s.type;
@@ -404,6 +407,8 @@ tx_data_bulk(struct tle_tcp_stream *s, union seqlen *sl, struct rte_mbuf *mi[],
 	k = 0;
 	tn = 0;
 	fail = 0;
+	tcp_flags = 0x0;
+
 	for (i = 0; i != num && sl->len != 0 && fail == 0; i++) {
 
 		mb = mi[i];
@@ -413,8 +418,12 @@ tx_data_bulk(struct tle_tcp_stream *s, union seqlen *sl, struct rte_mbuf *mi[],
 		/*fast path, no need to use indirect mbufs. */
 		if (plen <= sz) {
 
+			if (i == (num - 1)) {
+				tcp_flags |= TCP_FLAG_PSH;
+			}
+
 			/* update pkt TCP header */
-			tcp_update_mbuf(mb, type, &s->tcb, sl->seq, pid + i);
+			tcp_update_mbuf(mb, type, &s->tcb, sl->seq, pid + i, tcp_flags);
 
 			/* keep mbuf till ACK is received. */
 			rte_pktmbuf_refcnt_update(mb, 1);
