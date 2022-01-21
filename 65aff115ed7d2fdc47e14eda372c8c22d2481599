@@ -16,6 +16,24 @@
       "revId": "65aff115ed7d2fdc47e14eda372c8c22d2481599",
       "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "08acc990_ca20cd9d",
+        "filename": "lib/libtle_l4p/syncookie.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 218,
+      "author": {
+        "id": 2548
+      },
+      "writtenOn": "2022-01-21T20:52:03Z",
+      "side": 1,
+      "message": "I missed its use in fill_tcb_snd, thanks for catching!",
+      "parentUuid": "366e6c52_24cd3106",
+      "revId": "65aff115ed7d2fdc47e14eda372c8c22d2481599",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
     }
   ]
 }
