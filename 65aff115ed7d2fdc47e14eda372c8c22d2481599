@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "366e6c52_24cd3106",
+        "filename": "lib/libtle_l4p/syncookie.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 218,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2022-01-21T20:30:47Z",
+      "side": 1,
+      "message": "just as a nit suggestion (to keep things exactly the same):\nwscale \u003d to-\u003eecr \u0026 SYNC_TMS_WSCALE_MASK;\nfill_tcb_snd(tcb, seq, ack, mss, si-\u003ewnd, wscale, to);\nwscale \u003d (wscale \u003d\u003d TCP_WSCALE_NONE) ? TCP_WSCALE_NONE : TCP_WSCALE_DEFAULT;\nfill_tcb_rcv(tcb, seq, wscale, to);",
+      "revId": "65aff115ed7d2fdc47e14eda372c8c22d2481599",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    }
+  ]
+}
