@@ -1,0 +1,38 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "cb810aec_ded4a40a",
+        "filename": "lib/libtle_l4p/tcp_rxtx.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 309,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2022-01-27T17:09:56Z",
+      "side": 1,
+      "message": "instead of \u0027bool\u0027 parameter, might be better to just \u0027uint8_t flags\u0027.\nand then straight:\nl4h-\u003etcp_flags |\u003d flags;",
+      "revId": "4f357ee9040f60b106c24258f56fcb075c14780c",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "b900b541_9c6ffd87",
+        "filename": "lib/libtle_l4p/tcp_rxtx.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 502,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2022-01-27T17:09:56Z",
+      "side": 1,
+      "message": "instead of accessing txq ring directly, might be better to have:\ntcp_txq_get_count() or so.\nI.E:\nif (tcp_txq_get_count(s) \u003d\u003d num) \n  ...\nSuch function can be just a wrapper around rte_ring get_count().",
+      "revId": "4f357ee9040f60b106c24258f56fcb075c14780c",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    }
+  ]
+}
