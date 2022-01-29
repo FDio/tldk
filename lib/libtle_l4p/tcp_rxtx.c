@@ -2277,7 +2277,17 @@ tcb_establish(struct tle_tcp_stream *s, const struct tle_tcp_conn_info *ci)
 	uint32_t mss, tms;
 
 	tms = tcp_get_tms(s->s.ctx->cycles_ms_shift);
-	mss = calc_smss(ci->so.mss, &s->tx.dst);
+
+	/* set a default MSS if it is unset (0) */
+	if ((ci->so.mss == 0) && (s->s.type == TLE_V4)) {
+		mss = calc_smss(TCP4_MIN_MSS, &s->tx.dst);
+	}
+	else if ((ci->so.mss == 0) && (s->s.type == TLE_V6)) {
+		mss = calc_smss(TCP6_MIN_MSS, &s->tx.dst);
+	}
+	else {
+		mss = calc_smss(ci->so.mss, &s->tx.dst);
+	}
 
 	s->tcb.so = ci->so;
 	fill_tcb_snd(&s->tcb, ci->ack, ci->seq, mss,
