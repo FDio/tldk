@@ -19,6 +19,24 @@
     },
     {
       "key": {
+        "uuid": "207e64a3_6ad80d89",
+        "filename": "lib/libtle_l4p/tcp_rxtx.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 309,
+      "author": {
+        "id": 2548
+      },
+      "writtenOn": "2022-02-01T15:02:09Z",
+      "side": 1,
+      "message": "I didn\u0027t think about this option. I like this, it opens this up for more flexibility in the future.",
+      "parentUuid": "cb810aec_ded4a40a",
+      "revId": "4f357ee9040f60b106c24258f56fcb075c14780c",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "b900b541_9c6ffd87",
         "filename": "lib/libtle_l4p/tcp_rxtx.c",
         "patchSetId": 2
@@ -33,6 +51,24 @@
       "revId": "4f357ee9040f60b106c24258f56fcb075c14780c",
       "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "66d54216_c958355b",
+        "filename": "lib/libtle_l4p/tcp_rxtx.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 502,
+      "author": {
+        "id": 2548
+      },
+      "writtenOn": "2022-02-01T15:02:09Z",
+      "side": 1,
+      "message": "This is going to get dropped.  I realized we could do the check based on the `num` parameter in the `tx_data_bulk` call so this will all be removed.",
+      "parentUuid": "b900b541_9c6ffd87",
+      "revId": "4f357ee9040f60b106c24258f56fcb075c14780c",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": false
     }
   ]
 }
