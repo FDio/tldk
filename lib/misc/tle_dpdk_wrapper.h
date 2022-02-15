@@ -22,7 +22,9 @@ extern "C" {
 
 #include <rte_version.h>
 
-#if RTE_VERSION >= RTE_VERSION_NUM(17, 5, 0, 0)
+#if RTE_VERSION < RTE_VERSION_NUM(21, 11, 0, 0)
+#error "TLDK requires DPDK version 21.11 or newer is required"
+#endif
 
 static inline uint32_t
 _rte_ring_mp_enqueue_bulk(struct rte_ring *r, void * const *obj_table,
@@ -98,87 +100,8 @@ _rte_ring_dequeue_ptrs(struct rte_ring *r, void **obj_table, uint32_t num)
 	uint32_t tail;
 
 	tail = r->cons.tail;
-#if RTE_VERSION >= RTE_VERSION_NUM(20, 8, 0, 0)
 	__rte_ring_dequeue_elems(r, tail, obj_table, sizeof(obj_table[0]), num);
-#else
-	void **data = _rte_ring_get_data(r);
-	DEQUEUE_PTRS(r, data, tail, obj_table, num, void *);
-#endif
 }
-
-#else
-
-static inline uint32_t
-_rte_ring_mp_enqueue_bulk(struct rte_ring *r, void * const *obj_table,
-	uint32_t n)
-{
-	return rte_ring_mp_enqueue_bulk(r, (void * const *)obj_table, n);
-}
-
-static inline uint32_t
-_rte_ring_mp_enqueue_burst(struct rte_ring *r, void * const *obj_table,
-	uint32_t n)
-{
-	return rte_ring_mp_enqueue_burst(r, (void * const *)obj_table, n);
-}
-
-static inline uint32_t
-_rte_ring_mc_dequeue_burst(struct rte_ring *r, void **obj_table, uint32_t n)
-{
-	return rte_ring_mc_dequeue_burst(r, (void **)obj_table, n);
-}
-
-static inline uint32_t
-_rte_ring_enqueue_burst(struct rte_ring *r, void * const *obj_table, uint32_t n)
-{
-	return rte_ring_enqueue_burst(r, (void * const *)obj_table, n);
-}
-
-static inline uint32_t
-_rte_ring_enqueue_bulk(struct rte_ring *r, void * const *obj_table,
-	uint32_t n)
-{
-	return rte_ring_enqueue_bulk(r, (void * const *)obj_table, n);
-}
-
-static inline uint32_t
-_rte_ring_dequeue_burst(struct rte_ring *r, void **obj_table, uint32_t n)
-{
-	return rte_ring_dequeue_burst(r, (void **)obj_table, n);
-}
-
-static inline uint32_t
-_rte_ring_get_size(struct rte_ring *r)
-{
-	return r->prod.size;
-}
-
-static inline uint32_t
-_rte_ring_get_mask(struct rte_ring *r)
-{
-	return r->prod.mask;
-}
-
-static inline void **
-_rte_ring_get_data(struct rte_ring *r)
-{
-	return (void **)r->ring;
-}
-
-static inline void
-_rte_ring_dequeue_ptrs(struct rte_ring *r, void **obj_table, uint32_t num)
-{
-	uint32_t i, n;
-	uint32_t mask, cons_head;
-
-	n = num;
-	cons_head = r->cons.tail;
-	mask = _rte_ring_get_mask(r);
-
-	DEQUEUE_PTRS();
-}
-
-#endif /* RTE_VERSION >= RTE_VERSION_NUM(17, 5, 0, 0) */
 
 /*
  * Serialized variation of DPDK rte_ring dequeue mechanism.
