@@ -93,14 +93,8 @@ tcp_stream_acquire(struct tle_tcp_stream *s)
 static inline uint32_t
 calc_rx_wnd(const struct tle_tcp_stream *s, uint32_t scale)
 {
-	uint32_t wnd;
-
-	/* peer doesn't support WSCALE option, wnd size is limited to 64K */
-	if (scale == TCP_WSCALE_NONE) {
-		wnd = _rte_ring_get_mask(s->rx.q) << TCP_WSCALE_DEFAULT;
-		return RTE_MIN(wnd, (uint32_t)UINT16_MAX);
-	} else
-		return  _rte_ring_get_mask(s->rx.q) << scale;
+	return  ((_rte_ring_get_free_count(s->rx.q) *
+		s->s.ctx->prm.window_mbuf_size) >> scale);
 }
 
 /*

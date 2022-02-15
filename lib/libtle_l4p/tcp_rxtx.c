@@ -206,17 +206,20 @@ tcp_stream_adjust_tms(const struct tle_tcp_stream *s, uint32_t tms)
 }
 
 static inline void
-fill_tcph(struct rte_tcp_hdr *l4h, const struct tcb *tcb, union l4_ports port,
-	uint32_t seq, uint8_t hlen, uint8_t flags)
+fill_tcph(struct rte_tcp_hdr *l4h, const struct tle_tcp_stream *s,
+	union l4_ports port, uint32_t seq, uint8_t hlen, uint8_t flags)
 {
+	const struct tcb *tcb;
 	uint16_t wnd;
+
+	tcb = &s->tcb;
 
 	l4h->src_port = port.dst;
 	l4h->dst_port = port.src;
 
 	wnd = (flags & TCP_FLAG_SYN) ?
 		RTE_MIN(tcb->rcv.wnd, (uint32_t)UINT16_MAX) :
-		tcb->rcv.wnd >> tcb->rcv.wscale;
+		calc_rx_wnd(s, tcb->rcv.wscale);
 
 	/* ??? use sse shuffle to hton all remaining 16 bytes at once. ??? */
 	l4h->sent_seq = rte_cpu_to_be_32(seq);
@@ -263,7 +266,7 @@ tcp_fill_mbuf(struct rte_mbuf *m, const struct tle_tcp_stream *s,
 
 	/* setup TCP header & options */
 	l4h = (struct rte_tcp_hdr *)(l2h + len);
-	fill_tcph(l4h, &s->tcb, port, seq, l4, flags);
+	fill_tcph(l4h, s, port, seq, l4, flags);
 
 	/* setup mbuf TX offload related fields. */
 	m->tx_offload = _mbuf_tx_offload(dst->l2_len, dst->l3_len, l4, 0, 0, 0);
