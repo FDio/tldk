@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "fc60b3bf_5ae11cc2",
+        "filename": "lib/libtle_l4p/tcp_ctl.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 96,
+      "author": {
+        "id": 118
+      },
+      "writtenOn": "2022-02-21T00:49:58Z",
+      "side": 1,
+      "message": "The problems I am seeing with that code-change:\n- You introduced new context parater:\n    uint32_t window_mbuf_size;\n    and use it for receive window size calculations, \n    but as I can see you didn’t set it to some proper (default) value\n    neither at l4fwd/main.c, neither at tle_ctx_create().\n    So, from my understanig, it will be zero for l4fwd app.\n - the new version of this function doesn\u0027t look rihgt.\n   note that right now calc_rx_wnd() is used to caluclate of real max value of rcv.wnd\n   (before applying scaling), i.e at connection establish time.\n   So I suppose with window_mbuf_size (properly set) in place that function should look\n   something like that:\n  static inline uint32_t\ncalc_rx_wnd(const struct tle_tcp_stream *s, uint32_t scale, uint32_t wnd_mbuf_size)\n{\n\tuint32_t wnd;\n        wnd \u003d _rte_ring_get_free_count(s-\u003erx.q) * wnd_mbuf_size;\n        if (wnd \u003e\u003e scale \u003e UINT16_MAX)\n           wnd \u003d UINT16_MAX;  \n         return wnd;\n}",
+      "revId": "ebf960a5ee133f6bba491a146d56d1131b171c5d",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2",
+      "unresolved": true
+    }
+  ]
+}
