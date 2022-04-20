@@ -527,7 +527,7 @@ tle_drb_calc_size(uint32_t num)
 {
 	size_t sz;
 
-	sz = offsetof(struct tle_drb, objs[num]);
+	sz = offsetof(struct tle_drb, objs) + (sizeof(void*) * num);
 	return RTE_ALIGN_CEIL(sz, RTE_CACHE_LINE_SIZE);
 }
 
