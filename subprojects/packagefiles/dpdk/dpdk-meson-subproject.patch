@@ -1,0 +1,79 @@
+diff --git a/buildtools/subproject/meson.build b/buildtools/subproject/meson.build
+new file mode 100644
+index 0000000000..3192efaa40
+--- /dev/null
++++ b/buildtools/subproject/meson.build
+@@ -0,0 +1,21 @@
++# SPDX-License-Identifier: BSD-3-Clause
++# Copyright(c) 2022 Intel Corporation
++
++message('DPDK subproject linking: ' + get_option('default_library'))
++if get_option('default_library') == 'static'
++    dpdk_dep = declare_dependency(
++            version: meson.project_version(),
++            dependencies: dpdk_static_lib_deps,
++            # static library deps in DPDK build don't include "link_with" parameters,
++            # so explicitly link-in both libs and drivers
++            link_with: dpdk_static_libraries,
++            link_whole: dpdk_drivers,
++            link_args: dpdk_extra_ldflags)
++else
++    dpdk_dep = declare_dependency(
++            version: meson.project_version(),
++            # shared library deps include all necessary linking parameters
++            dependencies: dpdk_shared_lib_deps)
++endif
++
++libdpdk_dep = dpdk_dep
+diff --git a/drivers/meson.build b/drivers/meson.build
+index 1d8123b00c..db4d9c73bd 100644
+--- a/drivers/meson.build
++++ b/drivers/meson.build
+@@ -245,6 +245,10 @@ foreach subpath:subdirs
+
+         set_variable('shared_@0@'.format(lib_name), shared_dep)
+         set_variable('static_@0@'.format(lib_name), static_dep)
++        # for drivers, we only need to add dependency objects for static libs,
++        # shared lib drivers are not linked in
++        dpdk_static_lib_deps += static_dep
++
+         dependency_name = ''.join(lib_name.split('rte_'))
+         if developer_mode
+             message('drivers/@0@: Defining dependency "@1@"'.format(
+diff --git a/lib/meson.build b/lib/meson.build
+index 24adbe44c9..c648f7d800 100644
+--- a/lib/meson.build
++++ b/lib/meson.build
+@@ -266,6 +266,8 @@ foreach l:libraries
+
+     set_variable('shared_rte_' + name, shared_dep)
+     set_variable('static_rte_' + name, static_dep)
++    dpdk_shared_lib_deps += shared_dep
++    dpdk_static_lib_deps += static_dep
+     if developer_mode
+         message('lib/@0@: Defining dependency "@1@"'.format(l, name))
+     endif
+diff --git a/meson.build b/meson.build
+index 937f6110c0..6085e32a79 100644
+--- a/meson.build
++++ b/meson.build
+@@ -36,6 +36,8 @@ dpdk_build_root = meson.current_build_dir()
+ dpdk_conf = configuration_data()
+ dpdk_libraries = []
+ dpdk_static_libraries = []
++dpdk_shared_lib_deps = []
++dpdk_static_lib_deps = []
+ dpdk_chkinc_headers = []
+ dpdk_driver_classes = []
+ dpdk_drivers = []
+@@ -103,6 +105,10 @@ configure_file(output: build_cfg,
+ # build pkg-config files for dpdk
+ subdir('buildtools/pkg-config')
+
++if meson.is_subproject()
++    subdir('buildtools/subproject')
++endif
++
+ # final output, list all the libs and drivers to be built
+ # this does not affect any part of the build, for information only.
+ output_message = '\n=================\nLibraries Enabled\n=================\n'

@@ -1,7 +1,10 @@
-dpdk/_build/
-dpdk/dpdk-*.tar.gz
-x86_64-native-linuxapp-gcc/
+build/
+
 .project
 .idea
 .cproject
 .pydev*
+
+# editors
+# vim
+[._]*.sw[a-p]
