@@ -1,0 +1,18 @@
+# Please keep these options sorted alphabetically.
+
+option('cpu_instruction_set', type: 'string', value: 'auto',
+	description: 'Set the target machine ISA (instruction set architecture). Will be set according to the platform option by default.')
+option('developer_mode', type: 'feature', description:
+       'turn on additional build checks relevant for DPDK developers')
+option('docs', type: 'boolean', value: true, description:
+       'build documentation')
+option('examples', type: 'boolean', value: true, description:
+       'build example applications')
+option('machine', type: 'string', value: 'auto', description:
+       'Alias of cpu_instruction_set.')
+option('platform', type: 'string', value: 'native', description:
+       'Platform to build, either "native", "generic" or a SoC. Please refer to the Linux build guide for more information.')
+option('enable_trace_fp', type: 'boolean', value: false, description:
+       'enable fast path trace points.')
+option('tests', type: 'boolean', value: true, description:
+       'build unit tests')
