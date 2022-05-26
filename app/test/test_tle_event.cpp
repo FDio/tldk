@@ -64,6 +64,48 @@ TEST_F(tle_event_test, tle_event_alloc_free_positive)
 	EXPECT_EQ(evq->nb_free, max_events);
 }
 
+TEST_F(tle_event_test, tle_event_alloc_free_active_up)
+{
+	// basic setup
+  event = tle_event_alloc(evq, (void *) &fake_data);
+	ASSERT_NE(event, (struct tle_event *) NULL);
+	EXPECT_EQ(rte_errno, 0);
+	EXPECT_EQ(evq->nb_free, max_events - 1);
+
+  // activate event
+	tle_event_active(event, TLE_SEV_UP);
+  ASSERT_EQ(event->state, TLE_SEV_UP);
+  EXPECT_EQ(evq->nb_armed, 1);
+
+  // free (ensure completely disarmed too)
+	tle_event_free(event);
+  EXPECT_EQ(event->state, TLE_SEV_IDLE);
+	EXPECT_EQ(rte_errno, 0);
+	EXPECT_EQ(evq->nb_free, max_events);
+	EXPECT_EQ(evq->nb_armed, 0);
+}
+
+TEST_F(tle_event_test, tle_event_alloc_free_active_down)
+{
+	// basic setup
+  event = tle_event_alloc(evq, (void *) &fake_data);
+	ASSERT_NE(event, (struct tle_event *) NULL);
+	EXPECT_EQ(rte_errno, 0);
+	EXPECT_EQ(evq->nb_free, max_events - 1);
+
+  // activate event
+	tle_event_active(event, TLE_SEV_DOWN);
+  ASSERT_EQ(event->state, TLE_SEV_DOWN);
+  EXPECT_EQ(evq->nb_armed, 0);
+
+  // free (ensure completely disarmed too)
+	tle_event_free(event);
+  EXPECT_EQ(event->state, TLE_SEV_IDLE);
+	EXPECT_EQ(rte_errno, 0);
+	EXPECT_EQ(evq->nb_free, max_events);
+	EXPECT_EQ(evq->nb_armed, 0);
+}
+
 TEST_F(tle_event_test, tle_event_alloc_free_max_reached)
 {
 	uint32_t i;

@@ -97,6 +97,10 @@ tle_event_free(struct tle_event *ev)
 	q = ev->head;
 	rte_spinlock_lock(&q->lock);
 	ev->data = NULL;
+	if (ev->state == TLE_SEV_UP) {
+		TAILQ_REMOVE(&q->armed, ev, ql);
+		q->nb_armed--;
+	}
 	ev->state = TLE_SEV_IDLE;
 	TAILQ_INSERT_HEAD(&q->free, ev, ql);
 	q->nb_free++;
