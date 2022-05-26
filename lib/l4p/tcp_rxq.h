@@ -16,6 +16,7 @@
 #ifndef _TCP_RXQ_H_
 #define _TCP_RXQ_H_
 
+#include "tcp_ctl.h"
 #include "tcp_ofo.h"
 
 #ifdef __cplusplus
@@ -90,6 +91,7 @@ rx_ino_enqueue(struct tle_tcp_stream *s, union seqlen *sl,
 		sl->len -= mb[i]->pkt_len;
 
 	s->tcb.rcv.nxt = sl->seq + sl->len;
+	s->tcb.rcv.wnd = calc_rcv_wnd(s);
 	return n;
 }
 
@@ -177,6 +179,7 @@ tcp_rxq_get_objs(struct tle_tcp_stream *s, struct rxq_objs obj[2])
 static inline void
 tcp_rxq_consume(struct tle_tcp_stream *s, uint32_t num)
 {
+	s->tcb.rcv.wnd = calc_rcv_wnd(s);
 	_rte_ring_mcs_dequeue_finish(s->rx.q, num);
 }
 

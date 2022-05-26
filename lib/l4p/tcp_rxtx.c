@@ -214,9 +214,7 @@ fill_tcph(struct rte_tcp_hdr *l4h, const struct tcb *tcb, union l4_ports port,
 	l4h->src_port = port.dst;
 	l4h->dst_port = port.src;
 
-	wnd = (flags & TCP_FLAG_SYN) ?
-		RTE_MIN(tcb->rcv.wnd, (uint32_t)UINT16_MAX) :
-		tcb->rcv.wnd >> tcb->rcv.wscale;
+	wnd = calc_pkt_rx_wnd(tcb, flags);
 
 	/* ??? use sse shuffle to hton all remaining 16 bytes at once. ??? */
 	l4h->sent_seq = rte_cpu_to_be_32(seq);
@@ -310,12 +308,16 @@ tcp_update_mbuf(struct rte_mbuf *m, uint32_t type, const struct tcb *tcb,
 {
 	struct rte_tcp_hdr *l4h;
 	uint32_t len;
+	uint16_t wnd;
 
 	len = m->l2_len + m->l3_len;
 	l4h = rte_pktmbuf_mtod_offset(m, struct rte_tcp_hdr *, len);
 
+	wnd = calc_pkt_rx_wnd(tcb, tcp_flags);
+
 	l4h->sent_seq = rte_cpu_to_be_32(seq);
 	l4h->recv_ack = rte_cpu_to_be_32(tcb->rcv.nxt);
+	l4h->rx_win = rte_cpu_to_be_16(wnd);
 
 	l4h->tcp_flags |= tcp_flags;
 
@@ -927,7 +929,7 @@ accept_prep_stream(struct tle_tcp_stream *ps, struct stbl *st,
 
 	/* setup TCB */
 	sync_fill_tcb(&cs->tcb, si, to);
-	cs->tcb.rcv.wnd = calc_rx_wnd(cs, cs->tcb.rcv.wscale);
+	cs->tcb.rcv.wnd = calc_rcv_wnd_max(cs);
 
 	estimate_stream_rto(cs, tms);
 
@@ -1639,7 +1641,8 @@ rx_synack(struct tle_tcp_stream *s, uint32_t ts, uint32_t state,
 	/* if peer doesn't support WSCALE opt, recalculate RCV.WND */
 	s->tcb.rcv.wscale = (so.wscale == TCP_WSCALE_NONE) ?
 		TCP_WSCALE_NONE : TCP_WSCALE_DEFAULT;
-	s->tcb.rcv.wnd = calc_rx_wnd(s, s->tcb.rcv.wscale);
+	/* need to know wscale first to pick max rcv.wnd */
+	s->tcb.rcv.wnd = calc_rcv_wnd_max(s);
 
 	/* calculate initial rto */
 	rto_estimate(&s->tcb, ts - s->tcb.snd.ts);
@@ -2212,7 +2215,7 @@ tx_syn(struct tle_tcp_stream *s, const struct sockaddr *addr)
 
 	s->tcb.rcv.mss = s->tcb.so.mss;
 	s->tcb.rcv.wscale = TCP_WSCALE_DEFAULT;
-	s->tcb.rcv.wnd = calc_rx_wnd(s, s->tcb.rcv.wscale);
+	s->tcb.rcv.wnd = calc_rcv_wnd_max(s);
 	s->tcb.rcv.ts = 0;
 
 	/* add the stream in stream table */
@@ -2294,7 +2297,7 @@ tcb_establish(struct tle_tcp_stream *s, const struct tle_tcp_conn_info *ci)
 		ci->wnd, ci->so.wscale, &ci->so.ts);
 	fill_tcb_rcv(&s->tcb, ci->ack, ci->so.l_wscale, &ci->so.ts);
 
-	s->tcb.rcv.wnd = calc_rx_wnd(s, s->tcb.rcv.wscale);
+	s->tcb.rcv.wnd = calc_rcv_wnd_max(s);
 
 	/* setup congestion variables */
 	s->tcb.snd.cwnd = initial_cwnd(s->tcb.snd.mss, s->tcb.snd.cwnd);

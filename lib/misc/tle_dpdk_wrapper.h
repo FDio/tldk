@@ -88,6 +88,18 @@ _rte_ring_get_mask(struct rte_ring *r)
 	return r->mask;
 }
 
+static inline uint32_t
+_rte_ring_get_free_count(struct rte_ring *r)
+{
+	return rte_ring_free_count(r);
+}
+
+static inline uint32_t
+_rte_ring_get_capacity(struct rte_ring *r)
+{
+	return rte_ring_get_capacity(r);
+}
+
 static inline void **
 _rte_ring_get_data(struct rte_ring *r)
 {

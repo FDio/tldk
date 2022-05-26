@@ -89,18 +89,45 @@ tcp_stream_acquire(struct tle_tcp_stream *s)
 	return v;
 }
 
-/* calculate RCV.WND value based on size of stream receive buffer */
+/* calculate RCV.WND value based on current free size of stream receive buffer */
 static inline uint32_t
-calc_rx_wnd(const struct tle_tcp_stream *s, uint32_t scale)
+calc_rcv_wnd(const struct tle_tcp_stream *s)
 {
-	uint32_t wnd;
+	uint32_t buffer_max;
+	uint32_t wscale_max;
 
-	/* peer doesn't support WSCALE option, wnd size is limited to 64K */
-	if (scale == TCP_WSCALE_NONE) {
-		wnd = _rte_ring_get_mask(s->rx.q) << TCP_WSCALE_DEFAULT;
-		return RTE_MIN(wnd, (uint32_t)UINT16_MAX);
-	} else
-		return  _rte_ring_get_mask(s->rx.q) << scale;
+	buffer_max = _rte_ring_get_free_count(s->rx.q) * s->s.ctx->prm.window_mbuf_size;
+	wscale_max = UINT16_MAX << s->tcb.rcv.wscale;
+
+	return RTE_MIN(buffer_max, wscale_max);
+}
+
+/* calculate rcv.wnd value based on maximum capacity of stream receive buffer */
+static inline uint32_t
+calc_rcv_wnd_max(const struct tle_tcp_stream *s)
+{
+	uint32_t buffer_capacity;
+	uint32_t wscale_max;
+
+	buffer_capacity = _rte_ring_get_capacity(s->rx.q) * s->s.ctx->prm.window_mbuf_size;
+	wscale_max = UINT16_MAX << s->tcb.rcv.wscale;
+
+	return RTE_MIN(buffer_capacity, wscale_max);
+}
+
+/* calculate the value to put into a packet TCP header for window size */
+static inline uint16_t
+calc_pkt_rx_wnd(const struct tcb *tcb, uint8_t flags)
+{
+	uint32_t syn_capped_wnd;
+	uint32_t flag_checked_wnd;
+
+	syn_capped_wnd = RTE_MIN((uint32_t)UINT16_MAX, tcb->rcv.wnd);
+	flag_checked_wnd = (flags & TCP_FLAG_SYN) ? syn_capped_wnd : tcb->rcv.wnd;
+
+	assert((flag_checked_wnd >> tcb->rcv.wscale) <= UINT16_MAX);
+
+	return flag_checked_wnd >> tcb->rcv.wscale;
 }
 
 /*

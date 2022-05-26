@@ -739,7 +739,7 @@ tle_tcp_stream_listen(struct tle_stream *ts)
 				TLE_TCP_ST_LISTEN);
 		if (rc != 0) {
 			s->tcb.uop |= TLE_TCP_OP_LISTEN;
-			s->tcb.rcv.wnd = calc_rx_wnd(s, TCP_WSCALE_DEFAULT);
+			s->tcb.rcv.wnd = calc_rcv_wnd_max(s);
 			rc = 0;
 		} else
 			rc = -EDEADLK;
