@@ -30,6 +30,8 @@
 extern "C" {
 #endif
 
+#define TX_CTRL_FLAG_NORMAL     0x0000 /* transmit from snd.nxt */
+#define TX_CTRL_FLAG_UNA_FIRST  0x0001 /* transmit one segment fron snd.una then resume using snd.nxt */
 struct tcb {
 	volatile uint16_t state;
 	volatile uint16_t uop; /* operations by user performed */
@@ -55,7 +57,7 @@ struct tcb {
 		uint64_t fss;  /* FIN sequence # */
 		uint32_t fastack; /* # of partial acks in fast retransmit */
 		uint32_t wnd;
-		union wui wu; /* window update */
+		union wui wu; /* window update - 64 bits */
 		uint32_t ack; /* last sent ack */
 		uint32_t ts;
 		uint32_t cwnd;     /* congestion window */
@@ -66,8 +68,10 @@ struct tcb {
 		uint16_t mss;
 		uint8_t  wscale;
 		uint8_t nb_retx; /* number of retransmission */
+    // end of 64 bit aligned in snd
 		uint8_t nb_retm; /**< max number of retx attempts. */
 		uint8_t close_flags; /* tcp flags to send on close */
+    uint8_t tx_ctrl_flags; /**< what to TX next */
 	} snd;
 	struct tle_tcp_syn_opts so; /* initial syn options. */
 };

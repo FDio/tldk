@@ -20,6 +20,23 @@
 extern "C" {
 #endif
 
+/**
+ * ring structure in memory is:
+ * [rte_ring][data for circular buffer]
+ * _rte_ring_get_data(r) gets the pointer to [data...]
+ * ring head is snd.nxt
+ * ring tail is snd.una
+ * this means
+ *   get_data() + head == start of snd.nxt data
+ *   get_data() + tail == start of snd.una data
+ *
+ * this als means in "normal" conditions ring has unack'd sent data
+ * [... snd.una (tail) <sent !ack'd data> snd.nxt (head) <!sent data>
+ * this puts head forward of tail and things like rst_nxt_head() which
+ * move head back to tail "forget" about sent but unack'd data
+ */
+
+
 static inline struct rte_mbuf **
 tcp_txq_get_nxt_objs(const struct tle_tcp_stream *s, uint32_t *num)
 {

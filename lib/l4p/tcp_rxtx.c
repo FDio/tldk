@@ -473,6 +473,7 @@ tx_nxt_data(struct tle_tcp_stream *s, uint32_t tms)
 	uint32_t n, num, tn, wnd;
 	struct rte_mbuf **mi;
 	union seqlen sl;
+	union seqlen sl_una;
 
 	tn = 0;
 	wnd = s->tcb.snd.wnd - (uint32_t)(s->tcb.snd.nxt - s->tcb.snd.una);
@@ -484,6 +485,22 @@ tx_nxt_data(struct tle_tcp_stream *s, uint32_t tms)
 
 	/* update send timestamp */
 	s->tcb.snd.ts = tms;
+
+	if (s->tcb.snd.tx_ctrl_flags == TX_CTRL_FLAG_UNA_FIRST) {
+		// we only want 1 segment -- up to 1 mss worth of data
+		mi = tcp_txq_get_una_objs(s, &num);
+		if (num != 0) {
+			sl_una.seq = s->tcb.snd.una;
+			sl_una.len = s->tcb.snd.mss;
+			n = tx_data_bulk(s, &sl_una, mi, 1);
+			tn += n;
+			// of we enqueued the segment go back to normal processing
+			if (n == 1) {
+				s->tcb.snd.tx_ctrl_flags = TX_CTRL_FLAG_NORMAL;
+			}
+			// if we didn't enqueue, try again next time ??
+		}
+	}
 
 	do {
 		/* get group of packets */
@@ -870,7 +887,7 @@ stream_fill_dest(struct tle_tcp_stream *s)
 	uint32_t type;
 	const void *da;
 
-        type = s->s.type;
+	type = s->s.type;
 	if (type == TLE_V4)
 		da = &s->s.ipv4.addr.src;
 	else
@@ -1418,15 +1435,18 @@ start_fast_retransmit(struct tle_tcp_stream *s)
 	tcb = &s->tcb;
 
 	/* RFC 6582 3.2.2 */
-	tcb->snd.rcvr = tcb->snd.nxt;
+	tcb->snd.rcvr = RTE_MAX(tcb->snd.rcvr, tcb->snd.nxt);
 	tcb->snd.fastack = 1;
 
 	/* RFC 5681 3.2.2 */
 	rto_ssthresh_update(tcb);
 
 	/* RFC 5681 3.2.3 */
-	tcp_txq_rst_nxt_head(s);
-	tcb->snd.nxt = tcb->snd.una;
+	/**
+	 * We only want to retransmit the lost segment and 
+	 * not retransmit everything so just set a falg for first
+	 */
+	tcb->snd.tx_ctrl_flags = TX_CTRL_FLAG_UNA_FIRST;
 	tcb->snd.cwnd = tcb->snd.ssthresh + 3 * tcb->snd.mss;
 }
 
@@ -1441,6 +1461,7 @@ stop_fast_retransmit(struct tle_tcp_stream *s)
 	tcb->snd.cwnd = RTE_MIN(tcb->snd.ssthresh,
 		RTE_MAX(n, tcb->snd.mss) + tcb->snd.mss);
 	tcb->snd.fastack = 0;
+	tcb->snd.tx_ctrl_flags = TX_CTRL_FLAG_NORMAL;
 }
 
 static inline int
@@ -2771,7 +2792,7 @@ rto_stream(struct tle_tcp_stream *s, uint32_t tms)
 			rto_cwnd_update(&s->tcb);
 
 			/* RFC 6582 3.2.4 */
-			s->tcb.snd.rcvr = s->tcb.snd.nxt;
+			s->tcb.snd.rcvr = RTE_MAX(s->tcb.snd.rcvr, s->tcb.snd.nxt);
 			s->tcb.snd.fastack = 0;
 
 			/* restart from last acked data */
