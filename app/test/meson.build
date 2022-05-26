@@ -10,7 +10,7 @@ sources = files('main.cpp',
     'test_tle_dring.cpp',
     'test_tle_ctx.cpp',
     'test_tle_udp_destroy.cpp',
-    'test_tle_udp_event.cpp',
+    'test_tle_event.cpp',
     'test_tle_udp_stream_gen.cpp',
     'test_tle_tcp_stream.cpp')
 

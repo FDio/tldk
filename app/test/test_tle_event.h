@@ -13,8 +13,8 @@
  * limitations under the License.
  */
 
-#ifndef TEST_TLE_UDP_EVENT_H_
-#define TEST_TLE_UDP_EVENT_H_
+#ifndef TEST_TLE_EVENT_H_
+#define TEST_TLE_EVENT_H_
 
 #include <gtest/gtest.h>
 #include <rte_errno.h>
@@ -31,7 +31,7 @@ struct event_state_active_twice {
 	enum tle_ev_state result_state;
 };
 
-class udp_evq : public ::testing::Test {
+class tle_evq_test : public ::testing::Test {
 protected:
 
 	/* Can parameterize here for
@@ -57,7 +57,7 @@ protected:
 	}
 };
 
-class udp_event : public ::udp_evq {
+class tle_event_test : public ::tle_evq_test {
 protected:
 
 	int fake_data;
@@ -65,7 +65,7 @@ protected:
 
 	virtual void SetUp(void)
 	{
-		udp_evq::SetUp();
+		tle_evq_test::SetUp();
 		evq = tle_evq_create(&evq_params);
 		ASSERT_NE(evq, (struct tle_evq *) NULL);
 		EXPECT_EQ(rte_errno, 0);
@@ -77,12 +77,12 @@ protected:
 	}
 };
 
-class udp_event_state : public ::udp_event {
+class tle_event_state_test : public ::tle_event_test {
 protected:
 
 	virtual void SetUp(void)
 	{
-		udp_event::SetUp();
+		tle_event_test::SetUp();
 		event = tle_event_alloc(evq, (void *) &fake_data);
 		ASSERT_NE(event, (struct tle_event *) NULL);
 	}
@@ -90,21 +90,21 @@ protected:
 	virtual void TearDown(void)
 	{
 		tle_event_free(event);
-		udp_event::TearDown();
+		tle_event_test::TearDown();
 	}
 };
 
-struct udp_event_state_active : ::udp_event_state,
+struct tle_event_state_active_test : ::tle_event_state_test,
 testing::WithParamInterface < event_state_active > {
-	udp_event_state_active() {}
+	tle_event_state_active_test() {}
 };
 
-struct udp_event_state_active_twice : ::udp_event_state,
+struct tle_event_state_active_twice_test : ::tle_event_state_test,
 testing::WithParamInterface < event_state_active_twice > {
-	udp_event_state_active_twice() {}
+	tle_event_state_active_twice_test() {}
 };
 
-struct udp_event_state_idle : ::udp_event_state_active {
+struct tle_event_state_idle_test : ::tle_event_state_active_test {
 };
 
-#endif /* TEST_TLE_UDP_EVENT_H_ */
+#endif /* TEST_TLE_EVENT_H_ */

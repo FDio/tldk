@@ -13,23 +13,23 @@
  * limitations under the License.
  */
 
-#include "test_tle_udp_event.h"
+#include "test_tle_event.h"
 
-TEST_F(udp_evq, udp_evq_create_null)
+TEST_F(tle_evq_test, tle_evq_create_null)
 {
 	evq = tle_evq_create(NULL);
 	EXPECT_EQ(evq, (struct tle_evq *) NULL);
 	EXPECT_EQ(rte_errno, EINVAL);
 }
 
-TEST_F(udp_evq, udp_evq_create_invalid_socket)
+TEST_F(tle_evq_test, tle_evq_create_invalid_socket)
 {
 	evq_params.socket_id = 999;
 	evq = tle_evq_create(&evq_params);
 	ASSERT_EQ(evq, (struct tle_evq *) NULL);
 }
 
-TEST_F(udp_evq, udp_evq_create_destroy_positive)
+TEST_F(tle_evq_test, tle_evq_create_destroy_positive)
 {
 	evq = tle_evq_create(&evq_params);
 	ASSERT_NE(evq, (struct tle_evq *) NULL);
@@ -40,20 +40,20 @@ TEST_F(udp_evq, udp_evq_create_destroy_positive)
 	EXPECT_EQ(rte_errno, 0);
 }
 
-TEST_F(udp_event, udp_event_alloc_null)
+TEST_F(tle_event_test, tle_event_alloc_null)
 {
 	event = tle_event_alloc(NULL, (void *) &fake_data);
 	EXPECT_EQ(event, (struct tle_event *) NULL);
 	EXPECT_EQ(rte_errno, EINVAL);
 }
 
-TEST_F(udp_event, udp_event_free_null)
+TEST_F(tle_event_test, tle_event_free_null)
 {
 	tle_event_free(NULL);
 	EXPECT_EQ(rte_errno, EINVAL);
 }
 
-TEST_F(udp_event, udp_event_alloc_free_positive)
+TEST_F(tle_event_test, tle_event_alloc_free_positive)
 {
 	event = tle_event_alloc(evq, (void *) &fake_data);
 	ASSERT_NE(event, (struct tle_event *) NULL);
@@ -64,7 +64,7 @@ TEST_F(udp_event, udp_event_alloc_free_positive)
 	EXPECT_EQ(evq->nb_free, max_events);
 }
 
-TEST_F(udp_event, udp_event_alloc_free_max_reached)
+TEST_F(tle_event_test, tle_event_alloc_free_max_reached)
 {
 	uint32_t i;
 	struct tle_event *last_event;
@@ -86,12 +86,12 @@ TEST_F(udp_event, udp_event_alloc_free_max_reached)
 	EXPECT_EQ(evq->nb_free, max_events);
 }
 
-TEST_F(udp_event_state, udp_state_default)
+TEST_F(tle_event_state_test, tle_state_default)
 {
 	ASSERT_EQ(event->state, TLE_SEV_IDLE);
 }
 
-TEST_P(udp_event_state_active, udp_state_active)
+TEST_P(tle_event_state_active_test, tle_state_active)
 {
 	auto states = GetParam();
 
@@ -100,14 +100,14 @@ TEST_P(udp_event_state_active, udp_state_active)
 	EXPECT_EQ(rte_errno, 0);
 }
 
-INSTANTIATE_TEST_CASE_P(Default, udp_event_state_active,
+INSTANTIATE_TEST_CASE_P(Default, tle_event_state_active_test,
 	testing::Values(
 	event_state_active{TLE_SEV_IDLE},
 	event_state_active{TLE_SEV_UP},
 	event_state_active{TLE_SEV_DOWN}
 ));
 
-TEST_P(udp_event_state_active_twice, udp_state_active_twice)
+TEST_P(tle_event_state_active_twice_test, tle_state_active_twice)
 {
 	auto states = GetParam();
 
@@ -119,7 +119,7 @@ TEST_P(udp_event_state_active_twice, udp_state_active_twice)
 	EXPECT_EQ(rte_errno, 0);
 }
 
-INSTANTIATE_TEST_CASE_P(Default, udp_event_state_active_twice,
+INSTANTIATE_TEST_CASE_P(Default, tle_event_state_active_twice_test,
 	testing::Values(
 	event_state_active_twice{TLE_SEV_IDLE, TLE_SEV_IDLE, TLE_SEV_IDLE},
 	event_state_active_twice{TLE_SEV_IDLE, TLE_SEV_DOWN, TLE_SEV_DOWN},
@@ -132,7 +132,7 @@ INSTANTIATE_TEST_CASE_P(Default, udp_event_state_active_twice,
 	event_state_active_twice{TLE_SEV_UP, TLE_SEV_UP, TLE_SEV_UP}
 ));
 
-TEST_F(udp_event_state, udp_state_raise)
+TEST_F(tle_event_state_test, tle_state_raise)
 {
 	tle_event_raise(event);
 	ASSERT_EQ(event->state, TLE_SEV_IDLE);
@@ -145,7 +145,7 @@ TEST_F(udp_event_state, udp_state_raise)
 	EXPECT_EQ(rte_errno, 0);
 }
 
-TEST_F(udp_event_state, udp_state_down)
+TEST_F(tle_event_state_test, tle_state_down)
 {
 	tle_event_down(event);
 	ASSERT_EQ(event->state, TLE_SEV_IDLE);
@@ -158,7 +158,7 @@ TEST_F(udp_event_state, udp_state_down)
 	EXPECT_EQ(rte_errno, 0);
 }
 
-TEST_P(udp_event_state_idle, udp_state_idle)
+TEST_P(tle_event_state_idle_test, tle_state_idle)
 {
 	auto states = GetParam();
 
@@ -170,14 +170,14 @@ TEST_P(udp_event_state_idle, udp_state_idle)
 	EXPECT_EQ(rte_errno, 0);
 }
 
-INSTANTIATE_TEST_CASE_P(Default, udp_event_state_idle,
+INSTANTIATE_TEST_CASE_P(Default, tle_event_state_idle_test,
 	testing::Values(
 	event_state_active{TLE_SEV_IDLE},
 	event_state_active{TLE_SEV_UP},
 	event_state_active{TLE_SEV_DOWN}
 ));
 
-TEST_F(udp_event, udp_event_get)
+TEST_F(tle_event_test, tle_event_get)
 {
 	uint32_t i;
 	const void **evd;
