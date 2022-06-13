@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "e2af8ae8_9f5415a7",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 2
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 2548
+      },
+      "writtenOn": "2022-06-13T15:40:09Z",
+      "side": 1,
+      "message": "\u003e Patch Set 2:\n\u003e \n\u003e \u003e Patch Set 2:\n\u003e \u003e \n\u003e \u003e \u003e Patch Set 2:\n\u003e \u003e \u003e \n\u003e \u003e \u003e Hmm it effectively breaks our CI.\n\u003e \u003e \u003e CI scripts still expect make to work properly\n\u003e \u003e \u003e check jjb/tldk/include-raw-build.sh at \n\u003e \u003e \u003e https://gerrit.fd.io/r/ci-management\n\u003e \u003e \u003e I suppose the easiest thing would be to update Makefile\n\u003e \u003e \u003e so it starts meson...; ninja.\n\u003e \u003e \n\u003e \u003e I\u0027d like to think on that a bit more but agree it should work.  I don\u0027t have a good reason but that just feels a little wrong (at least without making some noise).  Do you know if there is the possibility of supporting a Jenkinsfile within the project repo?  This would be similar to say .gitlabci or .circleci (not sure I got their file names right).  If every project is leveraging the same pipeline configuration, I can see some push back as managing one configuration for several projects is definitely easier than managing a different configuration in several projects.\n\u003e \n\u003e AFAIK, Jenkinsfile is per repo.\n\u003e But it is not per branch.\n\u003e If you don\u0027t like to mimic make via meson, probbly another opportunity to change build script itself:\n\u003e it can check if \u0027meson.build\u0027 is present, if yes, then switch to meson/ninja path, if not use current make approach. WDYT?\n\n\nGotcha.  In our Jenkins setup we have a Jenkinsfile in the repo which effectively gives us per branch.  From some quick looking this looks like it may be leveraging a plugin we are not so I\u0027m not super familiar with the syntax but adding check and doing a different build possibly based on branch feels like it would make more sense.  Will try and look at what something like that would take this week.",
+      "revId": "5109fb967031a33150f9ac7e94ef9a2f6baeafca",
+      "serverId": "6d2eb258-4fe2-443e-8a38-ca81da23d4c2"
+    }
+  ]
+}
